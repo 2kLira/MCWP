@@ -97,7 +97,7 @@ export default function Actividades() {
         </select>
       </div>
 
-      <div className="rounded-tarjeta border border-borde bg-superficie">
+      <div className="vidrio filo rounded-tarjeta">
         {actividades.cargando ? (
           <ul className="divide-y divide-borde">
             {Array.from({ length: 6 }).map((_, i) => (

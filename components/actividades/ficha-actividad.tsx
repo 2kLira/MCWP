@@ -180,7 +180,7 @@ export function FichaActividad({ id }: { id: string }) {
 
       <Link
         href={`/registrar?actividad=${id}` as never}
-        className="transicion-ui flex items-center justify-center gap-2 rounded-tarjeta border border-borde bg-superficie px-4 text-base font-medium text-tinta toque-actividad elevacion-apoyo"
+        className="transicion-ui flex items-center justify-center gap-2 vidrio filo rounded-tarjeta px-4 text-base font-medium text-tinta toque-actividad elevacion-apoyo"
         style={{ minHeight: "var(--toque-actividad)" }}
       >
         <UserPlus className="size-5" aria-hidden />

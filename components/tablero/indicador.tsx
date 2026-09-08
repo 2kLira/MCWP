@@ -52,14 +52,14 @@ export function Indicador({
 
   return (
     <div
-      className="entrada rounded-tarjeta border border-borde bg-superficie p-4 elevacion-apoyo"
+      className="entrada vidrio filo rounded-tarjeta p-4"
       style={{ "--retraso": `${orden * 60}ms` } as React.CSSProperties}
     >
       <p className="text-sm text-tinta-suave">{etiqueta}</p>
       {cargando ? (
         <div className="mt-2 h-9 w-20 animate-pulse rounded-control bg-superficie-hundida" />
       ) : (
-        <p className="cifra-indicador mt-1 text-tinta">{mostrado.toLocaleString("es-MX")}</p>
+        <p className="cifra-atlas mt-1 text-tinta" style={{ fontSize: "var(--texto-cifra)" }}>{mostrado.toLocaleString("es-MX")}</p>
       )}
       {apoyo && <p className="mt-1 text-xs text-tinta-tenue">{apoyo}</p>}
     </div>

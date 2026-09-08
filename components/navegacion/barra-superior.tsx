@@ -2,25 +2,18 @@
 
 import { Buscador } from "@/components/buscador";
 import { ConmutadorRol } from "@/components/conmutador-rol";
-import { useActuante } from "@/components/proveedor-actuante";
-import { demarcacionPorId } from "@/lib/demarcaciones";
-import { etiquetaAlcance } from "@/lib/permisos";
 
-/** Barra superior de escritorio. El conmutador de rol va arriba a la derecha. */
+/**
+ * Barra superior de escritorio: dos piezas de vidrio que flotan sobre la lámina, separadas entre
+ * sí. No es una franja pegada al borde con un fondo sólido.
+ */
 export function BarraSuperior() {
-  const { actuante } = useActuante();
-  const territorio = etiquetaAlcance(
-    actuante,
-    demarcacionPorId(actuante.demarcacionId)?.nombre,
-  );
-
   return (
-    <header className="sticky top-0 z-30 hidden h-16 items-center gap-4 border-b border-borde bg-superficie px-6 md:flex">
-      <div className="min-w-0 flex-1">
-        <Buscador className="max-w-md" />
-        <p className="sr-only">Oaxaca de Juárez · {territorio}</p>
+    <div className="pointer-events-none sticky top-0 z-30 hidden px-6 pt-4 md:block">
+      <div className="mx-auto flex max-w-tope items-center gap-3">
+        <Buscador className="pointer-events-auto w-full max-w-md" conVidrio />
+        <ConmutadorRol className="pointer-events-auto ml-auto w-72" conVidrio />
       </div>
-      <ConmutadorRol className="w-72" />
-    </header>
+    </div>
   );
 }

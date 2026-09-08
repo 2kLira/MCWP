@@ -8,7 +8,7 @@ import { aplicarAlcance } from "@/lib/permisos";
 import type { UsuarioActuante } from "@/lib/tipos";
 import { db, esFaltaDeEsquema, type Resultado } from "@/lib/datos/cliente";
 import { seccionesResumen } from "@/lib/datos/catalogos";
-import { bandeja } from "@/lib/datos/seguimientos";
+import { totalBandeja } from "@/lib/datos/seguimientos";
 
 export type ResumenTablero = {
   personas: number;
@@ -92,7 +92,7 @@ export async function resumenTablero(
       c.or(`estatus.eq.en_curso,and(estatus.eq.programada,fecha.lt.${hoy()})`),
     ),
     seccionesResumen(usuario),
-    bandeja(usuario),
+    totalBandeja(usuario),
   ]);
 
   // Las secciones ya vienen recortadas al territorio del actuante, así que aquí solo se separan
@@ -115,7 +115,7 @@ export async function resumenTablero(
       recorridos: recorridos.total,
       seccionesConResponsable: conResponsable,
       seccionesSinResponsable: sinResponsable,
-      sinSeguimiento: porAtender.datos.length,
+      sinSeguimiento: porAtender.datos,
       porCerrar: porCerrar.total,
     },
     sinEsquema: false,

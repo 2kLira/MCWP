@@ -2,6 +2,9 @@
   "name": "estructura-territorial",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "npm run datos && next dev",
     "build": "npm run datos && next build",

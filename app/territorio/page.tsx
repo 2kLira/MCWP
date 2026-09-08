@@ -63,7 +63,7 @@ export default function Territorio() {
             return (
               <li
                 key={d.demarcacion_id}
-                className="overflow-hidden rounded-tarjeta border border-borde bg-superficie"
+                className="vidrio filo overflow-hidden rounded-tarjeta"
               >
                 <button
                   type="button"

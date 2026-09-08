@@ -14,7 +14,7 @@ export function RenglonBandeja({
   alRegistrar: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-tarjeta border border-borde bg-superficie p-3">
+    <div className="flex items-center gap-2 vidrio filo rounded-tarjeta p-3">
       <Link href={`/personas/${fila.persona_id}`} className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-tinta">{fila.nombre}</p>
         <p className="mt-0.5 truncate text-xs text-tinta-suave">

@@ -125,7 +125,7 @@ export function FichaPersona({ id }: { id: string }) {
         </p>
       )}
 
-      <section className="rounded-tarjeta border border-borde bg-superficie">
+      <section className="vidrio filo rounded-tarjeta">
         <h2 className="border-b border-borde px-4 py-3 text-sm font-semibold">Historial</h2>
         <div className="p-4">
           {historial.cargando ? (
@@ -161,7 +161,7 @@ export function FichaPersona({ id }: { id: string }) {
         </div>
       </section>
 
-      <section className="rounded-tarjeta border border-borde bg-superficie">
+      <section className="vidrio filo rounded-tarjeta">
         <h2 className="border-b border-borde px-4 py-3 text-sm font-semibold">Seguimientos</h2>
         <div className="p-4">
           {seguimientos.datos.length === 0 ? (

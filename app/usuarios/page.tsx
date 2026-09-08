@@ -40,7 +40,7 @@ export default function Usuarios() {
         </p>
       </header>
 
-      <div className="overflow-hidden rounded-tarjeta border border-borde bg-superficie">
+      <div className="vidrio filo overflow-hidden rounded-tarjeta">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[36rem] text-sm">
             <thead>

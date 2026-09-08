@@ -84,7 +84,7 @@ export default function Agenda() {
 
       {vista === "calendario" ? (
         <div className="flex flex-col gap-4">
-          <div className="rounded-tarjeta border border-borde bg-superficie p-3 elevacion-apoyo">
+          <div className="vidrio filo rounded-tarjeta p-3 elevacion-apoyo">
             <CalendarioMensual
               mes={mesCalendario}
               alCambiarMes={cambiarMes}
@@ -103,7 +103,7 @@ export default function Agenda() {
                   : `${actividadesDelDia.length} actividad${actividadesDelDia.length === 1 ? "" : "es"}`}
               </p>
               {actividadesDelDia.length > 0 && (
-                <div className="flex flex-col divide-y divide-borde rounded-tarjeta border border-borde bg-superficie">
+                <div className="flex flex-col divide-y divide-borde vidrio filo rounded-tarjeta">
                   {actividadesDelDia.map((actividad) => (
                     <RenglonActividad key={actividad.id} actividad={actividad} />
                   ))}

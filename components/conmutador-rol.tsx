@@ -17,7 +17,13 @@ function territorioDe(usuario: UsuarioActuante) {
  * Al cambiar, todo el sistema se recorta en vivo, así que el cambio tiene que ser inmediato y
  * notorio: por eso el territorio vigente se lee siempre, sin abrir el menú.
  */
-export function ConmutadorRol({ className }: { className?: string }) {
+export function ConmutadorRol({
+  className,
+  conVidrio = false,
+}: {
+  className?: string;
+  conVidrio?: boolean;
+}) {
   const { actuante, disponibles, cambiarActuante } = useActuante();
   const [abierto, setAbierto] = useState(false);
   const contenedor = useRef<HTMLDivElement>(null);
@@ -45,7 +51,12 @@ export function ConmutadorRol({ className }: { className?: string }) {
         aria-haspopup="listbox"
         aria-expanded={abierto}
         onClick={() => setAbierto((v) => !v)}
-        className="transicion-ui flex w-full items-center gap-3 rounded-control border border-borde bg-superficie px-3 py-2 text-left transition-colors hover:bg-superficie-hundida"
+        className={cn(
+          "transicion-ui flex w-full items-center gap-3 rounded-control px-3 py-2 text-left transition-colors",
+          conVidrio
+            ? "vidrio filo hover:bg-[var(--vidrio-fondo-denso)]"
+            : "border border-borde bg-superficie hover:bg-superficie-hundida",
+        )}
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-tinta">
@@ -68,7 +79,7 @@ export function ConmutadorRol({ className }: { className?: string }) {
         <ul
           role="listbox"
           aria-label="Cambiar de rol"
-          className="elevacion-flotante absolute right-0 z-50 mt-2 w-full min-w-72 overflow-hidden rounded-tarjeta border border-borde bg-superficie py-1"
+          className="vidrio filo absolute right-0 z-50 mt-2 w-full min-w-72 overflow-hidden rounded-tarjeta py-1"
         >
           {disponibles.map((usuario) => {
             const elegido = usuario.id === actuante.id;

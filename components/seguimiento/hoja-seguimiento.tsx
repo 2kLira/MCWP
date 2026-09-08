@@ -61,7 +61,7 @@ export function HojaSeguimiento({
         onClick={alCerrar}
         className="absolute inset-0 bg-tinta/40"
       />
-      <div className="transicion-panel relative w-full max-w-md rounded-hoja border border-borde bg-superficie p-4 elevacion-flotante">
+      <div className="transicion-panel relative w-full max-w-md vidrio filo rounded-hoja p-4 elevacion-flotante">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-tinta-tenue">Registrar seguimiento</p>

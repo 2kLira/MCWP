@@ -39,7 +39,7 @@ export function ListaPorDia({
           <p className="mb-1 text-xs font-medium capitalize text-tinta-tenue">
             {tituloDia(fecha)}
           </p>
-          <div className="flex flex-col divide-y divide-borde rounded-tarjeta border border-borde bg-superficie">
+          <div className="flex flex-col divide-y divide-borde vidrio filo rounded-tarjeta">
             {filas.map((actividad) => (
               <RenglonActividad key={actividad.id} actividad={actividad} />
             ))}

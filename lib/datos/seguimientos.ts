@@ -6,7 +6,7 @@
 
 import { aplicarAlcance } from "@/lib/permisos";
 import type { UsuarioActuante } from "@/lib/tipos";
-import { db, lista, uno, type Resultado } from "@/lib/datos/cliente";
+import { db, esFaltaDeEsquema, lista, uno, type Resultado } from "@/lib/datos/cliente";
 
 export type TipoSeguimiento = "llamada" | "whatsapp" | "invitacion" | "reunion" | "otro";
 export type EstadoSeguimiento = "pendiente" | "en_seguimiento" | "atendido";
@@ -43,6 +43,24 @@ export function bandeja(usuario: UsuarioActuante | null): Promise<Resultado<Fila
   );
   // Lo más viejo sin atender sale primero.
   return lista<FilaBandeja>(consulta.order("created_at", { ascending: true }));
+}
+
+/**
+ * Cuántas personas hay en la bandeja. Se pide como conteo exacto: la consulta de filas devuelve
+ * como máximo una página, así que contar el largo del arreglo daba el tope, no el total.
+ */
+export async function totalBandeja(
+  usuario: UsuarioActuante | null,
+): Promise<Resultado<number>> {
+  const consulta = aplicarAlcance(
+    db().from("v_bandeja_seguimiento").select("*", { count: "exact", head: true }),
+    usuario,
+  );
+  const { count, error } = await consulta;
+  if (error) {
+    return { datos: 0, sinEsquema: esFaltaDeEsquema(error), aviso: error.message };
+  }
+  return { datos: count ?? 0, sinEsquema: false, aviso: null };
 }
 
 export function seguimientosDePersona(personaId: string): Promise<Resultado<Seguimiento[]>> {

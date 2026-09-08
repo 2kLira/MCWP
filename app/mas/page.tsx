@@ -28,7 +28,7 @@ export default function Pagina() {
       </div>
 
       <nav aria-label="Más destinos">
-        <ul className="overflow-hidden rounded-tarjeta border border-borde bg-superficie">
+        <ul className="vidrio filo overflow-hidden rounded-tarjeta">
           {destinos.map(({ href, etiqueta, icono: Icono }, i) => (
             <li key={href}>
               <Link

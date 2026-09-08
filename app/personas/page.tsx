@@ -123,7 +123,7 @@ export default function Personas() {
 
       <div
         ref={contenedor}
-        className="min-h-0 flex-1 overflow-y-auto rounded-tarjeta border border-borde bg-superficie"
+        className="min-h-0 flex-1 overflow-y-auto vidrio filo rounded-tarjeta"
       >
         {cargando ? (
           <ul className="divide-y divide-borde">

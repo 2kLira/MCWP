@@ -46,14 +46,35 @@
   --mapa-3: #ffa34d;
   --mapa-4: #ff8200;
 
-  /* Vidrio: solo encima del mapa. */
-  --vidrio-fondo: rgb(255 255 255 / 0.72);
-  --vidrio-fondo-movimiento: rgb(255 255 255 / 0.92);
-  --vidrio-borde: rgb(255 255 255 / 0.55);
+  /* Vidrio. El sustrato de toda la aplicación es la lámina territorial, así que el vidrio
+     siempre tiene algo real detrás: no es decoración, es una capa de calco sobre el atlas. */
+  --vidrio-fondo: oklch(0.995 0.004 70 / 0.62);
+  --vidrio-fondo-denso: oklch(0.995 0.004 70 / 0.86);
+  --vidrio-fondo-movimiento: oklch(0.995 0.004 70 / 0.93);
+  --vidrio-borde: oklch(1 0 0 / 0.7);
+  --vidrio-borde-bajo: oklch(0.62 0.02 60 / 0.16);
+  --vidrio-luz: oklch(1 0 0 / 0.85);
+  --vidrio-desenfoque: 24px;
 
-  /* Sombra: poco, y nunca la gris genérica. */
-  --sombra-apoyo: 0 1px 2px rgb(28 27 25 / 0.06);
-  --sombra-flotante: 0 8px 24px rgb(28 27 25 / 0.1);
+  /* Lámina territorial: el atlas que vive detrás de todo. */
+  --lamina-papel: oklch(0.975 0.006 75);
+  --lamina-trazo: oklch(0.62 0.045 55 / 0.55);
+  --lamina-relleno: oklch(0.85 0.115 58 / 0.62);
+  --lamina-propio: oklch(0.76 0.175 55 / 0.9);
+  --lamina-bruma: oklch(0.985 0.005 75 / 0.5);
+  --bloom-naranja: oklch(0.85 0.1 58 / 0.22);
+  --bloom-lejano: oklch(0.9 0.05 40 / 0.16);
+
+  /* Sombra: poco, y nunca la gris genérica. Ahora con tinte cálido, que es lo que separa
+     una tarjeta flotante de verdad de un rectángulo con drop-shadow. */
+  --sombra-apoyo: 0 1px 2px oklch(0.32 0.03 55 / 0.07);
+  --sombra-flotante:
+    0 1px 1px oklch(0.32 0.03 55 / 0.05),
+    0 8px 24px oklch(0.32 0.03 55 / 0.1),
+    0 24px 56px oklch(0.32 0.03 55 / 0.07);
+  --sombra-dock:
+    0 2px 6px oklch(0.32 0.03 55 / 0.08),
+    0 16px 40px oklch(0.32 0.03 55 / 0.14);
 
   /* Tipografía. */
   --texto-xs: 0.75rem; /* 12, etiquetas de tabla */
@@ -94,13 +115,25 @@
 
   --alerta: #ff6b5e;
 
-  --vidrio-fondo: rgb(27 26 24 / 0.72);
-  --vidrio-fondo-movimiento: rgb(27 26 24 / 0.92);
-  --vidrio-borde: rgb(255 255 255 / 0.08);
+  --vidrio-fondo: oklch(0.24 0.012 60 / 0.62);
+  --vidrio-fondo-denso: oklch(0.24 0.012 60 / 0.88);
+  --vidrio-fondo-movimiento: oklch(0.24 0.012 60 / 0.94);
+  --vidrio-borde: oklch(1 0 0 / 0.1);
+  --vidrio-borde-bajo: oklch(1 0 0 / 0.06);
+  --vidrio-luz: oklch(1 0 0 / 0.14);
 
-  /* En oscuro no hay sombras: la elevación se lee con un borde un paso más claro. */
+  --lamina-papel: oklch(0.19 0.01 60);
+  --lamina-trazo: oklch(0.55 0.03 60 / 0.42);
+  --lamina-relleno: oklch(0.42 0.07 55 / 0.55);
+  --lamina-propio: oklch(0.66 0.15 55 / 0.8);
+  --lamina-bruma: oklch(0.16 0.008 60 / 0.55);
+  --bloom-naranja: oklch(0.55 0.12 55 / 0.2);
+  --bloom-lejano: oklch(0.45 0.07 40 / 0.15);
+
+  /* En oscuro la elevación se lee con luz en el borde, no con sombra. */
   --sombra-apoyo: none;
-  --sombra-flotante: none;
+  --sombra-flotante: 0 24px 56px oklch(0 0 0 / 0.5);
+  --sombra-dock: 0 16px 40px oklch(0 0 0 / 0.55);
   --borde-elevado: #3d3a36;
 }
 
@@ -118,12 +151,24 @@
 
     --alerta: #ff6b5e;
 
-    --vidrio-fondo: rgb(27 26 24 / 0.72);
-    --vidrio-fondo-movimiento: rgb(27 26 24 / 0.92);
-    --vidrio-borde: rgb(255 255 255 / 0.08);
+    --vidrio-fondo: oklch(0.24 0.012 60 / 0.62);
+    --vidrio-fondo-denso: oklch(0.24 0.012 60 / 0.88);
+    --vidrio-fondo-movimiento: oklch(0.24 0.012 60 / 0.94);
+    --vidrio-borde: oklch(1 0 0 / 0.1);
+    --vidrio-borde-bajo: oklch(1 0 0 / 0.06);
+    --vidrio-luz: oklch(1 0 0 / 0.14);
+
+    --lamina-papel: oklch(0.19 0.01 60);
+    --lamina-trazo: oklch(0.55 0.03 60 / 0.42);
+    --lamina-relleno: oklch(0.42 0.07 55 / 0.55);
+    --lamina-propio: oklch(0.66 0.15 55 / 0.8);
+    --lamina-bruma: oklch(0.16 0.008 60 / 0.55);
+    --bloom-naranja: oklch(0.55 0.12 55 / 0.2);
+    --bloom-lejano: oklch(0.45 0.07 40 / 0.15);
 
     --sombra-apoyo: none;
-    --sombra-flotante: none;
+    --sombra-flotante: 0 24px 56px oklch(0 0 0 / 0.5);
+    --sombra-dock: 0 16px 40px oklch(0 0 0 / 0.55);
     --borde-elevado: #3d3a36;
   }
 }
@@ -354,16 +399,46 @@
   max-width: 68ch;
 }
 
-/* Vidrio: solo en superficies que flotan encima del mapa. */
+/* Vidrio. Tres capas: el fondo translúcido, un borde que atrapa luz arriba, y el desenfoque.
+   Sin la línea de luz superior el vidrio se lee como un rectángulo gris con opacidad. */
 @utility vidrio {
+  position: relative;
   background: var(--vidrio-fondo);
-  border: 1px solid var(--vidrio-borde);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid var(--vidrio-borde-bajo);
+  border-top-color: var(--vidrio-borde);
+  backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.6);
+  -webkit-backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.6);
   color: var(--tinta);
+  box-shadow: var(--sombra-flotante);
 }
 
-/* Mientras el mapa se mueve se apaga el desenfoque y sube la opacidad. */
+/* La misma pieza, pero legible sobre zonas densas del atlas. */
+@utility vidrio-denso {
+  position: relative;
+  background: var(--vidrio-fondo-denso);
+  border: 1px solid var(--vidrio-borde-bajo);
+  border-top-color: var(--vidrio-borde);
+  backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.6);
+  -webkit-backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.6);
+  color: var(--tinta);
+  box-shadow: var(--sombra-flotante);
+}
+
+/* Filo de luz en el borde superior. Va como pseudoelemento para no gastar un div. */
+@utility filo {
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline: 12%;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--vidrio-luz), transparent);
+    pointer-events: none;
+  }
+}
+
+/* Mientras el mapa se mueve se apaga el desenfoque y sube la opacidad: nadie lo nota y se
+   recuperan veinte cuadros por segundo en celular. */
 @utility vidrio-en-movimiento {
   background: var(--vidrio-fondo-movimiento);
   backdrop-filter: none;
@@ -448,4 +523,63 @@
   .entrada {
     animation: none;
   }
+}
+
+/* ===========================================================================
+   Sustrato y navegación flotante
+   =========================================================================== */
+
+/* La lámina territorial vive detrás de todo y no recibe eventos. */
+@utility lamina {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--lamina-papel);
+}
+
+/* Bruma que separa la lámina del contenido para que el texto no pelee con la cartografía. */
+@utility bruma {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 12% 0%, var(--bloom-naranja) 0%, transparent 58%),
+    radial-gradient(90% 70% at 100% 100%, var(--bloom-lejano) 0%, transparent 60%),
+    var(--lamina-bruma);
+}
+
+/* Dock: la navegación flota, no se pega al borde. */
+@utility dock {
+  background: var(--vidrio-fondo-denso);
+  border: 1px solid var(--vidrio-borde-bajo);
+  border-top-color: var(--vidrio-borde);
+  backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.6);
+  -webkit-backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.6);
+  box-shadow: var(--sombra-dock);
+}
+
+/* Cifra grande del atlas: peso, apretado, cifras tabulares. */
+@utility cifra-atlas {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* Clave de sección: se lee como un sello, no como texto corrido. */
+@utility sello {
+  display: inline-flex;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: var(--radio-control);
+  border: 1px solid var(--vidrio-borde-bajo);
+  background: oklch(0.78 0.16 55 / 0.14);
+  color: var(--naranja-tipografico);
+  padding: 2px 7px;
+  font-size: var(--texto-xs);
+  min-height: 0;
 }

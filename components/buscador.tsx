@@ -20,7 +20,13 @@ type Resultado =
  * Una sola caja que resuelve tres cosas: nombre de demarcación o colonia, nombre de persona, y
  * clave de sección de cuatro dígitos. Cada una abre lo que corresponde.
  */
-export function Buscador({ className }: { className?: string }) {
+export function Buscador({
+  className,
+  conVidrio = false,
+}: {
+  className?: string;
+  conVidrio?: boolean;
+}) {
   const router = useRouter();
   const { actuante } = useActuante();
   const [texto, setTexto] = useState("");
@@ -127,12 +133,12 @@ export function Buscador({ className }: { className?: string }) {
         onFocus={() => resultados.length > 0 && setAbierto(true)}
         placeholder="Buscar sección, colonia o persona"
         aria-label="Buscador general"
-        className="campo pl-9"
+        className={cn("campo pl-9", conVidrio && "vidrio filo border-transparent")}
         style={{ minHeight: 44 }}
       />
 
       {abierto && resultados.length > 0 && (
-        <ul className="elevacion-flotante absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-tarjeta border border-borde bg-superficie py-1">
+        <ul className="vidrio filo absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-tarjeta py-1">
           {resultados.map((r) => (
             <li key={`${r.tipo}-${"id" in r ? r.id : r.clave}`}>
               <button

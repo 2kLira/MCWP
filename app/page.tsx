@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowRight, Map as MapaIcono } from "lucide-react";
+import dynamic from "next/dynamic";
+import { ArrowRight } from "lucide-react";
 import { Indicador } from "@/components/tablero/indicador";
 import { Tarjeta } from "@/components/tablero/tarjeta";
 import { useActuante } from "@/components/proveedor-actuante";
@@ -12,6 +13,13 @@ import { ETIQUETA_TIPO_ACTIVIDAD } from "@/lib/tipos";
 import { useConsulta } from "@/lib/usar-consulta";
 import { resumenTablero, type ResumenTablero } from "@/lib/datos/tablero";
 import { actividadesDeAgenda, type Actividad } from "@/lib/datos/actividades";
+
+// El mapa real, no una caja gris con un icono. Se carga solo en el navegador porque MapLibre
+// necesita WebGL, y solo cuando el tablero ya está en pantalla.
+const MapaPagina = dynamic(
+  () => import("@/components/mapa/mapa-pagina").then((m) => m.MapaPagina),
+  { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-superficie-hundida" /> },
+);
 
 const RESUMEN_VACIO = {} as ResumenTablero;
 
@@ -61,19 +69,11 @@ export default function Tablero() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header>
         <div>
           <h1 className="text-xl">Tablero</h1>
           <p className="text-sm text-tinta-suave">{territorio}</p>
         </div>
-        {/* Única acción primaria de la pantalla, y por eso lo único naranja. */}
-        <Link
-          href="/registrar"
-          data-destino
-          className="transicion-ui inline-flex items-center gap-2 rounded-control bg-naranja px-4 text-sm font-medium text-tinta toque-actividad"
-        >
-          Registrar persona
-        </Link>
       </header>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -120,18 +120,9 @@ export default function Tablero() {
             </Link>
           }
         >
-          <Link
-            href="/mapa"
-            className="group grid min-h-56 w-full place-items-center rounded-control border border-borde bg-superficie-hundida p-6 text-center"
-          >
-            <span className="flex max-w-full flex-col items-center gap-2 text-balance text-sm text-tinta-suave">
-              <MapaIcono className="size-8 text-tinta-tenue" aria-hidden />
-              157 secciones con geometría en 14 demarcaciones
-              <span className="text-xs text-tinta-tenue">
-                Estructura, personas, actividad, problemáticas y recorridos
-              </span>
-            </span>
-          </Link>
+          <div className="relative h-[26rem] overflow-hidden rounded-control border border-[var(--vidrio-borde-bajo)] md:h-[32rem]">
+            <MapaPagina />
+          </div>
         </Tarjeta>
 
         <div className="flex flex-col gap-4">
