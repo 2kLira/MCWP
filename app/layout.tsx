@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
+import { AvisoConfiguracion } from "@/components/aviso-configuracion";
 import { BarraInferior } from "@/components/navegacion/barra-inferior";
 import { BarraSuperior } from "@/components/navegacion/barra-superior";
 import { Dock } from "@/components/navegacion/dock";
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <BarraSuperior />
             {/* Espacio a la izquierda para el dock flotante y abajo para la píldora de celular. */}
             <main className="mx-auto w-full max-w-tope flex-1 px-4 pb-28 pt-4 md:pl-24 md:pr-6 md:pb-10 md:pt-5">
+              <AvisoConfiguracion />
               {children}
             </main>
           </div>

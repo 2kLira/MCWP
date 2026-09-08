@@ -43,8 +43,15 @@ export function FotosActividad({
     }
 
     try {
+      const supabase = clienteSupabase();
+      if (!supabase) {
+        setSubiendo(false);
+        setError("Este despliegue no está conectado a la base de datos.");
+        return;
+      }
+
       const ruta = `${actividadId}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
-      const { error: errorSubida } = await clienteSupabase()
+      const { error: errorSubida } = await supabase
         .storage.from(CUBETA)
         .upload(ruta, comprimida.archivo, { contentType: "image/webp" });
 
@@ -56,7 +63,7 @@ export function FotosActividad({
         return;
       }
 
-      const { data: publica } = clienteSupabase().storage.from(CUBETA).getPublicUrl(ruta);
+      const { data: publica } = supabase.storage.from(CUBETA).getPublicUrl(ruta);
 
       const r = await agregarFoto({
         actividadId,
