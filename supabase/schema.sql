@@ -1,0 +1,446 @@
+-- Sistema de Operación y Estructura Territorial — Oaxaca de Juárez
+-- Esquema tal como está definido en spec/modelo-datos.md.
+--
+-- Nota de orden: en el spec, personas.actividad_origen apunta a actividades(id) y personas se
+-- declara antes que actividades. Aquí las tablas van en el orden del spec y esa única llave
+-- foránea se agrega con ALTER TABLE al final, cuando actividades ya existe. Es lo mismo, en un
+-- orden que corre.
+
+create extension if not exists postgis;
+create extension if not exists pgcrypto;
+
+-- ---------------------------------------------------------------------------
+-- Territorio
+-- ---------------------------------------------------------------------------
+
+create table demarcaciones (
+  id          serial primary key,
+  nombre      text not null unique,
+  slug        text not null unique,
+  centro_lat  double precision,
+  centro_lng  double precision
+);
+
+create table secciones (
+  clave            text primary key,          -- '0524', cuatro dígitos con ceros
+  numero           integer not null unique,
+  demarcacion_id   integer not null references demarcaciones(id),
+  distrito_local   integer,
+  distrito_federal integer,
+  area_km2         numeric(8,3),
+  centro_lat       double precision,
+  centro_lng       double precision,
+  es_sustituta     boolean not null default false,
+  nota             text
+);
+
+create table colonias (
+  id            serial primary key,
+  nombre        text not null,
+  cp            text,
+  demarcacion_principal_id integer references demarcaciones(id)
+);
+
+create table colonia_seccion (
+  colonia_id     integer references colonias(id),
+  seccion_clave  text references secciones(clave),
+  traslape_pct   numeric(5,1) not null,
+  primary key (colonia_id, seccion_clave)
+);
+
+-- La geometría va aparte para no arrastrar polígonos en cada consulta normal.
+
+create table secciones_geom (
+  clave text primary key references secciones(clave),
+  geom  geometry(MultiPolygon, 4326) not null
+);
+create index secciones_geom_gix on secciones_geom using gist (geom);
+
+-- Respaldo del servidor para punto en polígono. En el cliente la misma resolución se hace contra
+-- secciones.geojson cacheado. Ambas rutas deben dar el mismo resultado.
+
+create or replace function seccion_por_punto(lng double precision, lat double precision)
+returns text language sql stable as $$
+  select clave from secciones_geom
+  where st_contains(geom, st_setsrid(st_point(lng, lat), 4326))
+  limit 1;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Usuarios y responsables
+-- ---------------------------------------------------------------------------
+
+create type rol_usuario as enum ('admin','resp_demarcacion','resp_seccion','colaborador');
+
+create table usuarios (
+  id             uuid primary key default gen_random_uuid(),
+  nombre         text not null,
+  telefono       text,
+  rol            rol_usuario not null,
+  demarcacion_id integer references demarcaciones(id),
+  seccion_clave  text references secciones(clave),
+  activo         boolean not null default true,
+  created_at     timestamptz not null default now()
+);
+
+-- Las asignaciones territoriales van en su propia tabla, con vigencia, para que dar de baja a
+-- alguien no borre historia y para que la consulta de secciones sin responsable sea trivial.
+
+create table asignaciones_responsable (
+  id             serial primary key,
+  usuario_id     uuid not null references usuarios(id),
+  ambito         text not null check (ambito in ('demarcacion','seccion')),
+  demarcacion_id integer references demarcaciones(id),
+  seccion_clave  text references secciones(clave),
+  desde          date not null default current_date,
+  hasta          date
+);
+create unique index una_asignacion_vigente_por_seccion
+  on asignaciones_responsable (seccion_clave) where hasta is null and ambito = 'seccion';
+
+-- ---------------------------------------------------------------------------
+-- Personas
+-- ---------------------------------------------------------------------------
+
+create table personas (
+  id                 uuid primary key default gen_random_uuid(),
+  nombre             text not null,
+  telefono_norm      text unique,               -- 10 dígitos, sin nada más
+  telefono_raw       text,
+  calle              text,
+  colonia_id         integer references colonias(id),
+  seccion_clave      text references secciones(clave),
+  demarcacion_id     integer references demarcaciones(id),
+  lat                double precision,
+  lng                double precision,
+  origen_ubicacion   text check (origen_ubicacion in ('gps','mapa','manual')),
+  quiere_participar  boolean not null default false,
+  quiere_info        boolean not null default false,
+  aviso_version      text,
+  consentimiento_en  timestamptz,
+  registrada_por     uuid references usuarios(id),
+  actividad_origen   uuid,                      -- fk agregada al final, ver nota de arriba
+  created_at         timestamptz not null default now()
+);
+
+-- Deduplicación: el teléfono normalizado es la llave. Normalizar es quedarse con los últimos
+-- 10 dígitos.
+
+create or replace function normalizar_telefono(t text)
+returns text language sql immutable as $$
+  select nullif(right(regexp_replace(coalesce(t,''), '\D', '', 'g'), 10), '');
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Actividades
+-- ---------------------------------------------------------------------------
+
+create type tipo_actividad   as enum ('reunion','activismo','recorrido');
+create type estatus_actividad as enum ('programada','en_curso','realizada','cancelada');
+
+create table actividades (
+  id              uuid primary key default gen_random_uuid(),
+  tipo            tipo_actividad not null,
+  subtipo         text,          -- domiciliaria, vecinal, limpieza, reforestación, etc.
+  nombre          text not null,
+  fecha           date not null,
+  hora            time,
+  direccion       text,
+  colonia_id      integer references colonias(id),
+  seccion_clave   text references secciones(clave),
+  demarcacion_id  integer references demarcaciones(id),
+  lat             double precision,
+  lng             double precision,
+  responsable_id  uuid references usuarios(id),
+  objetivo        text,
+  notas           text,
+  estatus         estatus_actividad not null default 'programada',
+  asistentes_aprox integer,
+  conclusion      text,
+  cerrada_en      timestamptz,
+  cerrada_por     uuid references usuarios(id),
+  created_by      uuid references usuarios(id),
+  created_at      timestamptz not null default now()
+);
+
+alter table personas
+  add constraint personas_actividad_origen_fkey
+  foreign key (actividad_origen) references actividades(id);
+
+create table actividad_colaboradores (
+  actividad_id uuid references actividades(id) on delete cascade,
+  usuario_id   uuid references usuarios(id),
+  primary key (actividad_id, usuario_id)
+);
+
+create table participaciones (
+  id             uuid primary key default gen_random_uuid(),
+  persona_id     uuid not null references personas(id),
+  actividad_id   uuid not null references actividades(id),
+  tipo           text not null check (tipo in ('registro','asistencia')),
+  registrada_por uuid references usuarios(id),
+  created_at     timestamptz not null default now(),
+  unique (persona_id, actividad_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- Problemáticas y solicitudes
+-- ---------------------------------------------------------------------------
+
+create table problematicas (
+  id     serial primary key,
+  nombre text not null unique,
+  orden  integer not null default 0,
+  activa boolean not null default true
+);
+-- Agua, Seguridad, Alumbrado, Basura, Baches y calles, Transporte y movilidad,
+-- Parques y espacios públicos, Servicios públicos, Otro
+
+create table menciones_problematica (
+  id               uuid primary key default gen_random_uuid(),
+  participacion_id uuid not null references participaciones(id) on delete cascade,
+  problematica_id  integer not null references problematicas(id),
+  comentario       text,
+  unique (participacion_id, problematica_id)
+);
+
+create table solicitudes (
+  id                   uuid primary key default gen_random_uuid(),
+  persona_id           uuid not null references personas(id),
+  participacion_id     uuid references participaciones(id),
+  tema                 text not null,
+  descripcion          text,
+  requiere_seguimiento boolean not null default false,
+  created_at           timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- Seguimiento
+-- ---------------------------------------------------------------------------
+
+create type tipo_seguimiento as enum ('llamada','whatsapp','invitacion','reunion','otro');
+create type estado_seguimiento as enum ('pendiente','en_seguimiento','atendido');
+
+create table seguimientos (
+  id             uuid primary key default gen_random_uuid(),
+  persona_id     uuid not null references personas(id),
+  fecha          date not null default current_date,
+  tipo           tipo_seguimiento not null,
+  nota           text,
+  responsable_id uuid references usuarios(id),
+  estado         estado_seguimiento not null default 'pendiente',
+  created_at     timestamptz not null default now()
+);
+
+-- La bandeja de seguimiento no es una tabla aparte, es una consulta: personas con
+-- quiere_participar o quiere_info en verdadero cuyo último seguimiento sea pendiente o no exista.
+
+-- ---------------------------------------------------------------------------
+-- Fotos
+-- ---------------------------------------------------------------------------
+
+create table fotos (
+  id           uuid primary key default gen_random_uuid(),
+  actividad_id uuid references actividades(id) on delete cascade,
+  url          text not null,
+  subida_por   uuid references usuarios(id),
+  created_at   timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- Índices de apoyo para las consultas del tablero, el mapa y los reportes
+-- ---------------------------------------------------------------------------
+
+create index personas_seccion_idx        on personas (seccion_clave);
+create index personas_demarcacion_idx    on personas (demarcacion_id);
+create index personas_colonia_idx        on personas (colonia_id);
+create index personas_created_at_idx     on personas (created_at desc);
+create index personas_participar_idx     on personas (quiere_participar) where quiere_participar;
+create index personas_info_idx           on personas (quiere_info) where quiere_info;
+
+create index secciones_demarcacion_idx   on secciones (demarcacion_id);
+create index colonia_seccion_seccion_idx on colonia_seccion (seccion_clave);
+create index colonias_nombre_idx         on colonias (nombre);
+
+create index actividades_fecha_idx       on actividades (fecha desc);
+create index actividades_seccion_idx     on actividades (seccion_clave);
+create index actividades_demarcacion_idx on actividades (demarcacion_id);
+create index actividades_estatus_idx     on actividades (estatus);
+create index actividades_tipo_idx        on actividades (tipo);
+create index actividades_responsable_idx on actividades (responsable_id);
+
+create index participaciones_persona_idx   on participaciones (persona_id);
+create index participaciones_actividad_idx on participaciones (actividad_id);
+
+create index menciones_participacion_idx   on menciones_problematica (participacion_id);
+create index menciones_problematica_idx    on menciones_problematica (problematica_id);
+
+create index seguimientos_persona_idx      on seguimientos (persona_id, fecha desc);
+create index seguimientos_estado_idx       on seguimientos (estado);
+
+create index asignaciones_usuario_idx      on asignaciones_responsable (usuario_id);
+create index asignaciones_demarcacion_idx  on asignaciones_responsable (demarcacion_id)
+  where hasta is null and ambito = 'demarcacion';
+
+create index solicitudes_persona_idx       on solicitudes (persona_id);
+create index fotos_actividad_idx           on fotos (actividad_id);
+
+-- ---------------------------------------------------------------------------
+-- Vistas
+-- Se consultan desde la aplicación en lugar de armar agregaciones en el cliente.
+-- ---------------------------------------------------------------------------
+
+create or replace view v_seccion_resumen as
+select
+  s.clave,
+  s.numero,
+  s.demarcacion_id,
+  d.nombre                                        as demarcacion,
+  s.es_sustituta,
+  ar.usuario_id                                   as responsable_id,
+  u.nombre                                        as responsable,
+  coalesce(p.personas, 0)                         as personas,
+  coalesce(p.quieren_participar, 0)               as quieren_participar,
+  coalesce(p.quieren_info, 0)                     as quieren_info,
+  coalesce(a.reuniones, 0)                        as reuniones,
+  coalesce(a.activismo, 0)                        as activismo,
+  coalesce(a.recorridos, 0)                       as recorridos,
+  a.ultima_actividad,
+  a.proxima_actividad
+from secciones s
+join demarcaciones d on d.id = s.demarcacion_id
+left join asignaciones_responsable ar
+  on ar.seccion_clave = s.clave and ar.ambito = 'seccion' and ar.hasta is null
+left join usuarios u on u.id = ar.usuario_id
+left join lateral (
+  select
+    count(*)                                             as personas,
+    count(*) filter (where pe.quiere_participar)         as quieren_participar,
+    count(*) filter (where pe.quiere_info)               as quieren_info
+  from personas pe
+  where pe.seccion_clave = s.clave
+) p on true
+left join lateral (
+  select
+    count(*) filter (where ac.tipo = 'reunion')          as reuniones,
+    count(*) filter (where ac.tipo = 'activismo')        as activismo,
+    count(*) filter (where ac.tipo = 'recorrido')        as recorridos,
+    max(ac.fecha) filter (where ac.estatus = 'realizada')            as ultima_actividad,
+    min(ac.fecha) filter (where ac.estatus = 'programada'
+                            and ac.fecha >= current_date)            as proxima_actividad
+  from actividades ac
+  where ac.seccion_clave = s.clave and ac.estatus <> 'cancelada'
+) a on true;
+
+create or replace view v_demarcacion_resumen as
+select
+  d.id                                                     as demarcacion_id,
+  d.nombre                                                 as demarcacion,
+  d.slug,
+  d.centro_lat,
+  d.centro_lng,
+  count(v.clave)                                           as secciones,
+  count(v.clave) filter (where v.responsable_id is not null) as secciones_con_responsable,
+  count(v.clave) filter (where v.responsable_id is null)     as secciones_sin_responsable,
+  coalesce(sum(v.personas), 0)                             as personas,
+  coalesce(sum(v.quieren_participar), 0)                   as quieren_participar,
+  coalesce(sum(v.quieren_info), 0)                         as quieren_info,
+  coalesce(sum(v.reuniones), 0)                            as reuniones,
+  coalesce(sum(v.activismo), 0)                            as activismo,
+  coalesce(sum(v.recorridos), 0)                           as recorridos,
+  max(v.ultima_actividad)                                  as ultima_actividad,
+  min(v.proxima_actividad)                                 as proxima_actividad
+from demarcaciones d
+left join v_seccion_resumen v on v.demarcacion_id = d.id
+group by d.id, d.nombre, d.slug, d.centro_lat, d.centro_lng;
+
+create or replace view v_problematicas_por_seccion as
+select
+  pe.seccion_clave                as clave,
+  pe.demarcacion_id,
+  pr.id                           as problematica_id,
+  pr.nombre                       as problematica,
+  count(*)                        as menciones
+from menciones_problematica m
+join problematicas pr    on pr.id = m.problematica_id
+join participaciones par on par.id = m.participacion_id
+join personas pe         on pe.id = par.persona_id
+where pe.seccion_clave is not null
+group by pe.seccion_clave, pe.demarcacion_id, pr.id, pr.nombre;
+
+create or replace view v_historial_persona as
+select
+  par.persona_id,
+  'participacion'::text                                  as evento,
+  par.tipo                                               as detalle,
+  ac.fecha                                               as fecha,
+  ac.id                                                  as actividad_id,
+  ac.nombre                                              as actividad,
+  ac.tipo::text                                          as tipo_actividad,
+  par.registrada_por                                     as usuario_id,
+  ur.nombre                                              as usuario,
+  null::text                                             as nota,
+  par.created_at
+from participaciones par
+join actividades ac on ac.id = par.actividad_id
+left join usuarios ur on ur.id = par.registrada_por
+union all
+select
+  sg.persona_id,
+  'seguimiento'::text                                    as evento,
+  sg.tipo::text                                          as detalle,
+  sg.fecha                                               as fecha,
+  null::uuid                                             as actividad_id,
+  null::text                                             as actividad,
+  null::text                                             as tipo_actividad,
+  sg.responsable_id                                      as usuario_id,
+  ur.nombre                                              as usuario,
+  sg.nota,
+  sg.created_at
+from seguimientos sg
+left join usuarios ur on ur.id = sg.responsable_id
+order by fecha desc, created_at desc;
+
+-- La bandeja de seguimiento no es una tabla aparte, es una consulta: personas con
+-- quiere_participar o quiere_info en verdadero cuyo último seguimiento sea pendiente o no exista.
+-- El spec la describe en prosa y no la pide como vista; se escribe aquí porque la misma regla dice
+-- que las agregaciones se resuelven en la base y no en el navegador. Anotado en PENDIENTES.md.
+create or replace view v_bandeja_seguimiento as
+select
+  p.id                       as persona_id,
+  p.nombre,
+  p.telefono_norm,
+  p.seccion_clave,
+  p.demarcacion_id,
+  p.quiere_participar,
+  p.quiere_info,
+  p.created_at,
+  ult.fecha                  as ultimo_seguimiento_fecha,
+  ult.estado                 as ultimo_seguimiento_estado,
+  ult.tipo                   as ultimo_seguimiento_tipo
+from personas p
+left join lateral (
+  select s.fecha, s.estado, s.tipo
+  from seguimientos s
+  where s.persona_id = p.id
+  order by s.fecha desc, s.created_at desc
+  limit 1
+) ult on true
+where (p.quiere_participar or p.quiere_info)
+  and (ult.estado is null or ult.estado = 'pendiente');
+
+-- ---------------------------------------------------------------------------
+-- Catálogo de problemáticas
+-- ---------------------------------------------------------------------------
+
+insert into problematicas (nombre, orden) values
+  ('Agua', 1),
+  ('Seguridad', 2),
+  ('Alumbrado', 3),
+  ('Basura', 4),
+  ('Baches y calles', 5),
+  ('Transporte y movilidad', 6),
+  ('Parques y espacios públicos', 7),
+  ('Servicios públicos', 8),
+  ('Otro', 9)
+on conflict (nombre) do nothing;

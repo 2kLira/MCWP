@@ -1,0 +1,451 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* El modo oscuro responde a la clase .dark y también a la preferencia del sistema, salvo que se
+   haya forzado el modo claro con la clase .claro. */
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:not(.claro, .claro *)) {
+      @slot;
+    }
+  }
+}
+
+/* ===========================================================================
+   Tokens del sistema de diseño — spec/sistema-diseno.md
+   =========================================================================== */
+
+:root {
+  /* Naranja Pantone 151 C. Contra blanco da 2.49 a 1: como relleno sí, como texto no.
+     De ahí las tres variantes. */
+  --naranja: #ff8200; /* solo relleno, con --tinta encima */
+  --naranja-texto: #b35700; /* naranja tipográfico en claro, 4.91 sobre blanco */
+  --naranja-claro: #ff9b33; /* naranja tipográfico en oscuro, 8.91 sobre el fondo */
+  --naranja-tipografico: var(--naranja-texto);
+
+  /* Neutros casi neutros. Nada de fondo crema. */
+  --fondo: #f7f7f6;
+  --superficie: #ffffff;
+  --superficie-hundida: #f0efed;
+  --borde: #e4e3e1;
+  --tinta: #1c1b19;
+  --tinta-suave: #6b6966;
+  --tinta-tenue: #94918c;
+
+  /* Una sola señal de alerta. */
+  --alerta: #c0362c;
+
+  /* Escala del mapa: cinco pasos del neutro al naranja pleno. */
+  --mapa-0: #efedea;
+  --mapa-1: #ffe0bf;
+  --mapa-2: #ffc48a;
+  --mapa-3: #ffa34d;
+  --mapa-4: #ff8200;
+
+  /* Vidrio: solo encima del mapa. */
+  --vidrio-fondo: rgb(255 255 255 / 0.72);
+  --vidrio-fondo-movimiento: rgb(255 255 255 / 0.92);
+  --vidrio-borde: rgb(255 255 255 / 0.55);
+
+  /* Sombra: poco, y nunca la gris genérica. */
+  --sombra-apoyo: 0 1px 2px rgb(28 27 25 / 0.06);
+  --sombra-flotante: 0 8px 24px rgb(28 27 25 / 0.1);
+
+  /* Tipografía. */
+  --texto-xs: 0.75rem; /* 12, etiquetas de tabla */
+  --texto-sm: 0.8125rem; /* 13, apoyo */
+  --texto-base: clamp(0.9375rem, 0.9rem + 0.2vw, 1rem);
+  --texto-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.1875rem);
+  --texto-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --texto-cifra: clamp(1.75rem, 1.4rem + 1.6vw, 2.5rem); /* indicadores */
+
+  /* Forma: los radios cambian según jerarquía. */
+  --radio-control: 6px;
+  --radio-tarjeta: 12px;
+  --radio-hoja: 20px;
+  --radio-pildora: 999px;
+
+  /* Movimiento: una sola familia de curvas, sin rebote. */
+  --curva: cubic-bezier(0.2, 0, 0, 1);
+  --dur-ui: 160ms; /* cambios de estado, apertura de menús */
+  --dur-panel: 240ms; /* fichas y hojas */
+  --dur-camara: 600ms; /* movimientos de mapa */
+
+  /* Área táctil. */
+  --toque-minimo: 44px;
+  --toque-actividad: 48px;
+}
+
+/* Tokens de modo oscuro. Se aplican con la clase .dark o por preferencia del sistema. */
+.dark {
+  --naranja-tipografico: var(--naranja-claro);
+
+  --fondo: #121110;
+  --superficie: #1b1a18;
+  --superficie-hundida: #121110;
+  --borde: #2e2c29;
+  --tinta: #f5f4f2;
+  --tinta-suave: #a3a09b;
+  --tinta-tenue: #6e6b66;
+
+  --alerta: #ff6b5e;
+
+  --vidrio-fondo: rgb(27 26 24 / 0.72);
+  --vidrio-fondo-movimiento: rgb(27 26 24 / 0.92);
+  --vidrio-borde: rgb(255 255 255 / 0.08);
+
+  /* En oscuro no hay sombras: la elevación se lee con un borde un paso más claro. */
+  --sombra-apoyo: none;
+  --sombra-flotante: none;
+  --borde-elevado: #3d3a36;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.claro) {
+    --naranja-tipografico: var(--naranja-claro);
+
+    --fondo: #121110;
+    --superficie: #1b1a18;
+    --superficie-hundida: #121110;
+    --borde: #2e2c29;
+    --tinta: #f5f4f2;
+    --tinta-suave: #a3a09b;
+    --tinta-tenue: #6e6b66;
+
+    --alerta: #ff6b5e;
+
+    --vidrio-fondo: rgb(27 26 24 / 0.72);
+    --vidrio-fondo-movimiento: rgb(27 26 24 / 0.92);
+    --vidrio-borde: rgb(255 255 255 / 0.08);
+
+    --sombra-apoyo: none;
+    --sombra-flotante: none;
+    --borde-elevado: #3d3a36;
+  }
+}
+
+/* ===========================================================================
+   Puente con shadcn/ui: sus variables apuntan a los tokens de arriba.
+   Nunca blanco sobre naranja: --primary-foreground es --tinta.
+   =========================================================================== */
+
+:root {
+  --background: var(--fondo);
+  --foreground: var(--tinta);
+  --card: var(--superficie);
+  --card-foreground: var(--tinta);
+  --popover: var(--superficie);
+  --popover-foreground: var(--tinta);
+  --primary: var(--naranja);
+  --primary-foreground: var(--tinta);
+  --secondary: var(--superficie-hundida);
+  --secondary-foreground: var(--tinta);
+  --muted: var(--superficie-hundida);
+  --muted-foreground: var(--tinta-suave);
+  --accent: var(--superficie-hundida);
+  --accent-foreground: var(--tinta);
+  --destructive: var(--alerta);
+  --destructive-foreground: var(--superficie);
+  --border: var(--borde);
+  --input: var(--borde);
+  --ring: var(--naranja);
+  --radius: var(--radio-tarjeta);
+
+  /* Gráficas: una sola serie naranja, el resto en neutros. */
+  --chart-1: var(--naranja);
+  --chart-2: var(--tinta-suave);
+  --chart-3: var(--tinta-tenue);
+  --chart-4: #c9c6c2;
+  --chart-5: #a8a5a0;
+
+  --sidebar: var(--superficie);
+  --sidebar-foreground: var(--tinta);
+  --sidebar-primary: var(--naranja);
+  --sidebar-primary-foreground: var(--tinta);
+  --sidebar-accent: var(--superficie-hundida);
+  --sidebar-accent-foreground: var(--tinta);
+  --sidebar-border: var(--borde);
+  --sidebar-ring: var(--naranja);
+}
+
+/* ===========================================================================
+   Tema de Tailwind
+   =========================================================================== */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Los nombres del sistema, en español, para usarlos directo en las clases. */
+  --color-fondo: var(--fondo);
+  --color-superficie: var(--superficie);
+  --color-superficie-hundida: var(--superficie-hundida);
+  --color-borde: var(--borde);
+  --color-tinta: var(--tinta);
+  --color-tinta-suave: var(--tinta-suave);
+  --color-tinta-tenue: var(--tinta-tenue);
+  --color-naranja: var(--naranja);
+  --color-naranja-texto: var(--naranja-tipografico);
+  --color-alerta: var(--alerta);
+  --color-mapa-0: var(--mapa-0);
+  --color-mapa-1: var(--mapa-1);
+  --color-mapa-2: var(--mapa-2);
+  --color-mapa-3: var(--mapa-3);
+  --color-mapa-4: var(--mapa-4);
+
+  --font-sans: var(--fuente-plex), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--fuente-plex), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+
+  --text-xs: var(--texto-xs);
+  --text-xs--line-height: 1.5;
+  --text-sm: var(--texto-sm);
+  --text-sm--line-height: 1.5;
+  --text-base: var(--texto-base);
+  --text-base--line-height: 1.5;
+  --text-lg: var(--texto-lg);
+  --text-lg--line-height: 1.2;
+  --text-xl: var(--texto-xl);
+  --text-xl--line-height: 1.2;
+  --text-cifra: var(--texto-cifra);
+  --text-cifra--line-height: 1.2;
+
+  --radius-sm: var(--radio-control);
+  --radius-md: var(--radio-control);
+  --radius-lg: var(--radio-tarjeta);
+  --radius-xl: var(--radio-hoja);
+  --radius-2xl: var(--radio-hoja);
+  --radius-control: var(--radio-control);
+  --radius-tarjeta: var(--radio-tarjeta);
+  --radius-hoja: var(--radio-hoja);
+  --radius-pildora: var(--radio-pildora);
+
+  --shadow-apoyo: var(--sombra-apoyo);
+  --shadow-flotante: var(--sombra-flotante);
+
+  --ease-curva: var(--curva);
+
+  --container-tope: 1280px;
+}
+
+/* ===========================================================================
+   Base
+   =========================================================================== */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-fondo text-tinta text-base;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    line-height: 1.2;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  /* Cifras tabulares donde siempre hacen falta. La clase .cifras cubre el resto. */
+  th,
+  td,
+  time,
+  input[type="number"],
+  input[type="tel"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Ningún control por debajo del área táctil mínima. */
+  button,
+  [role="button"],
+  a[data-destino],
+  input,
+  select {
+    min-height: var(--toque-minimo);
+  }
+
+  /* Una sola cosa se mueve a la vez, y nada se mueve si el sistema lo pide. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 80ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 80ms !important;
+      transition-timing-function: linear !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Foco visible: anillo de 2 en naranja con desplazamiento de 2. Va fuera de @layer base a
+   propósito: dentro de la capa, las reglas de shadcn le ganaban el color del anillo. */
+:focus-visible {
+  outline: 2px solid var(--naranja) !important;
+  outline-offset: 2px !important;
+  border-radius: var(--radio-control);
+}
+
+/* ===========================================================================
+   Utilidades del sistema
+   =========================================================================== */
+
+/* Cifras tabulares: indicadores, claves de sección, columnas y conteos. */
+@utility cifras {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Indicador grande del tablero. */
+@utility cifra-indicador {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--texto-cifra);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Longitud de línea máxima en texto corrido. */
+@utility medida {
+  max-width: 68ch;
+}
+
+/* Vidrio: solo en superficies que flotan encima del mapa. */
+@utility vidrio {
+  background: var(--vidrio-fondo);
+  border: 1px solid var(--vidrio-borde);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  color: var(--tinta);
+}
+
+/* Mientras el mapa se mueve se apaga el desenfoque y sube la opacidad. */
+@utility vidrio-en-movimiento {
+  background: var(--vidrio-fondo-movimiento);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@utility elevacion-apoyo {
+  box-shadow: var(--sombra-apoyo);
+}
+
+@utility elevacion-flotante {
+  box-shadow: var(--sombra-flotante);
+}
+
+/* Píldora de estatus: neutra, nunca de color. */
+@utility pildora {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 1.5);
+  border-radius: var(--radio-pildora);
+  border: 1px solid var(--borde);
+  background: var(--superficie-hundida);
+  color: var(--tinta-suave);
+  font-size: var(--texto-xs);
+  font-weight: 500;
+  padding: 2px 10px;
+  min-height: 0;
+}
+
+/* Sin responsable: relleno hueco y borde punteado. No es un error, es trabajo pendiente. */
+@utility hueco-punteado {
+  background: transparent;
+  border: 1px dashed var(--tinta-tenue);
+  color: var(--tinta-suave);
+}
+
+/* Botón grande de captura en calle. */
+@utility toque-actividad {
+  min-height: var(--toque-actividad);
+}
+
+@utility transicion-ui {
+  transition-duration: var(--dur-ui);
+  transition-timing-function: var(--curva);
+}
+
+@utility transicion-panel {
+  transition-duration: var(--dur-panel);
+  transition-timing-function: var(--curva);
+}
+
+/* Campo de formulario. Altura de toque de sobra, radio de control, foco del sistema. */
+@utility campo {
+  width: 100%;
+  min-height: var(--toque-actividad);
+  border-radius: var(--radio-control);
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--tinta);
+  padding-inline: 12px;
+  font-size: var(--texto-base);
+}
+
+/* Coreografía de entrada, una sola vez al montar. El escalonado se pasa con --retraso. */
+@keyframes entrada-sube {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility entrada {
+  animation: entrada-sube var(--dur-panel) var(--curva) both;
+  animation-delay: var(--retraso, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entrada {
+    animation: none;
+  }
+}
