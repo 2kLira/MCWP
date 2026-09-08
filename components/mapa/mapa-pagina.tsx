@@ -18,7 +18,20 @@ type Seleccion = { rasgo: RasgoSeccion; origen: { x: number; y: number } };
  * vía seccionesResumen/problematicasPorSeccion). Alrededor del lienzo arma la barra superior, el
  * selector de capas y la ficha lateral, las tres únicas superficies de vidrio de esta pantalla.
  */
-export function MapaPagina() {
+/**
+ * `cromoDesplazado` baja la barra y el selector de capas para que no choquen con el buscador
+ * global, que en la pantalla completa del mapa flota justo encima. En el tablero el mapa va
+ * dentro de una tarjeta y ahí no hace falta.
+ */
+export function MapaPagina({
+  cromoDesplazado = false,
+  sangradoIzquierdo = false,
+  conBarra = true,
+}: {
+  cromoDesplazado?: boolean;
+  sangradoIzquierdo?: boolean;
+  conBarra?: boolean;
+}) {
   const { actuante } = useActuante();
   const [coleccion, setColeccion] = useState<ColeccionSecciones | null>(null);
   const [errorColeccion, setErrorColeccion] = useState<string | null>(null);
@@ -77,14 +90,10 @@ export function MapaPagina() {
 
   return (
     <div
-      className={
-        // Sangra fuera del acolchado de <main> (app/layout.tsx) para ocupar la pantalla
-        // completa: el mapa es el protagonista, no un recuadro más del tablero. La ficha usa
-        // position: fixed y calcula su propio margen sobre la barra inferior de celular, así que
-        // sangrar aquí no la tapa ni la deja tapada.
-        "relative -mx-4 -mt-4 -mb-24 h-[calc(100%+7rem)] w-[calc(100%+2rem)] overflow-hidden " +
-        "bg-superficie-hundida md:-mx-6 md:-mt-6 md:-mb-8 md:h-[calc(100%+3.5rem)] md:w-[calc(100%+3rem)]"
-      }
+      // Llena a su contenedor y nada más. Quién le da tamaño depende de dónde se monte: la
+      // pantalla del mapa lo pone a pantalla completa, el tablero lo mete en una caja de altura
+      // fija. Antes esto usaba altura en porcentaje contra <main> y se quedaba en cero.
+      className="relative size-full overflow-hidden bg-superficie-hundida"
     >
       <EsqueletoMapa listo={listo} />
 
@@ -107,8 +116,18 @@ export function MapaPagina() {
             onMovimiento={setEnMovimiento}
           />
 
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-start gap-3 p-3 md:p-4">
-            <BarraMapa enMovimiento={enMovimiento} className="pointer-events-auto" />
+          <div
+            className={
+              "pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-start gap-3 p-3 md:p-4" +
+              (cromoDesplazado ? " md:pt-20" : "") +
+              // Cuando el mapa sangra por debajo del riel de navegación, su cromo tiene que
+              // arrancar a la derecha de él o queda tapado.
+              (sangradoIzquierdo ? " md:pl-24" : "")
+            }
+          >
+            {conBarra && (
+              <BarraMapa enMovimiento={enMovimiento} className="pointer-events-auto" />
+            )}
             <SelectorCapas
               vista={vista}
               onCambiar={setVista}
