@@ -4,17 +4,20 @@ import Link from "next/link";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId } from "@/lib/demarcaciones";
+import { puedeEditar } from "@/lib/permisos";
+import { cumpleHoy, etiquetaEdad } from "@/lib/personas";
 import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido } from "@/lib/transicion";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
   historialPersona,
+  marcarPromovido,
   obtenerPersona,
   type EventoHistorial,
   type Persona,
 } from "@/lib/datos/personas";
 import { seguimientosDePersona, type Seguimiento } from "@/lib/datos/seguimientos";
-import { ETIQUETA_TIPO_ACTIVIDAD, NOTA_SUSTITUTA } from "@/lib/tipos";
+import { ETIQUETA_GENERO, ETIQUETA_TIPO_ACTIVIDAD, NOTA_SUSTITUTA } from "@/lib/tipos";
 import { rasgoPorClave, cargarSecciones } from "@/lib/territorio";
 import { useEffect, useState } from "react";
 
@@ -28,12 +31,19 @@ function fechaLarga(iso: string): string {
 
 export function FichaPersona({ id }: { id: string }) {
   const { actuante } = useActuante();
+  // recargar fuerza que obtenerPersona se vuelva a pedir después de marcar/desmarcar promovido,
+  // así la ficha refleja el estado nuevo sin recargar la página.
+  const [recargar, setRecargar] = useState(0);
   const persona = useConsulta<Persona | null>(() => obtenerPersona(actuante, id), null, [
     actuante.id,
     id,
+    recargar,
   ]);
   const historial = useConsulta<EventoHistorial[]>(() => historialPersona(id), [], [id]);
   const seguimientos = useConsulta<Seguimiento[]>(() => seguimientosDePersona(id), [], [id]);
+
+  const [marcando, setMarcando] = useState(false);
+  const [avisoPromovido, setAvisoPromovido] = useState<string | null>(null);
 
   const [esSustituta, setEsSustituta] = useState(false);
   useEffect(() => {
@@ -66,6 +76,20 @@ export function FichaPersona({ id }: { id: string }) {
   }
 
   const demarcacion = demarcacionPorId(p.demarcacion_id)?.nombre;
+  const editable = puedeEditar(actuante, "persona", p);
+
+  // Se guarda el valor aquí y no dentro de la función: el estrechamiento de `p` no sobrevive al
+  // cierre de una función declarada, y adentro TypeScript vuelve a verlo como posiblemente nulo.
+  const esPromovido = p.es_promovido;
+
+  async function alternarPromovido() {
+    setMarcando(true);
+    setAvisoPromovido(null);
+    const r = await marcarPromovido(actuante, id, !esPromovido);
+    setMarcando(false);
+    if (r.aviso) setAvisoPromovido(r.aviso);
+    if (r.datos) setRecargar((v) => v + 1);
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -78,6 +102,11 @@ export function FichaPersona({ id }: { id: string }) {
             style={{ viewTransitionName: nombreCompartido(p.id) }}
           >
             {p.nombre}
+            {cumpleHoy(p.fecha_nacimiento) && (
+              <span className="ml-2 align-middle text-xs font-medium text-naranja-texto">
+                Hoy cumple años
+              </span>
+            )}
           </h1>
           <p className="text-sm text-tinta-suave">
             {p.seccion_clave && <span className="cifras">Sección {p.seccion_clave}</span>}
@@ -99,6 +128,13 @@ export function FichaPersona({ id }: { id: string }) {
 
       <section className="grid gap-3 sm:grid-cols-2">
         <Dato etiqueta="Teléfono" valor={formatearTelefono(p.telefono_norm) || "Sin teléfono"} />
+        {p.genero && <Dato etiqueta="Género" valor={ETIQUETA_GENERO[p.genero]} />}
+        {p.fecha_nacimiento && (
+          <Dato
+            etiqueta="Nacimiento"
+            valor={`${fechaLarga(p.fecha_nacimiento)} · ${etiquetaEdad(p.fecha_nacimiento)}`}
+          />
+        )}
         <Dato etiqueta="Calle" valor={p.calle ?? "Sin dato"} />
         <Dato
           etiqueta="Ubicación"
@@ -111,11 +147,41 @@ export function FichaPersona({ id }: { id: string }) {
         <Dato etiqueta="Registrada" valor={fechaLarga(p.created_at)} />
       </section>
 
-      <div className="flex flex-wrap gap-2">
-        {p.quiere_participar && <span className="pildora">Quiere participar</span>}
-        {p.quiere_info && <span className="pildora">Quiere información</span>}
-        {p.aviso_version && (
-          <span className="pildora">Consentimiento {p.aviso_version}</span>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {p.quiere_participar && <span className="pildora">Quiere participar</span>}
+          {p.quiere_info && <span className="pildora">Quiere información</span>}
+          {p.aviso_version && (
+            <span className="pildora">Consentimiento {p.aviso_version}</span>
+          )}
+          {p.es_promovido && (
+            <span className="inline-flex items-center gap-1.5 rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-tinta">
+              Promovido
+            </span>
+          )}
+        </div>
+        {p.es_promovido && p.promovido_en && (
+          <p className="cifras text-xs text-tinta-tenue">{fechaLarga(p.promovido_en)}</p>
+        )}
+        {p.quiere_ser_representante && (
+          <p className="text-sm text-tinta-suave">Quiere ser representante de casilla</p>
+        )}
+        {editable && (
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={alternarPromovido}
+              disabled={marcando}
+              className="transicion-ui w-fit rounded-control border border-borde bg-superficie px-4 text-sm font-medium text-tinta toque-actividad disabled:opacity-50"
+            >
+              {marcando
+                ? "Guardando…"
+                : p.es_promovido
+                  ? "Quitar promovido"
+                  : "Marcar como promovido"}
+            </button>
+            {avisoPromovido && <p className="text-sm text-alerta">{avisoPromovido}</p>}
+          </div>
         )}
       </div>
 

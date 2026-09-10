@@ -110,3 +110,86 @@ decidió así y qué falta confirmar antes de dar el asunto por cerrado.
     desplace la página de lado en los dos anchos, que el anillo de foco sea de dos píxeles en
     naranja, que con `prefers-reduced-motion` no corra ninguna animación, y que el conmutador de
     rol recorte de verdad los datos. Si hay que repetirla, se vuelve a instalar y a quitar.
+
+## Etapa electoral
+
+Las entradas siguientes vienen de la lista de requerimientos del 10 de septiembre de 2026, que
+amplía el alcance de estructura territorial a operación electoral. Ninguna está en los tres
+documentos de `spec/`. El plan de construcción está en `PLAN-ELECTORAL.md`.
+
+8. **Intención de voto como dato sensible.** Marcar a una persona como promovida registra su opinión
+   política, que la ley trata como dato personal sensible y no como dato personal común. Eso exige
+   consentimiento expreso, no el genérico que hoy guarda la columna `consentimiento_en`. Antes de la
+   primera carga real de promovidos hay que resolver tres cosas: el texto del consentimiento
+   específico, si la columna se cifra a nivel de columna, y quién puede consultarla. Es la decisión
+   que más urge de esta lista porque bloquea la fase 4.
+
+9. **Promovido: campo independiente o escalón de estatus.** Se eligió `es_promovido` como booleano
+   independiente, junto a `quiere_participar` y `quiere_info`, porque las tres cosas pueden ser
+   ciertas a la vez y un estatus con escalones las volvería excluyentes. Si el socio prefiere la
+   escalera `alcanzada → interesada → promovida`, es un cambio de una columna, pero hay que decidirlo
+   antes de la carga masiva. Falta confirmarlo.
+
+10. **169 secciones contra las 157 de la entrada 3.** El requerimiento nuevo pide presentar las 169
+    del catálogo. La decisión anterior de cargar solo 157 queda revertida: entran las 169 al catálogo
+    y siguen siendo 157 las que tienen polígono, porque el esquema ya separa `secciones` de
+    `secciones_geom`. **Falta el archivo**: el repositorio no tiene el listado de las 169 claves. De
+    las 18 sin geometría, la cartografía solo nombra 9 como sucesoras de las sustitutas; las otras 9
+    no aparecen en ningún archivo del proyecto. Sin ese listado la fase 2 no se puede construir.
+
+11. **Catálogo de casillas.** No existe en `data/`. Hace falta con domicilio, tipo y lista nominal.
+    Si no trae coordenadas usables, se fijan a mano con la herramienta de la fase 3, que por eso se
+    construye. Falta pedirlo.
+
+12. **Mapa de calor por colonia.** La colonia no es unidad exacta y 28 están partidas entre
+    demarcaciones, así que el calor por colonia se calcula sobre la colonia declarada de cada
+    persona, no sobre geometría. La pantalla lo tiene que decir. Falta confirmar que al socio le
+    sirve así, o si prefiere que el calor por colonia se reparta proporcionalmente al traslape que ya
+    guarda `colonia_seccion.traslape_pct`.
+
+13. **La cola de captura sin señal deja de ser opcional.** `spec/alcance.md` la dejó fuera y cotizada
+    aparte. Con la jornada electoral adentro ya no se sostiene: un acta capturada en una casilla sin
+    señal se pierde. Hay que construirla en la fase 6 o aceptar huecos en el preconteo. Falta
+    decidir, y tiene costo.
+
+14. **Caducidad, no borrado, del capturista por actividad.** El requerimiento dice que al terminar la
+    actividad «se les borra su página». Se implementa como caducidad del acceso: la sesión se
+    invalida y la pantalla deja de servir, pero lo capturado se conserva atribuido a esa persona y a
+    esa actividad. Borrar los registros dejaría la actividad sin sus datos y rompería la
+    consolidación que el sistema hace al cerrarla. No requiere confirmación, pero conviene decirlo
+    para que nadie espere otra cosa.
+
+15. **Autenticación adelantada.** Las fases 6 y 7 no se pueden construir sin cuentas de usuario. El
+    bloque de autenticación, que estaba anotado como trabajo de producción, pasa a ser prerrequisito
+    de esas dos fases. Falta que el socio sepa que eso mueve el orden y el presupuesto.
+
+16. **El mapa compartible de la jornada es la única superficie pública del sistema.** Se resuelve con
+    enlace de solo lectura, caducable, que muestra únicamente agregados por casilla: ningún nombre,
+    ningún teléfono, ninguna ficha. Falta decidir quién puede generar esos enlaces y cuánto duran.
+
+## Fase 1 de la etapa electoral
+
+17. **Validación de teléfono por forma, no por catálogo.** `validarTelefonoMexicano` en
+    `lib/territorio.ts` acepta diez dígitos, rechaza los que empiezan con 0 o 1, rechaza el mismo
+    dígito diez veces, y distingue las cuatro ladas de dos dígitos que existen en México (33, 55, 56
+    y 81) del resto, que son de tres. No comprueba que la clave exista en el catálogo del IFT, que
+    tiene cientos de entradas y cambia. Si en producción hace falta esa exactitud, se carga el
+    catálogo como tabla y la función lo consulta. No requiere confirmación de nadie.
+
+18. **La edad nunca se guarda.** Se calcula desde `fecha_nacimiento` en `lib/personas.ts` y en la
+    vista `v_cumpleanos_hoy`. Guardarla obligaría a recalcularla todos los días.
+
+19. **El 29 de febrero.** `v_cumpleanos_hoy` compara mes y día exactos, así que quien nació el 29 de
+    febrero solo aparece en años bisiestos. Felicitarlo el 28 sería una decisión de producto y no
+    está en el spec. Falta decidirlo, aunque no urge.
+
+20. **Mayoría de edad.** El esquema solo exige que `fecha_nacimiento` esté entre 1900 y hoy. No pide
+    18 años cumplidos, porque el sistema registra gente en general y no solo a quien vota. Cuando
+    entre el padrón de promovidos habrá que decidir si una persona menor de edad puede marcarse como
+    promovida, que es contradictorio. Falta confirmarlo.
+
+21. **`crearPersona` no recibe al actuante.** Por eso `promovido_por` se queda en null cuando alguien
+    se registra ya marcado como promovido desde el formulario de captura; `promovido_en` sí se sella.
+    La firma de esa función viene de antes de esta fase y cambiarla toca a todos sus llamadores.
+    Falta decidir si se cambia ahora o cuando entren las cuentas de usuario, que es cuando de verdad
+    importa saber quién promovió a quién.

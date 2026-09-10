@@ -6,7 +6,7 @@
 
 import { aplicarAlcance } from "@/lib/permisos";
 import type { UsuarioActuante } from "@/lib/tipos";
-import { db, esFaltaDeEsquema, type Resultado } from "@/lib/datos/cliente";
+import { db, esFaltaDeEsquema, lista, type Resultado } from "@/lib/datos/cliente";
 import { seccionesResumen } from "@/lib/datos/catalogos";
 import { totalBandeja } from "@/lib/datos/seguimientos";
 
@@ -23,6 +23,8 @@ export type ResumenTablero = {
   seccionesSinResponsable: number;
   sinSeguimiento: number;
   porCerrar: number;
+  promovidos: number;
+  aspirantesRepresentante: number;
 };
 
 const VACIO: ResumenTablero = {
@@ -38,6 +40,8 @@ const VACIO: ResumenTablero = {
   seccionesSinResponsable: 0,
   sinSeguimiento: 0,
   porCerrar: 0,
+  promovidos: 0,
+  aspirantesRepresentante: 0,
 };
 
 function haceDias(dias: number): string {
@@ -79,6 +83,8 @@ export async function resumenTablero(
     porCerrar,
     secciones,
     porAtender,
+    promovidos,
+    aspirantes,
   ] = await Promise.all([
     contar(usuario, "personas"),
     contar(usuario, "personas", (c) => c.gte("created_at", haceDias(7))),
@@ -93,6 +99,8 @@ export async function resumenTablero(
     ),
     seccionesResumen(usuario),
     totalBandeja(usuario),
+    contar(usuario, "personas", (c) => c.eq("es_promovido", true)),
+    contar(usuario, "personas", (c) => c.eq("quiere_ser_representante", true)),
   ]);
 
   // Las secciones ya vienen recortadas al territorio del actuante, así que aquí solo se separan
@@ -117,8 +125,28 @@ export async function resumenTablero(
       seccionesSinResponsable: sinResponsable,
       sinSeguimiento: porAtender.datos,
       porCerrar: porCerrar.total,
+      promovidos: promovidos.total,
+      aspirantesRepresentante: aspirantes.total,
     },
     sinEsquema: false,
     aviso: null,
   };
+}
+
+export type CumpleanosHoy = {
+  persona_id: string;
+  nombre: string;
+  telefono_norm: string | null;
+  seccion_clave: string | null;
+  demarcacion_id: number | null;
+  fecha_nacimiento: string;
+  edad: number;
+};
+
+/** Quiénes cumplen años hoy, recortado al territorio del actuante. La vista aún puede no existir. */
+export async function cumpleanosDeHoy(
+  usuario: UsuarioActuante | null,
+): Promise<Resultado<CumpleanosHoy[]>> {
+  const consulta = aplicarAlcance(db().from("v_cumpleanos_hoy").select("*"), usuario);
+  return lista<CumpleanosHoy>(consulta.order("nombre", { ascending: true }));
 }

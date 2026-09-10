@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Search } from "lucide-react";
+import { Search, Star } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { DEMARCACIONES, demarcacionPorId } from "@/lib/demarcaciones";
 import { alcanceDe } from "@/lib/permisos";
+import { etiquetaEdad } from "@/lib/personas";
 import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido, useNavegarConTransicion } from "@/lib/transicion";
 import { listarPersonas, type PersonaEnLista } from "@/lib/datos/personas";
+import { ETIQUETA_GENERO, GENEROS, type Genero } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
 
 const PAGINA = 300;
@@ -22,6 +24,9 @@ export default function Personas() {
   const [demarcacionId, setDemarcacionId] = useState<number | null>(null);
   const [participar, setParticipar] = useState(false);
   const [info, setInfo] = useState(false);
+  const [promovido, setPromovido] = useState(false);
+  const [representante, setRepresentante] = useState(false);
+  const [genero, setGenero] = useState<Genero | null>(null);
 
   const [filas, setFilas] = useState<PersonaEnLista[]>([]);
   const [total, setTotal] = useState(0);
@@ -45,6 +50,9 @@ export default function Personas() {
         demarcacionId,
         quiereParticipar: participar || undefined,
         quiereInfo: info || undefined,
+        promovido: promovido || undefined,
+        representante: representante || undefined,
+        genero,
       },
       { desde: 0, limite: PAGINA },
     ).then((r) => {
@@ -56,7 +64,7 @@ export default function Personas() {
     return () => {
       vigente = false;
     };
-  }, [actuante, textoDiferido, demarcacionId, participar, info]);
+  }, [actuante, textoDiferido, demarcacionId, participar, info, promovido, representante, genero]);
 
   const virtual = useVirtualizer({
     count: filas.length,
@@ -116,8 +124,26 @@ export default function Personas() {
               ))}
             </select>
           )}
+          <select
+            value={genero ?? ""}
+            onChange={(e) => setGenero((e.target.value || null) as Genero | null)}
+            className="campo w-auto"
+          >
+            <option value="">Todos los géneros</option>
+            {GENEROS.map((g) => (
+              <option key={g} value={g}>
+                {ETIQUETA_GENERO[g]}
+              </option>
+            ))}
+          </select>
           <Filtro etiqueta="Quiere participar" activo={participar} alCambiar={setParticipar} />
           <Filtro etiqueta="Quiere información" activo={info} alCambiar={setInfo} />
+          <Filtro etiqueta="Promovido" activo={promovido} alCambiar={setPromovido} />
+          <Filtro
+            etiqueta="Quiere ser representante"
+            activo={representante}
+            alCambiar={setRepresentante}
+          />
         </div>
       </div>
 
@@ -140,6 +166,7 @@ export default function Personas() {
             {virtual.getVirtualItems().map((item) => {
               const persona = filas[item.index];
               const demarcacion = demarcacionPorId(persona.demarcacion_id)?.nombre;
+              const edad = etiquetaEdad(persona.fecha_nacimiento);
               return (
                 <button
                   key={persona.id}
@@ -158,11 +185,23 @@ export default function Personas() {
                     >
                       {persona.nombre}
                     </span>
-                    <span className="block truncate text-xs text-tinta-suave">
-                      {persona.seccion_clave && (
-                        <span className="cifras">Sección {persona.seccion_clave}</span>
+                    <span className="flex min-w-0 items-center gap-1 text-xs text-tinta-suave">
+                      <span className="truncate">
+                        {persona.seccion_clave && (
+                          <span className="cifras">Sección {persona.seccion_clave}</span>
+                        )}
+                        {demarcacion && ` · ${demarcacion}`}
+                        {/* La edad ocupa espacio que a 390px ya no sobra; se reserva para 1280+. */}
+                        {edad && <span className="cifras hidden xl:inline"> · {edad}</span>}
+                      </span>
+                      {persona.quiere_ser_representante && (
+                        <span
+                          title="Quiere ser representante"
+                          className="shrink-0 text-tinta-tenue"
+                        >
+                          <Star className="size-3" aria-hidden />
+                        </span>
                       )}
-                      {demarcacion && ` · ${demarcacion}`}
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
@@ -170,6 +209,11 @@ export default function Personas() {
                       {formatearTelefono(persona.telefono_norm)}
                     </span>
                     <span className="mt-1 flex justify-end gap-1">
+                      {persona.es_promovido && (
+                        <span className="rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-tinta">
+                          Promovido
+                        </span>
+                      )}
                       {persona.quiere_participar && <span className="pildora">Participa</span>}
                       {persona.quiere_info && <span className="pildora">Info</span>}
                     </span>

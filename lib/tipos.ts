@@ -39,6 +39,23 @@ export type Seccion = {
   nota: string | null;
 };
 
+/** Género de una persona. Se captura, nunca se infiere del nombre. */
+export type Genero = "mujer" | "hombre" | "otro" | "no_especifica";
+
+export const GENEROS: readonly Genero[] = [
+  "mujer",
+  "hombre",
+  "otro",
+  "no_especifica",
+];
+
+export const ETIQUETA_GENERO: Record<Genero, string> = {
+  mujer: "Mujer",
+  hombre: "Hombre",
+  otro: "Otro",
+  no_especifica: "Prefiere no decir",
+};
+
 export type TipoActividad = "reunion" | "activismo" | "recorrido";
 export type EstatusActividad =
   | "programada"

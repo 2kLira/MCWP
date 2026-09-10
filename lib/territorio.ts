@@ -253,3 +253,75 @@ export function esTelefonoSembrado(normalizado: string | null | undefined): bool
   if (!Number.isFinite(numero)) return false;
   return numero >= INICIO_RANGO_SEMBRADO && numero <= FIN_RANGO_SEMBRADO;
 }
+
+/* ---------------------------------------------------------------------------
+ * Teléfono: validación de número mexicano
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Las cuatro ladas de dos dígitos que existen en México. Todo lo demás usa lada de tres.
+ * El catálogo completo del IFT tiene cientos de claves y cambia; aquí se valida la forma, no la
+ * existencia exacta de la clave. Anotado en PENDIENTES.md.
+ */
+const LADAS_DE_DOS_DIGITOS = ["33", "55", "56", "81"] as const;
+
+export type ResultadoTelefono =
+  | { valido: true; normalizado: string }
+  | { valido: false; motivo: string };
+
+/**
+ * Valida que lo capturado pueda ser un teléfono mexicano de diez dígitos. Devuelve el motivo en
+ * español, listo para mostrarse debajo del campo: el capturista tiene que saber qué corregir.
+ *
+ * No confirma que la línea exista, eso solo lo sabe el operador. Confirma la forma.
+ */
+export function validarTelefonoMexicano(
+  entrada: string | null | undefined,
+): ResultadoTelefono {
+  const soloDigitos = (entrada ?? "").replace(/\D/g, "");
+
+  if (soloDigitos === "") {
+    return { valido: false, motivo: "Falta el teléfono." };
+  }
+
+  // Con lada de país: 52 al frente, o 521 del formato viejo de celular.
+  let digitos = soloDigitos;
+  if (digitos.length === 12 && digitos.startsWith("52")) digitos = digitos.slice(2);
+  if (digitos.length === 13 && digitos.startsWith("521")) digitos = digitos.slice(3);
+
+  if (digitos.length < 10) {
+    const faltan = 10 - digitos.length;
+    return {
+      valido: false,
+      motivo: `Faltan ${faltan} ${faltan === 1 ? "dígito" : "dígitos"}: son diez.`,
+    };
+  }
+  if (digitos.length > 10) {
+    return { valido: false, motivo: "Sobran dígitos: son diez." };
+  }
+
+  if (digitos[0] === "0" || digitos[0] === "1") {
+    return { valido: false, motivo: "Ningún teléfono mexicano empieza con 0 ni con 1." };
+  }
+
+  if (/^(\d)\1{9}$/.test(digitos)) {
+    return { valido: false, motivo: "Ese número no puede ser real." };
+  }
+
+  const esDeDos = (LADAS_DE_DOS_DIGITOS as readonly string[]).includes(
+    digitos.slice(0, 2),
+  );
+  const lada = esDeDos ? digitos.slice(0, 2) : digitos.slice(0, 3);
+  const local = digitos.slice(lada.length);
+
+  if (!esDeDos && local[0] === "0") {
+    return { valido: false, motivo: "Revisa la lada, no parece una clave válida." };
+  }
+
+  return { valido: true, normalizado: digitos };
+}
+
+/** True si el teléfono capturado tiene forma de número mexicano. Atajo para la interfaz. */
+export function esTelefonoMexicano(entrada: string | null | undefined): boolean {
+  return validarTelefonoMexicano(entrada).valido;
+}

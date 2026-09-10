@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { MessageCircle } from "lucide-react";
 import { useMemo } from "react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId } from "@/lib/demarcaciones";
@@ -9,7 +10,13 @@ import { etiquetaAlcance } from "@/lib/permisos";
 import { ETIQUETA_TIPO_ACTIVIDAD } from "@/lib/tipos";
 import { useMovimientoReducido } from "@/lib/movimiento";
 import { useConsulta } from "@/lib/usar-consulta";
-import { resumenTablero, type ResumenTablero } from "@/lib/datos/tablero";
+import { Indicador } from "@/components/tablero/indicador";
+import {
+  resumenTablero,
+  cumpleanosDeHoy,
+  type ResumenTablero,
+  type CumpleanosHoy,
+} from "@/lib/datos/tablero";
 import { reporteSemanal, type SemanaReporte } from "@/lib/datos/reportes";
 import { actividadesDeAgenda, type Actividad } from "@/lib/datos/actividades";
 
@@ -46,6 +53,12 @@ export default function Tablero() {
   ]);
   const agenda = useConsulta<Actividad[]>(
     () => actividadesDeAgenda(actuante, enDias(0), enDias(7)),
+    [],
+    [actuante.id],
+  );
+  // Ya viene recortado por territorio desde lib/datos/tablero.ts; aquí solo se pinta.
+  const cumpleanos = useConsulta<CumpleanosHoy[]>(
+    () => cumpleanosDeHoy(actuante),
     [],
     [actuante.id],
   );
@@ -97,6 +110,18 @@ export default function Tablero() {
               grafico={<Franja datos={semanal.datos} />}
             />
           </dl>
+
+          {/* Embudo de reclutamiento: son las dos cifras que el operador revisa a diario,
+              por eso llevan tarjeta propia en vez de perderse como texto plano. */}
+          <div className="flex flex-wrap gap-3">
+            <Indicador etiqueta="Promovidos" valor={r.promovidos ?? 0} cargando={cargando} orden={0} />
+            <Indicador
+              etiqueta="Quieren ser representantes"
+              valor={r.aspirantesRepresentante ?? 0}
+              cargando={cargando}
+              orden={1}
+            />
+          </div>
         </div>
 
         {/* Cobertura territorial: la barra es información, no adorno. Es la historia que el
@@ -165,6 +190,45 @@ export default function Tablero() {
           </ul>
         </Columna>
       </section>
+
+      {/* Zona de apoyo, no protagonista: por eso va al final y desaparece por completo si hoy
+          no cumple nadie, en vez de dejar una tarjeta vacía ocupando lugar. */}
+      {!cumpleanos.cargando && cumpleanos.datos.length > 0 && (
+        <section className="mt-8 border-t border-borde pt-6">
+          <h2 className="mb-3 text-sm font-medium text-tinta-tenue">
+            Cumplen años hoy · <span className="cifras text-tinta">{cumpleanos.datos.length}</span>
+          </h2>
+          <ul className="flex flex-col divide-y divide-borde">
+            {cumpleanos.datos.map((c) => (
+              <li key={c.persona_id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0">
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-tinta">{c.nombre}</p>
+                  <p className="mt-0.5 text-xs text-tinta-suave">
+                    <span className="cifras">{c.edad} años</span>
+                    {c.seccion_clave && (
+                      <>
+                        {" · "}
+                        <span className="cifras">{c.seccion_clave}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+                {c.telefono_norm && (
+                  <a
+                    href={`https://wa.me/52${c.telefono_norm}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="transicion-ui inline-flex shrink-0 items-center gap-2 rounded-control border border-borde bg-superficie px-3 text-sm text-tinta toque-actividad"
+                  >
+                    <MessageCircle className="size-4" aria-hidden />
+                    WhatsApp
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

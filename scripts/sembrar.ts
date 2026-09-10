@@ -737,6 +737,8 @@ async function main() {
    * 8. Personas
    * ------------------------------------------------------------------------------------------ */
 
+  type Genero = "mujer" | "hombre" | "otro" | "no_especifica" | null;
+
   type FilaPersona = {
     id: string;
     nombre: string;
@@ -755,8 +757,98 @@ async function main() {
     consentimiento_en: string;
     registrada_por: string;
     actividad_origen: string | null;
+    genero: Genero;
+    fecha_nacimiento: string | null;
+    es_promovido: boolean;
+    promovido_en: string | null;
+    promovido_por: string | null;
+    quiere_ser_representante: boolean;
     created_at: string;
   };
+
+  /* ----------------------------------------------------------------------------------------
+   * 8a. Género, fecha de nacimiento, promovidos y aspirantes a representante. Van aparte de la
+   *     ficha base porque cada uno tiene su propia distribución verosímil (spec/PLAN-ELECTORAL.md,
+   *     fase 1).
+   * ---------------------------------------------------------------------------------------- */
+
+  // Reparto cercano al padrón real: ~52 % mujeres, ~46 % hombres, un resto chico entre "otro" y
+  // "no_especifica", y un 5 % adicional en null porque en la calle no siempre se captura todo —
+  // una base con el campo lleno al 100 % se ve sembrada.
+  function generoAlAzar(): Genero {
+    return elegirPonderado<Genero>([
+      { valor: null, peso: 5 },
+      { valor: "mujer", peso: 52 },
+      { valor: "hombre", peso: 46 },
+      { valor: "otro", peso: 1 },
+      { valor: "no_especifica", peso: 1 },
+    ]);
+  }
+
+  // Curva de edad de padrón: más gente entre 30 y 55, menos en los extremos, siempre mayor de
+  // edad. Se sortea primero un bloque de edad (con más peso en el centro) y luego un año dentro
+  // del bloque, en vez de una edad uniforme entre 18 y 95 que se vería pareja y falsa.
+  const BLOQUES_EDAD: { desde: number; hasta: number; peso: number }[] = [
+    { desde: 18, hasta: 29, peso: 15 },
+    { desde: 30, hasta: 40, peso: 28 },
+    { desde: 41, hasta: 55, peso: 32 },
+    { desde: 56, hasta: 70, peso: 18 },
+    { desde: 71, hasta: 95, peso: 7 },
+  ];
+
+  function edadAlAzar(): number {
+    const bloque = elegirPonderado(BLOQUES_EDAD.map((b) => ({ valor: b, peso: b.peso })));
+    return entero(bloque.desde, bloque.hasta);
+  }
+
+  // Fecha de nacimiento a partir de una edad: se resta la edad en días (con variación dentro del
+  // año) en vez de restar años de calendario, para no tener que lidiar con años bisiestos ni con
+  // el riesgo de que el resultado caiga después de HOY. 15 % se queda en null, igual de verosímil
+  // que el género sin capturar.
+  function fechaNacimientoAlAzar(): string | null {
+    if (conProbabilidad(0.15)) return null;
+    const edad = edadAlAzar();
+    const diasEdad = edad * 365 + entero(0, 364);
+    return formatearFecha(sumarDias(HOY, -diasEdad));
+  }
+
+  // Fecha de nacimiento con mes y día forzados a los de HOY (para el cumpleaños de hoy) y una
+  // edad verosímil: como el mes y el día coinciden exactamente con HOY, la persona cumple años
+  // hoy sin importar qué año le toque.
+  function fechaNacimientoHoyConEdad(edad: number): string {
+    const anioNacimiento = HOY.getFullYear() - edad;
+    const mes = (HOY.getMonth() + 1).toString().padStart(2, "0");
+    const dia = HOY.getDate().toString().padStart(2, "0");
+    return `${anioNacimiento}-${mes}-${dia}`;
+  }
+
+  // Promovidos: ~20 % en total, con dos correlaciones que lo hacen creíble. Primera: quien ya
+  // dijo que quiere participar tiene bastante más probabilidad de ser promovido que quien solo
+  // pidió información, y quien no pidió nada casi no aparece. Segunda: las secciones que ya
+  // tienen responsable concentran algo más de promovidos que las que no.
+  function probabilidadPromovido(quiereParticipar: boolean, quiereInfo: boolean, seccionClave: string): number {
+    const base = quiereParticipar ? 0.4 : quiereInfo ? 0.09 : 0.04;
+    const factorZona = clavesConResponsableSet.has(seccionClave) ? 1.2 : 0.85;
+    return Math.min(base * factorZona, 0.85);
+  }
+
+  // promovido_en: posterior a created_at de la persona y anterior a HOY. Si el azar de horas
+  // dejara created_at pegado a HOY (persona registrada hoy mismo), el rango se acota a un
+  // milisegundo como salvaguarda en vez de generar un delta negativo.
+  function promovidoEnAlAzar(creadoEn: string): string {
+    const creado = new Date(creadoEn).getTime();
+    const rango = Math.max(HOY.getTime() - creado, 1);
+    return new Date(creado + entero(1, rango)).toISOString();
+  }
+
+  // Representante de casilla: fracción chica (~6 % del total) y nunca sin haber levantado antes
+  // la mano. Por eso la probabilidad solo se sortea entre quienes ya son promovidos o ya dijeron
+  // que quieren participar; el resto queda en false sin sorteo.
+  const PROB_REPRESENTANTE_ELEGIBLE = 0.16;
+  function quiereSerRepresentanteAlAzar(esPromovido: boolean, quiereParticipar: boolean): boolean {
+    if (!esPromovido && !quiereParticipar) return false;
+    return conProbabilidad(PROB_REPRESENTANTE_ELEGIBLE);
+  }
 
   const personas: FilaPersona[] = [];
   const personasPorSeccionClave = new Map<string, FilaPersona[]>();
@@ -770,6 +862,11 @@ async function main() {
       const telefono = siguienteTelefono();
       const punto = jitter(seccion.centro_lat, seccion.centro_lng);
       const createdAt = fechaConHoraAlAzar(sumarDias(HOY, -entero(0, 69))).toISOString();
+      const quiereParticipar = conProbabilidad(0.3);
+      const quiereInfo = conProbabilidad(0.65);
+      const esPromovido = conProbabilidad(probabilidadPromovido(quiereParticipar, quiereInfo, clave));
+      const promovidoPor = esPromovido ? usuarioLocal(seccion.demarcacion_id, clave) : null;
+
       const persona: FilaPersona = {
         id: uuidDeterminista(),
         nombre: nombreVerosimil(),
@@ -786,12 +883,18 @@ async function main() {
           { valor: "mapa" as const, peso: 25 },
           { valor: "manual" as const, peso: 20 },
         ]),
-        quiere_participar: conProbabilidad(0.3),
-        quiere_info: conProbabilidad(0.65),
+        quiere_participar: quiereParticipar,
+        quiere_info: quiereInfo,
         aviso_version: "provisional-1",
         consentimiento_en: createdAt,
         registrada_por: usuarioLocal(seccion.demarcacion_id, clave),
         actividad_origen: null,
+        genero: generoAlAzar(),
+        fecha_nacimiento: fechaNacimientoAlAzar(),
+        es_promovido: esPromovido,
+        promovido_en: esPromovido ? promovidoEnAlAzar(createdAt) : null,
+        promovido_por: promovidoPor,
+        quiere_ser_representante: quiereSerRepresentanteAlAzar(esPromovido, quiereParticipar),
         created_at: createdAt,
       };
       personas.push(persona);
@@ -802,6 +905,30 @@ async function main() {
       lista2.push(persona);
       personasPorDemarcacionId.set(seccion.demarcacion_id, lista2);
     }
+  }
+
+  /* ------------------------------------------------------------------------------------------
+   * 8b. Cumpleaños de hoy, forzados. El tablero tiene una zona de "cumplen años hoy" que se
+   *     oculta si está vacía, y en la demostración importa que se vea: con la fecha de
+   *     nacimiento repartida al azar día por día entre ~1700 personas, lo esperable es que ronde
+   *     4 o 5 el día que se corre el sembrado, y algunas corridas caerían en cero o uno, que es
+   *     justo lo que no se puede mostrar en la junta. Por eso se fuerza a que entre 6 y 12
+   *     personas cumplan años en el mes y día de HOY. Se reparten en
+   *     demarcaciones distintas para que un responsable de demarcación también las vea en su
+   *     propio tablero y no sea un dato que solo el administrador nota. El conteo y la elección
+   *     de personas salen del mismo generador con semilla fija: dos corridas el mismo día
+   *     producen exactamente el mismo grupo.
+   * ------------------------------------------------------------------------------------------ */
+
+  const CANTIDAD_CUMPLEANOS_HOY = entero(6, 12);
+  const demarcacionesParaCumpleanos = barajar([...idsDemarcaciones]).slice(0, CANTIDAD_CUMPLEANOS_HOY);
+  let personasCumpleanosHoy = 0;
+  for (const demarcacionId of demarcacionesParaCumpleanos) {
+    const candidatas = personasPorDemarcacionId.get(demarcacionId) ?? [];
+    if (candidatas.length === 0) continue;
+    const persona = elegirUno(candidatas);
+    persona.fecha_nacimiento = fechaNacimientoHoyConEdad(edadAlAzar());
+    personasCumpleanosHoy++;
   }
 
   /* ------------------------------------------------------------------------------------------
@@ -1347,6 +1474,17 @@ async function main() {
       cantidad: seguimientos.filter((s) => s.estado === estado).length,
     })),
   );
+
+  console.log("\nFicha de persona (fase 1 · PLAN-ELECTORAL.md):");
+  console.table([
+    {
+      "con género": personas.filter((p) => p.genero !== null).length,
+      "con fecha de nacimiento": personas.filter((p) => p.fecha_nacimiento !== null).length,
+      "cumplen hoy": personasCumpleanosHoy,
+      promovidas: personas.filter((p) => p.es_promovido).length,
+      "aspiran a representante": personas.filter((p) => p.quiere_ser_representante).length,
+    },
+  ]);
 
   console.log(
     `\nResumen: ${usuarios.length} usuarios, ${asignaciones.length} asignaciones, ${personas.length} personas, ` +

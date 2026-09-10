@@ -102,10 +102,13 @@ create unique index una_asignacion_vigente_por_seccion
 -- Personas
 -- ---------------------------------------------------------------------------
 
+create type genero_persona as enum ('mujer','hombre','otro','no_especifica');
+
 create table personas (
   id                 uuid primary key default gen_random_uuid(),
   nombre             text not null,
-  telefono_norm      text unique,               -- 10 dígitos, sin nada más
+  telefono_norm      text unique
+    check (telefono_norm ~ '^[0-9]{10}$'),      -- 10 dígitos, sin nada más
   telefono_raw       text,
   calle              text,
   colonia_id         integer references colonias(id),
@@ -114,8 +117,21 @@ create table personas (
   lat                double precision,
   lng                double precision,
   origen_ubicacion   text check (origen_ubicacion in ('gps','mapa','manual')),
+  genero             genero_persona,
+  fecha_nacimiento   date
+    check (fecha_nacimiento is null
+           or (fecha_nacimiento > date '1900-01-01' and fecha_nacimiento <= current_date)),
   quiere_participar  boolean not null default false,
   quiere_info        boolean not null default false,
+
+  -- Promoción. Las tres marcas son independientes a propósito: una misma persona puede querer
+  -- información, querer participar y ser promovida a la vez. Ver PENDIENTES.md, entrada 9.
+  es_promovido       boolean not null default false,
+  promovido_en       timestamptz,
+  promovido_por      uuid references usuarios(id),
+
+  quiere_ser_representante boolean not null default false,
+
   aviso_version      text,
   consentimiento_en  timestamptz,
   registrada_por     uuid references usuarios(id),
@@ -257,6 +273,15 @@ create index personas_colonia_idx        on personas (colonia_id);
 create index personas_created_at_idx     on personas (created_at desc);
 create index personas_participar_idx     on personas (quiere_participar) where quiere_participar;
 create index personas_info_idx           on personas (quiere_info) where quiere_info;
+create index personas_promovido_idx      on personas (es_promovido) where es_promovido;
+create index personas_representante_idx  on personas (quiere_ser_representante)
+  where quiere_ser_representante;
+
+-- El cumpleaños se busca por mes y día, nunca por año. extract sobre date es inmutable, to_char
+-- no lo es, así que el índice y la vista v_cumpleanos_hoy usan la misma expresión con extract.
+create index personas_cumple_idx         on personas
+  (extract(month from fecha_nacimiento), extract(day from fecha_nacimiento))
+  where fecha_nacimiento is not null;
 
 create index secciones_demarcacion_idx   on secciones (demarcacion_id);
 create index colonia_seccion_seccion_idx on colonia_seccion (seccion_clave);
@@ -428,6 +453,24 @@ left join lateral (
 ) ult on true
 where (p.quiere_participar or p.quiere_info)
   and (ult.estado is null or ult.estado = 'pendiente');
+
+-- Cumpleaños del día. Se compara mes y día, nunca el año, con la misma expresión que indexa
+-- personas_cumple_idx. El 29 de febrero solo aparece en años bisiestos: felicitarlo el 28 sería
+-- una decisión de producto y no está en el spec, así que no se toma aquí.
+create or replace view v_cumpleanos_hoy as
+select
+  p.id                       as persona_id,
+  p.nombre,
+  p.telefono_norm,
+  p.seccion_clave,
+  p.demarcacion_id,
+  p.fecha_nacimiento,
+  extract(year from age(current_date, p.fecha_nacimiento))::int as edad
+from personas p
+where p.fecha_nacimiento is not null
+  and extract(month from p.fecha_nacimiento) = extract(month from current_date)
+  and extract(day   from p.fecha_nacimiento) = extract(day   from current_date)
+order by p.nombre;
 
 -- ---------------------------------------------------------------------------
 -- Catálogo de problemáticas

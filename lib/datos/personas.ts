@@ -4,7 +4,7 @@
 
 import { aplicarAlcance, puedeEditar, puedeVerRegistro } from "@/lib/permisos";
 import { normalizarTelefono } from "@/lib/territorio";
-import type { UsuarioActuante } from "@/lib/tipos";
+import type { Genero, UsuarioActuante } from "@/lib/tipos";
 import { db, lista, resultado, uno, type Resultado } from "@/lib/datos/cliente";
 
 export type Persona = {
@@ -26,6 +26,12 @@ export type Persona = {
   registrada_por: string | null;
   actividad_origen: string | null;
   created_at: string;
+  genero: Genero | null;
+  fecha_nacimiento: string | null;
+  es_promovido: boolean;
+  promovido_en: string | null;
+  promovido_por: string | null;
+  quiere_ser_representante: boolean;
 };
 
 export type PersonaEnLista = Pick<
@@ -40,6 +46,10 @@ export type PersonaEnLista = Pick<
   | "quiere_participar"
   | "quiere_info"
   | "created_at"
+  | "genero"
+  | "fecha_nacimiento"
+  | "es_promovido"
+  | "quiere_ser_representante"
 >;
 
 export type FiltrosPersonas = {
@@ -48,10 +58,13 @@ export type FiltrosPersonas = {
   quiereParticipar?: boolean;
   quiereInfo?: boolean;
   texto?: string;
+  promovido?: boolean;
+  representante?: boolean;
+  genero?: Genero | null;
 };
 
 const COLUMNAS_LISTA =
-  "id, nombre, telefono_norm, calle, colonia_id, seccion_clave, demarcacion_id, quiere_participar, quiere_info, created_at";
+  "id, nombre, telefono_norm, calle, colonia_id, seccion_clave, demarcacion_id, quiere_participar, quiere_info, created_at, genero, fecha_nacimiento, es_promovido, quiere_ser_representante";
 
 export async function listarPersonas(
   usuario: UsuarioActuante | null,
@@ -72,6 +85,9 @@ export async function listarPersonas(
   if (filtros.seccionClave) consulta = consulta.eq("seccion_clave", filtros.seccionClave);
   if (filtros.quiereParticipar) consulta = consulta.eq("quiere_participar", true);
   if (filtros.quiereInfo) consulta = consulta.eq("quiere_info", true);
+  if (filtros.promovido) consulta = consulta.eq("es_promovido", true);
+  if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
+  if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
 
   const texto = filtros.texto?.trim();
   if (texto) {
@@ -169,14 +185,24 @@ export type EntradaPersona = {
   consentimiento_en?: string | null;
   registrada_por?: string | null;
   actividad_origen?: string | null;
+  genero?: Genero | null;
+  fecha_nacimiento?: string | null;
+  es_promovido?: boolean;
+  quiere_ser_representante?: boolean;
 };
 
 export function crearPersona(entrada: EntradaPersona): Promise<Resultado<Persona | null>> {
-  const fila = {
+  const fila: Record<string, unknown> = {
     ...entrada,
     // El teléfono normalizado es la llave de deduplicación y lo calcula el sistema, no el usuario.
     telefono_norm: normalizarTelefono(entrada.telefono_raw),
   };
+  // La fecha de promoción no se le pide a nadie: se sella sola en el momento del alta.
+  if (entrada.es_promovido) {
+    fila.promovido_en = new Date().toISOString();
+  }
+  // crearPersona no recibe el actuante en su firma actual, así que promovido_por se queda sin
+  // llenar aquí; lo pone marcarPromovido, que sí conoce quién marca.
   return uno<Persona>(db().from("personas").insert(fila).select().single());
 }
 
@@ -193,5 +219,29 @@ export async function actualizarPersona(
   if (cambios.telefono_raw !== undefined) {
     fila.telefono_norm = normalizarTelefono(cambios.telefono_raw);
   }
+  return uno<Persona>(db().from("personas").update(fila).eq("id", id).select().single());
+}
+
+/**
+ * Marca o desmarca a una persona como promovida. Va aparte de actualizarPersona porque, a
+ * diferencia de un cambio de datos cualquiera, aquí el sistema sella quién y cuándo: no se le pide
+ * al usuario ninguna de las dos cosas.
+ */
+export async function marcarPromovido(
+  usuario: UsuarioActuante | null,
+  id: string,
+  valor: boolean,
+): Promise<Resultado<Persona | null>> {
+  const actual = await obtenerPersona(usuario, id);
+  if (!actual.datos || !puedeEditar(usuario, "persona", actual.datos)) {
+    return { datos: null, sinEsquema: false, aviso: "No puedes editar esta persona." };
+  }
+  const fila = valor
+    ? {
+        es_promovido: true,
+        promovido_en: new Date().toISOString(),
+        promovido_por: usuario?.id ?? null,
+      }
+    : { es_promovido: false, promovido_en: null, promovido_por: null };
   return uno<Persona>(db().from("personas").update(fila).eq("id", id).select().single());
 }

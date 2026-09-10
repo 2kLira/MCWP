@@ -5,15 +5,36 @@ import { Check, LoaderCircle, MapPin, TriangleAlert } from "lucide-react";
 import { SelectorPunto } from "@/components/registro/selector-punto";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId, DEMARCACIONES } from "@/lib/demarcaciones";
-import { cargarSecciones, normalizarTelefono, rasgoPorClave, seccionPorPunto } from "@/lib/territorio";
+import {
+  cargarSecciones,
+  normalizarTelefono,
+  rasgoPorClave,
+  seccionPorPunto,
+  validarTelefonoMexicano,
+} from "@/lib/territorio";
 import { crearPersona, buscarPorTelefono, type Persona } from "@/lib/datos/personas";
 import { registrarParticipacion } from "@/lib/datos/actividades";
 import { crearSeguimiento } from "@/lib/datos/seguimientos";
 import { coloniasDeSeccion, problematicas, type ColoniaBreve, type Problematica } from "@/lib/datos/catalogos";
+import { GENEROS, ETIQUETA_GENERO, type Genero } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
 
 /** El texto del aviso va provisional, con nota visible de que falta revisión legal. */
 const AVISO_VERSION = "provisional-1";
+
+/** Edad en años cumplidos a hoy, o null si la fecha viene vacía o mal formada. Solo confirmación. */
+function edadCumplida(fechaIso: string): number | null {
+  if (!fechaIso) return null;
+  const nacimiento = new Date(`${fechaIso}T00:00:00`);
+  if (Number.isNaN(nacimiento.getTime())) return null;
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const antesDelCumpleanos =
+    hoy.getMonth() < nacimiento.getMonth() ||
+    (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
+  if (antesDelCumpleanos) edad -= 1;
+  return edad >= 0 ? edad : null;
+}
 
 type Ubicacion = {
   lat: number;
@@ -28,11 +49,16 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const { actuante } = useActuante();
 
   const [nombre, setNombre] = useState("");
+  const [genero, setGenero] = useState<Genero | null>(null);
+  const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [errorTelefono, setErrorTelefono] = useState<string | null>(null);
   const [calle, setCalle] = useState("");
   const [coloniaId, setColoniaId] = useState<number | null>(null);
   const [quiereParticipar, setQuiereParticipar] = useState(false);
   const [quiereInfo, setQuiereInfo] = useState(true);
+  const [esPromovido, setEsPromovido] = useState(false);
+  const [quiereSerRepresentante, setQuiereSerRepresentante] = useState(false);
   const [elegidas, setElegidas] = useState<number[]>([]);
   const [comentario, setComentario] = useState("");
   const [consiente, setConsiente] = useState(false);
@@ -120,6 +146,18 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     setCaminoDuplicado("agregar");
   }, []);
 
+  // No regaña mientras se escribe: valida hasta que hay diez dígitos o al salir del campo.
+  const validarTelefonoEnVivo = useCallback((valor: string) => {
+    if (!valor.trim()) {
+      setErrorTelefono(null);
+      return;
+    }
+    const r = validarTelefonoMexicano(valor);
+    setErrorTelefono(r.valido ? null : r.motivo);
+  }, []);
+
+  const edad = edadCumplida(fechaNacimiento);
+
   const rasgo = ubicacion ? rasgoPorClave(ubicacion.clave) : null;
   const demarcacionNombre = rasgo?.properties.demarcacion ?? null;
   const demarcacionId =
@@ -150,8 +188,12 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         lat: ubicacion.lat,
         lng: ubicacion.lng,
         origen_ubicacion: ubicacion.origen,
+        genero,
+        fecha_nacimiento: fechaNacimiento || null,
         quiere_participar: quiereParticipar,
         quiere_info: quiereInfo,
+        es_promovido: esPromovido,
+        quiere_ser_representante: quiereSerRepresentante,
         aviso_version: AVISO_VERSION,
         consentimiento_en: new Date().toISOString(),
         registrada_por: actuante.id,
@@ -194,11 +236,16 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
   function otraCaptura() {
     setNombre("");
+    setGenero(null);
+    setFechaNacimiento("");
     setTelefono("");
+    setErrorTelefono(null);
     setCalle("");
     setColoniaId(null);
     setQuiereParticipar(false);
     setQuiereInfo(true);
+    setEsPromovido(false);
+    setQuiereSerRepresentante(false);
     setElegidas([]);
     setComentario("");
     setConsiente(false);
@@ -293,16 +340,61 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
           />
         </Campo>
 
+        <div>
+          <p className="mb-2 text-sm text-tinta-suave">Género</p>
+          <div className="flex flex-wrap gap-2">
+            {GENEROS.map((g) => {
+              const activo = genero === g;
+              return (
+                <button
+                  key={g}
+                  type="button"
+                  aria-pressed={activo}
+                  onClick={() => setGenero(activo ? null : g)}
+                  className={cn(
+                    "transicion-ui rounded-pildora border px-3 py-2 text-sm transition-colors",
+                    activo
+                      ? "border-tinta bg-tinta text-superficie"
+                      : "border-borde bg-superficie text-tinta-suave",
+                  )}
+                >
+                  {ETIQUETA_GENERO[g]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <Campo etiqueta="Fecha de nacimiento">
+          <input
+            type="date"
+            value={fechaNacimiento}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setFechaNacimiento(e.target.value)}
+            className="campo cifras"
+          />
+          {edad !== null && <span className="text-xs text-tinta-tenue">{edad} años</span>}
+        </Campo>
+
         <Campo etiqueta="Teléfono" apoyo="Diez dígitos. Opcional.">
           <input
             value={telefono}
             inputMode="tel"
             onChange={(e) => {
-              setTelefono(e.target.value);
-              void revisarTelefono(e.target.value);
+              const valor = e.target.value;
+              setTelefono(valor);
+              void revisarTelefono(valor);
+              // Solo regaña cuando ya hay diez dígitos; antes deja escribir en paz.
+              if (valor.replace(/\D/g, "").length >= 10) {
+                validarTelefonoEnVivo(valor);
+              } else {
+                setErrorTelefono(null);
+              }
             }}
+            onBlur={(e) => validarTelefonoEnVivo(e.target.value)}
             className="campo cifras"
           />
+          {errorTelefono && <p className="text-sm text-alerta">{errorTelefono}</p>}
         </Campo>
 
         {duplicada && (
@@ -369,6 +461,16 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
             etiqueta="Quiere recibir información"
             valor={quiereInfo}
             alCambiar={setQuiereInfo}
+          />
+          <Interruptor
+            etiqueta="Promovido, dará su voto"
+            valor={esPromovido}
+            alCambiar={setEsPromovido}
+          />
+          <Interruptor
+            etiqueta="Quiere ser representante de casilla"
+            valor={quiereSerRepresentante}
+            alCambiar={setQuiereSerRepresentante}
           />
         </div>
 
