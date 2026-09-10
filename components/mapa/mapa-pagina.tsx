@@ -4,13 +4,20 @@ import { useEffect, useState } from "react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { cargarSecciones, type ColeccionSecciones, type RasgoSeccion } from "@/lib/territorio";
 import { BarraMapa } from "./barra-mapa";
-import { cargarDatosMapa, DATOS_MAPA_VACIOS, type DatosMapa, type VistaMapa } from "./datos-mapa";
+import {
+  cargarDatosMapa,
+  DATOS_MAPA_VACIOS,
+  vistaEsDeColonias,
+  type DatosMapa,
+  type VistaMapa,
+} from "./datos-mapa";
 import { EsqueletoMapa } from "./esqueleto-mapa";
-import { FichaSeccion } from "./ficha-seccion";
-import { MapaLienzo } from "./mapa-lienzo";
+import { FichaColonia, FichaSeccion } from "./ficha-seccion";
+import { MapaLienzo, type RasgoColonia } from "./mapa-lienzo";
 import { SelectorCapas } from "./selector-capas";
 
 type Seleccion = { rasgo: RasgoSeccion; origen: { x: number; y: number } };
+type SeleccionColonia = { rasgo: RasgoColonia; origen: { x: number; y: number } };
 
 /**
  * Orquesta el mapa: carga el GeoJSON de secciones una vez (nunca desde la base) y el resumen real
@@ -40,10 +47,21 @@ export function MapaPagina({
   const [seleccionCruda, setSeleccion] = useState<(Seleccion & { actuanteId: string }) | null>(
     null,
   );
+  const [seleccionColoniaCruda, setSeleccionColonia] = useState<
+    (SeleccionColonia & { actuanteId: string }) | null
+  >(null);
   // La ficha caduca sola si el actuante cambió de territorio con ella abierta, en vez de
-  // mostrar una sección ajena a su alcance.
+  // mostrar una sección o colonia ajena a su alcance.
   const seleccion = seleccionCruda?.actuanteId === actuante.id ? seleccionCruda : null;
+  const seleccionColonia =
+    seleccionColoniaCruda?.actuanteId === actuante.id ? seleccionColoniaCruda : null;
   const [enMovimiento, setEnMovimiento] = useState(false);
+
+  // Una colonia seleccionada solo tiene sentido dentro de la vista de colonias: al salir de ella
+  // se limpia, en vez de quedar viva de fondo esperando a que se vuelva a entrar.
+  useEffect(() => {
+    if (!vistaEsDeColonias(vista)) setSeleccionColonia(null);
+  }, [vista]);
 
   useEffect(() => {
     let cancelado = false;
@@ -87,6 +105,10 @@ export function MapaPagina({
     ? (datos?.porClave.get(claveSeleccionada) ?? null)
     : null;
 
+  const coloniaSeleccionada = seleccionColonia?.rasgo.properties.colonia_id ?? null;
+  const datoColoniaSeleccion =
+    coloniaSeleccionada != null ? (datos?.porColonia.get(coloniaSeleccionada) ?? null) : null;
+
 
   return (
     <div
@@ -110,9 +132,15 @@ export function MapaPagina({
             datos={datos}
             vista={vista}
             claveSeleccionada={claveSeleccionada}
-            onClicSeccion={(rasgo, origen) =>
-              setSeleccion({ rasgo, origen, actuanteId: actuante.id })
-            }
+            coloniaSeleccionada={coloniaSeleccionada}
+            onClicSeccion={(rasgo, origen) => {
+              setSeleccion({ rasgo, origen, actuanteId: actuante.id });
+              setSeleccionColonia(null);
+            }}
+            onClicColonia={(rasgo, origen) => {
+              setSeleccionColonia({ rasgo, origen, actuanteId: actuante.id });
+              setSeleccion(null);
+            }}
             onMovimiento={setEnMovimiento}
           />
 
@@ -144,6 +172,17 @@ export function MapaPagina({
               origen={seleccion.origen}
               enMovimiento={enMovimiento}
               onCerrar={() => setSeleccion(null)}
+            />
+          )}
+
+          {seleccionColonia && (
+            <FichaColonia
+              key={seleccionColonia.rasgo.properties.colonia_id}
+              rasgo={seleccionColonia.rasgo}
+              dato={datoColoniaSeleccion}
+              origen={seleccionColonia.origen}
+              enMovimiento={enMovimiento}
+              onCerrar={() => setSeleccionColonia(null)}
             />
           )}
         </>

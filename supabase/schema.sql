@@ -132,6 +132,11 @@ create table personas (
 
   quiere_ser_representante boolean not null default false,
 
+  -- Origen de la carga masiva, si la persona entró por un archivo y no por captura en la calle.
+  -- La llave foránea se agrega al final, junto con actividad_origen, porque importaciones se
+  -- declara después de personas.
+  importacion_id     uuid,
+
   aviso_version      text,
   consentimiento_en  timestamptz,
   registrada_por     uuid references usuarios(id),
@@ -146,6 +151,26 @@ create or replace function normalizar_telefono(t text)
 returns text language sql immutable as $$
   select nullif(right(regexp_replace(coalesce(t,''), '\D', '', 'g'), 10), '');
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Importaciones
+-- ---------------------------------------------------------------------------
+
+-- Toda carga masiva queda registrada. No es burocracia: es lo que permite deshacer un archivo
+-- completo si resulta que no debía estar ahí. Ver PLAN-ELECTORAL.md, fase 4.
+
+create table importaciones (
+  id             uuid primary key default gen_random_uuid(),
+  archivo        text not null,
+  importada_por  uuid references usuarios(id),
+  renglones      integer not null default 0,
+  nuevas         integer not null default 0,
+  actualizadas   integer not null default 0,
+  rechazadas     integer not null default 0,
+  created_at     timestamptz not null default now()
+);
+
+create index importaciones_fecha_idx on importaciones (created_at desc);
 
 -- ---------------------------------------------------------------------------
 -- Actividades
@@ -182,6 +207,10 @@ create table actividades (
 alter table personas
   add constraint personas_actividad_origen_fkey
   foreign key (actividad_origen) references actividades(id);
+
+alter table personas
+  add constraint personas_importacion_fkey
+  foreign key (importacion_id) references importaciones(id) on delete set null;
 
 create table actividad_colaboradores (
   actividad_id uuid references actividades(id) on delete cascade,
@@ -274,6 +303,7 @@ create index personas_created_at_idx     on personas (created_at desc);
 create index personas_participar_idx     on personas (quiere_participar) where quiere_participar;
 create index personas_info_idx           on personas (quiere_info) where quiere_info;
 create index personas_promovido_idx      on personas (es_promovido) where es_promovido;
+create index personas_importacion_idx    on personas (importacion_id) where importacion_id is not null;
 create index personas_representante_idx  on personas (quiere_ser_representante)
   where quiere_ser_representante;
 
@@ -310,6 +340,22 @@ create index asignaciones_demarcacion_idx  on asignaciones_responsable (demarcac
 create index solicitudes_persona_idx       on solicitudes (persona_id);
 create index fotos_actividad_idx           on fotos (actividad_id);
 
+-- Resultados de elecciones y consultas pasadas, por sección. Genérica a propósito: la capa que se
+-- pidió es la de la revocación de mandato de 2022, pero el mismo molde sirve para cualquier otro
+-- proceso sin volver a tocar el esquema. El reparto de votos va en jsonb porque cada proceso tiene
+-- opciones distintas: en una revocación son dos, en una elección son los partidos que compitieron.
+create table if not exists resultados_historicos (
+  id             serial primary key,
+  proceso        text not null,
+  seccion_clave  text references secciones(clave),
+  lista_nominal  integer,
+  votos_totales  integer,
+  votos          jsonb,
+  unique (proceso, seccion_clave)
+);
+
+create index if not exists resultados_proceso_idx on resultados_historicos (proceso);
+
 -- ---------------------------------------------------------------------------
 -- Vistas
 -- Se consultan desde la aplicación en lugar de armar agregaciones en el cliente.
@@ -331,7 +377,9 @@ select
   coalesce(a.activismo, 0)                        as activismo,
   coalesce(a.recorridos, 0)                       as recorridos,
   a.ultima_actividad,
-  a.proxima_actividad
+  a.proxima_actividad,
+  coalesce(p.promovidos, 0)                       as promovidos,
+  coalesce(p.aspirantes_representante, 0)         as aspirantes_representante
 from secciones s
 join demarcaciones d on d.id = s.demarcacion_id
 left join asignaciones_responsable ar
@@ -341,7 +389,9 @@ left join lateral (
   select
     count(*)                                             as personas,
     count(*) filter (where pe.quiere_participar)         as quieren_participar,
-    count(*) filter (where pe.quiere_info)               as quieren_info
+    count(*) filter (where pe.quiere_info)               as quieren_info,
+    count(*) filter (where pe.es_promovido)              as promovidos,
+    count(*) filter (where pe.quiere_ser_representante)  as aspirantes_representante
   from personas pe
   where pe.seccion_clave = s.clave
 ) p on true
@@ -356,6 +406,22 @@ left join lateral (
   from actividades ac
   where ac.seccion_clave = s.clave and ac.estatus <> 'cancelada'
 ) a on true;
+
+create or replace view v_colonia_resumen as
+select
+  pe.colonia_id,
+  co.nombre                                            as colonia,
+  pe.demarcacion_id,
+  pe.seccion_clave,
+  count(*)                                             as personas,
+  count(*) filter (where pe.quiere_participar)         as quieren_participar,
+  count(*) filter (where pe.quiere_info)               as quieren_info,
+  count(*) filter (where pe.es_promovido)              as promovidos,
+  count(*) filter (where pe.quiere_ser_representante)  as aspirantes_representante
+from personas pe
+join colonias co on co.id = pe.colonia_id
+where pe.colonia_id is not null
+group by pe.colonia_id, co.nombre, pe.demarcacion_id, pe.seccion_clave;
 
 create or replace view v_demarcacion_resumen as
 select

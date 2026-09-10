@@ -286,3 +286,17 @@ export function puedeVerReportesComparativos(
 ): boolean {
   return alcanceDe(usuario).tipo === "todo";
 }
+
+/**
+ * La carga masiva se restringe más que la captura de una persona. Un colaborador registra gente en
+ * la calle de una en una, pero meter un archivo de miles de renglones es otra cosa: cambia el
+ * padrón de golpe y hay que poder señalar a un responsable. Por eso solo el administrador y los
+ * responsables de demarcación.
+ *
+ * El recorte por territorio de los renglones del archivo no se decide aquí: cada renglón se
+ * revisa con puedeVerSeccion, para que nadie cargue promovidos de un territorio que no le toca.
+ */
+export function puedeImportar(usuario: UsuarioActuante | null): boolean {
+  if (!usuario || !usuario.activo) return false;
+  return usuario.rol === "admin" || usuario.rol === "resp_demarcacion";
+}

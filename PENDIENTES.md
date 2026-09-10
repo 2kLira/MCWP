@@ -193,3 +193,53 @@ documentos de `spec/`. El plan de construcción está en `PLAN-ELECTORAL.md`.
     La firma de esa función viene de antes de esta fase y cambiarla toca a todos sus llamadores.
     Falta decidir si se cambia ahora o cuando entren las cuentas de usuario, que es cuando de verdad
     importa saber quién promovió a quién.
+
+## Fase 4 de la etapa electoral
+
+22. **Quién puede hacer carga masiva.** El spec no lo dice. Se decidió: administrador general y
+    responsables de demarcación, en `puedeImportar` de `lib/permisos.ts`. Un colaborador registra
+    gente de una en una en la calle, pero meter un archivo de miles de renglones cambia el padrón de
+    golpe y hay que poder señalar a un responsable. Además cada renglón del archivo se valida contra
+    el territorio de quien lo sube: nadie carga promovidos de una sección que no le toca. Falta
+    confirmarlo con el socio.
+
+23. **Una persona que ya existe nunca se sobrescribe.** La carga masiva solo le marca
+    `es_promovido`, `promovido_en` y `promovido_por`. No le toca nombre, calle ni sección, aunque el
+    archivo traiga esos datos distintos. Un archivo de promovidos suele venir de un tercero y su
+    versión del domicilio no es mejor que la que capturó alguien en la calle. Si el socio quiere que
+    el archivo mande, es un cambio chico, pero hay que decidirlo antes de la primera carga real.
+
+24. **Un género mal escrito no tira el renglón.** Se guarda en null y la persona entra igual.
+    Perder a alguien entero por una columna opcional mal capturada sería absurdo. Los campos que sí
+    tiran el renglón son nombre, teléfono y sección.
+
+25. **Menores de 18 en la carga masiva.** La carga los rechaza, aunque el esquema sí los permita
+    (entrada 20). La contradicción es a propósito y acotada: un promovido es alguien que va a votar.
+    Cuando se resuelva la entrada 20 hay que alinear las dos reglas.
+
+26. **Deshacer una importación todavía no tiene pantalla.** La tabla `importaciones` y la columna
+    `personas.importacion_id` ya guardan lo necesario para revertir un archivo completo, y la llave
+    foránea va con `on delete set null` para que borrar el registro de la carga no borre gente. Lo
+    que falta es el botón. Se construye cuando alguien lo necesite; el dato ya se está guardando
+    desde ahora, que es lo que no se puede recuperar después.
+
+## Fase 5 de la etapa electoral
+
+27. **El calor por colonia se agrupa por colonia, demarcación y sección a la vez.** Agrupar solo por
+    colonia obligaría a decidir a qué demarcación se le cuenta cada persona, y 28 colonias cruzan
+    demarcaciones. Con la vista partida así, el recorte por rol funciona con `aplicarAlcance` sin
+    inventar nada, quien ve todo el municipio suma los renglones, y una colonia partida aparece con
+    sus pedazos separados, que es la verdad. La ficha de colonia lo dice cuando pasa. Falta
+    confirmar si al socio le sirve así o prefiere repartir proporcionalmente con el
+    `colonia_seccion.traslape_pct` que ya está guardado.
+
+28. **El conteo por colonia sale de la colonia declarada, no de geometría.** Una persona cuenta en
+    la colonia que se le capturó, no en el polígono donde cayó su coordenada. Si algún día se
+    quieren las dos cifras, la geometría ya está y el cálculo es un punto en polígono más. Hasta
+    entonces la pantalla lo dice: la colonia es referencia, la sección es la unidad exacta.
+
+29. **`resultados_historicos` está creada pero vacía.** Es la tabla genérica para la capa de
+    revocación de mandato y para cualquier otro proceso pasado. El reparto de votos va en jsonb
+    porque cada proceso tiene opciones distintas. **Falta el archivo**: los resultados de la
+    revocación de 2022 por sección son públicos y los publica el INE, pero nadie los ha cargado.
+    Sin ellos la capa no se puede construir, y por eso es lo único de la fase 5 que queda fuera.

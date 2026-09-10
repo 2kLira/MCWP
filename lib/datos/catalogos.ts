@@ -37,6 +37,26 @@ export type SeccionResumen = {
   recorridos: number;
   ultima_actividad: string | null;
   proxima_actividad: string | null;
+  promovidos: number;
+  aspirantes_representante: number;
+};
+
+/**
+ * Resumen por colonia, partido por demarcación y sección: 28 colonias cruzan demarcaciones, y
+ * agrupar solo por colonia obligaría a decidir a qué territorio se le cuenta cada persona. Con
+ * esta forma, aplicarAlcance recorta sin inventar nada; quien ve todo el municipio suma los
+ * renglones por colonia.
+ */
+export type ColoniaResumen = {
+  colonia_id: number;
+  colonia: string;
+  demarcacion_id: number | null;
+  seccion_clave: string | null;
+  personas: number;
+  quieren_participar: number;
+  quieren_info: number;
+  promovidos: number;
+  aspirantes_representante: number;
 };
 
 export type DemarcacionResumen = {
@@ -108,6 +128,19 @@ export function seccionesResumen(
   return lista<SeccionResumen>(
     aplicarAlcance(consulta, usuario, { seccion: "clave" }).order("clave"),
   );
+}
+
+/**
+ * Resumen por colonia, demarcación y sección a la vez, ya recortado al territorio del usuario
+ * actuante. Cada renglón es la porción de una colonia dentro de una sección; una colonia partida
+ * entre demarcaciones aparece en varios renglones. Devuelve vacío sin tronar si la vista todavía
+ * no existe.
+ */
+export function coloniaResumen(
+  usuario: UsuarioActuante | null,
+): Promise<Resultado<ColoniaResumen[]>> {
+  const consulta = db().from("v_colonia_resumen").select("*");
+  return lista<ColoniaResumen>(aplicarAlcance(consulta, usuario).order("colonia"));
 }
 
 /** Resumen por demarcación, recortado igual. */

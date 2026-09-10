@@ -6,13 +6,14 @@ import {
   LayoutDashboard,
   ListChecks,
   Map,
+  Upload,
   UserCog,
   UserPlus,
   Users,
   type LucideIcon,
 } from "lucide-react";
 import type { Route } from "next";
-import { puedeCrear, puedeVerUsuarios } from "@/lib/permisos";
+import { puedeCrear, puedeImportar, puedeVerUsuarios } from "@/lib/permisos";
 import type { UsuarioActuante } from "@/lib/tipos";
 
 export type Destino = {
@@ -38,6 +39,12 @@ export const DESTINOS: readonly Destino[] = [
     etiqueta: "Registrar persona",
     icono: UserPlus,
     visible: (usuario) => puedeCrear(usuario, "persona"),
+  },
+  {
+    href: "/importar",
+    etiqueta: "Carga masiva",
+    icono: Upload,
+    visible: puedeImportar,
   },
   {
     href: "/usuarios",
