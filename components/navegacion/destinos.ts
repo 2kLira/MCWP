@@ -28,7 +28,7 @@ export type Destino = {
 export const DESTINOS: readonly Destino[] = [
   { href: "/", etiqueta: "Tablero", icono: LayoutDashboard },
   { href: "/mapa", etiqueta: "Mapa", icono: Map },
-  { href: "/personas", etiqueta: "Personas", icono: Users },
+  { href: "/personas", etiqueta: "Personas alcanzadas", icono: Users },
   { href: "/actividades", etiqueta: "Actividades", icono: CalendarDays },
   { href: "/agenda", etiqueta: "Agenda", icono: CalendarDays },
   { href: "/territorio", etiqueta: "Estructura territorial", icono: Building2 },

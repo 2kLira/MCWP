@@ -4,7 +4,7 @@ export type RolUsuario =
   | "admin"
   | "resp_demarcacion"
   | "resp_seccion"
-  | "colaborador";
+  | "brigadista";
 
 /** El usuario que está actuando en la sesión. Sin login, lo elige el conmutador de rol. */
 export type UsuarioActuante = {
@@ -56,7 +56,7 @@ export const ETIQUETA_GENERO: Record<Genero, string> = {
   no_especifica: "Prefiere no decir",
 };
 
-export type TipoActividad = "reunion" | "activismo" | "recorrido";
+export type TipoActividad = "reunion" | "activismo" | "recorrido" | "crucero";
 export type EstatusActividad =
   | "programada"
   | "en_curso"
@@ -67,13 +67,14 @@ export const ETIQUETA_ROL: Record<RolUsuario, string> = {
   admin: "Administrador general",
   resp_demarcacion: "Responsable de demarcación",
   resp_seccion: "Responsable de sección",
-  colaborador: "Colaborador",
+  brigadista: "Brigadista",
 };
 
 export const ETIQUETA_TIPO_ACTIVIDAD: Record<TipoActividad, string> = {
   reunion: "Reunión",
   activismo: "Actividad de activismo",
   recorrido: "Recorrido",
+  crucero: "Crucero",
 };
 
 export const ETIQUETA_ESTATUS: Record<EstatusActividad, string> = {

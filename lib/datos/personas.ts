@@ -32,6 +32,12 @@ export type Persona = {
   promovido_en: string | null;
   promovido_por: string | null;
   quiere_ser_representante: boolean;
+  /**
+   * Quién la trajo, si llegó por un promotor. Columna nueva, todavía sin migración aplicada: ver
+   * PENDIENTES.md / el reporte de la fase D. Se codifica contra este nombre para que la migración
+   * solo tenga que agregar la columna, sin tocar el código.
+   */
+  promotor_id: string | null;
 };
 
 export type PersonaEnLista = Pick<
@@ -189,6 +195,8 @@ export type EntradaPersona = {
   fecha_nacimiento?: string | null;
   es_promovido?: boolean;
   quiere_ser_representante?: boolean;
+  /** Igual que en Persona: columna sin migración todavía. Ver el aviso de crearPersona. */
+  promotor_id?: string | null;
 };
 
 export function crearPersona(entrada: EntradaPersona): Promise<Resultado<Persona | null>> {
@@ -244,4 +252,90 @@ export async function marcarPromovido(
       }
     : { es_promovido: false, promovido_en: null, promovido_por: null };
   return uno<Persona>(db().from("personas").update(fila).eq("id", id).select().single());
+}
+
+/* ---------------------------------------------------------------------------
+ * Solicitudes (petición particular del registro rápido)
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Alta de una solicitud. Por el andamiaje de esta fase (solo puede tocarse este archivo, no
+ * lib/datos/catalogos.ts ni uno nuevo lib/datos/solicitudes.ts), la función vive aquí en lugar de
+ * en un módulo propio. Si en otra fase se libera ese archivo, esta función se muda ahí completa.
+ */
+export function crearSolicitud(entrada: {
+  personaId: string;
+  participacionId?: string | null;
+  tema: string;
+  descripcion?: string | null;
+  requiereSeguimiento?: boolean;
+}): Promise<Resultado<{ id: string } | null>> {
+  return uno<{ id: string }>(
+    db()
+      .from("solicitudes")
+      .insert({
+        persona_id: entrada.personaId,
+        participacion_id: entrada.participacionId ?? null,
+        tema: entrada.tema,
+        descripcion: entrada.descripcion ?? null,
+        requiere_seguimiento: entrada.requiereSeguimiento ?? false,
+      })
+      .select("id")
+      .single(),
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Exportación
+ * ------------------------------------------------------------------------- */
+
+export type PromovidoExportable = {
+  nombre: string;
+  telefono_norm: string | null;
+  seccion_clave: string | null;
+  demarcacion_id: number | null;
+  genero: Genero | null;
+  fecha_nacimiento: string | null;
+  promovido_en: string | null;
+  // Embed de la colonia por su relación con colonia_id. Objeto y no arreglo: cada persona tiene
+  // cuando mucho una colonia.
+  colonias: { nombre: string } | null;
+};
+
+/**
+ * Promovidos listos para exportar, con los mismos filtros que la lista de personas y siempre con
+ * es_promovido en verdadero: lo que se ve en pantalla es lo que se descarga. Sin límite de página
+ * porque el CSV se arma de una sola vez, no se pagina.
+ */
+export async function listarPromovidosExportar(
+  usuario: UsuarioActuante | null,
+  filtros: FiltrosPersonas = {},
+): Promise<Resultado<PromovidoExportable[]>> {
+  let consulta = db()
+    .from("personas")
+    .select(
+      "nombre, telefono_norm, seccion_clave, demarcacion_id, genero, fecha_nacimiento, promovido_en, colonias(nombre)",
+    );
+
+  consulta = aplicarAlcance(consulta, usuario);
+  consulta = consulta.eq("es_promovido", true);
+
+  if (filtros.demarcacionId) consulta = consulta.eq("demarcacion_id", filtros.demarcacionId);
+  if (filtros.seccionClave) consulta = consulta.eq("seccion_clave", filtros.seccionClave);
+  if (filtros.quiereParticipar) consulta = consulta.eq("quiere_participar", true);
+  if (filtros.quiereInfo) consulta = consulta.eq("quiere_info", true);
+  if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
+  if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
+
+  const texto = filtros.texto?.trim();
+  if (texto) {
+    const digitos = texto.replace(/\D/g, "");
+    consulta =
+      digitos.length >= 4
+        ? consulta.or(`nombre.ilike.%${texto}%,telefono_norm.ilike.%${digitos}%`)
+        : consulta.ilike("nombre", `%${texto}%`);
+  }
+
+  const { data, error } = await consulta.order("promovido_en", { ascending: false }).limit(5000);
+  return resultado((data ?? []) as unknown as PromovidoExportable[], error, []);
 }

@@ -1,5 +1,5 @@
 /**
- * Reunión, actividad de activismo y recorrido son una sola entidad con una columna `tipo`.
+ * Reunión, activismo, recorrido y crucero son una sola entidad con una columna `tipo`.
  * El cierre lo consolida el sistema: el responsable únicamente escribe la conclusión.
  */
 
@@ -11,7 +11,6 @@ import { db, lista, resultado, uno, type Resultado } from "@/lib/datos/cliente";
 export type Actividad = {
   id: string;
   tipo: TipoActividad;
-  subtipo: string | null;
   nombre: string;
   fecha: string;
   hora: string | null;
@@ -304,16 +303,16 @@ export function agregarFoto(entrada: {
   );
 }
 
-export function agregarColaborador(actividadId: string, usuarioId: string) {
-  return db().from("actividad_colaboradores").upsert({
+export function agregarBrigadista(actividadId: string, usuarioId: string) {
+  return db().from("actividad_brigadistas").upsert({
     actividad_id: actividadId,
     usuario_id: usuarioId,
   });
 }
 
-export function quitarColaborador(actividadId: string, usuarioId: string) {
+export function quitarBrigadista(actividadId: string, usuarioId: string) {
   return db()
-    .from("actividad_colaboradores")
+    .from("actividad_brigadistas")
     .delete()
     .eq("actividad_id", actividadId)
     .eq("usuario_id", usuarioId);

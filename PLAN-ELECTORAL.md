@@ -1,230 +1,172 @@
-# Plan de la etapa electoral
+# Plan de la etapa electoral, versión 2
 
-Este documento traduce la lista de requerimientos nuevos a fases construibles, en el orden en que se
-pueden construir. La regla de trabajo no cambia: una fase a la vez, `npm run build` al terminar cada
-una, y no se empieza la siguiente sin que la anterior compile.
+Reemplaza a `PLAN-ELECTORAL-v1.md`, que queda solo como registro de lo que se decidió antes. Este
+documento recoge las notas del 11 de septiembre de 2026 y reordena todo lo que falta.
 
-El cambio de fondo es que el sistema deja de ser solo estructura territorial y se vuelve además
-operación electoral: casillas, promovidos y jornada. Eso trae dos consecuencias que conviene decir
-antes de escribir una línea de código.
-
-**La primera.** Las fases 6 y 7 no se pueden construir sin cuentas de usuario. Un jefe de casilla que
-reporta un acta tiene que ser una persona identificada, y un capturista al que se le caduca el acceso
-necesita tener un acceso que caducar. El bloque de autenticación deja de ser trabajo de producción y
-se convierte en prerrequisito de esas dos fases.
-
-**La segunda.** La intención de voto es dato personal sensible. Un teléfono y un nombre son datos
-personales normales; saber que una persona va a votar en cierto sentido revela su opinión política, y
-eso cambia el nivel de consentimiento y de protección que exige la ley. No es un detalle de abogados:
-condiciona el aviso de privacidad, el cifrado de esa columna y quién puede consultarla. Está anotado
-en `PENDIENTES.md` y hay que resolverlo antes de la primera carga real de promovidos.
+La regla de trabajo no cambia: una fase a la vez, `npm run build` al terminar cada una, y no se
+empieza la siguiente sin que la anterior compile. Las migraciones las corre el cliente en el editor
+SQL de Supabase.
 
 ---
 
-## Fase 1 · Ficha de persona completa
+## Qué cambió respecto a la versión 1
 
-La más barata y la que no depende de nadie. Se puede empezar hoy.
+**Se da por hecho lo ya construido.** La fase 1 de la v1 (género, fecha de nacimiento, promovidos,
+validación de teléfono, cumpleaños) está terminada y sembrada. La fase 4 (carga masiva de
+promovidos) está terminada. De la fase 5 quedó el calor de promovidos por sección.
 
-**Base de datos**
+**Se retira trabajo terminado.** Las vistas de mapa de **problemáticas** y de **colonias** se
+eliminan. La de colonias se construyó apenas y sale: lo que se quería no era una capa de calor por
+colonia, sino saber qué colonias integran cada sección, que es un dato de la ficha y no del mapa. Las
+problemáticas se siguen capturando y se siguen reportando; lo que desaparece es su capa en el mapa.
 
-- `personas.genero` — enum `mujer | hombre | otro | no_especifica`. Se captura, nunca se infiere.
-- `personas.fecha_nacimiento` — `date`, opcional. De ahí sale la edad, que no se guarda calculada.
-- `personas.es_promovido` — booleano, con `promovido_en` y `promovido_por`.
-- `personas.quiere_ser_representante` — booleano.
-- Vista `v_cumpleanos_hoy`, recortada por territorio como todas las demás.
+**Cambia el lenguaje del sistema.** "Personas" pasa a "Personas alcanzadas". El rol "colaborador"
+pasa a "brigadista". No son etiquetas: son los nombres con los que esta gente se llama a sí misma, y
+el sistema tiene que hablar como ellos.
 
-**Por qué booleano y no un estatus con escalones.** Un estatus tipo
-`alcanzada → interesada → promovida` obliga a que las tres cosas sean excluyentes, y no lo son: una
-persona puede querer información, querer participar y además ser promovida, las tres a la vez. Los
-tres campos ya existentes o nuevos son independientes y el conteo de promovidos sale igual de fácil.
-Si el socio prefiere la escalera, es un cambio de una columna y está anotado en `PENDIENTES.md`.
+**La unidad de medida deja de ser la persona y pasa a ser el voto.** Cada sección gana meta de votos
+y lista nominal, y las secciones se clasifican en prioritarias A, prioritarias B y el resto. Esa
+clasificación es la que manda en el mapa y en los listados.
 
-**Interfaz**
+**La casilla entra al centro.** Ya no es solo cartografía: es el lugar donde se registran titulares y
+suplentes, con su estado de capacitación, de manual y de acreditación, y con barras de avance. Y el
+día de la elección, 402 representantes con usuario propio reportan desde ahí.
 
-- Registro rápido: género y fecha de nacimiento. Ninguno obligatorio, para no alargar la captura en
-  la calle.
-- Teléfono con validación de número mexicano: diez dígitos, lada existente, y aviso en vivo si ya
-  está registrado. El duplicado ya se detecta hoy; lo que falta es rechazar de entrada lo que no
-  puede ser un teléfono. En la maqueta se conserva la advertencia de que el número esté fuera del
-  rango sembrado.
-- Filtros de la lista de personas: quiere participar, quiere información, promovido, quiere ser
-  representante, género y rango de edad.
-- Tablero: zona de cumpleaños de hoy, con el botón de WhatsApp que ya existe en la ficha.
-
-**Tamaño** Chico. Nada de esto toca el mapa.
+**Cae la escalera de permisos por estatus.** Brigadistas, responsables de sección y responsables de
+demarcación dejan de ver las actividades realizadas: solo programadas y en curso. Lo cerrado es
+historia, y la historia es de quien coordina.
 
 ---
 
-## Fase 2 · Las 169 secciones
+## Archivos que hacen falta y no están
 
-**Está bloqueada, y conviene saberlo desde ahora.** El repositorio tiene geometría de 157 secciones.
-El catálogo de 169 no está en `data/`: de las 18 secciones sin geometría, la cartografía solo nombra
-9 como sucesoras de las sustitutas. Las otras 9 no aparecen en ningún archivo del proyecto.
+Tres, y bloquean fases completas. Van en `data/`.
 
-**Lo que hay que pedir** El listado de las 169 claves de sección con su demarcación asignada. Es un
-archivo chico y con eso la fase se destraba.
+1. **Excel de lista nominal por sección.** Bloquea la meta de votos y los indicadores de avance.
+2. **Archivo de coordenadas de casilla.** Bloquea el mapa de casillas y todo lo que cuelga de él.
+3. **Clasificación de secciones prioritarias A y B.** Si viene dentro del Excel de lista nominal, se
+   destraba junto con el primero.
 
-**Lo bueno** El esquema ya está preparado. La geometría vive en su propia tabla, `secciones_geom`,
-separada del catálogo `secciones`. Así que las 169 entran al catálogo y solo 157 tienen polígono, sin
-inventar geometrías falsas.
-
-- `secciones.tiene_geometria` — derivado de la existencia del renglón en `secciones_geom`.
-- Las 18 sin polígono aparecen en listas, conteos, buscador y asignación de responsables, con la nota
-  de que no se pintan todavía. Igual de visibles que las sustitutas, por la misma razón: esconderlas
-  produce cifras que no cuadran.
-- Los conteos del tablero pasan a decir 169, y el mapa sigue pintando 157. Esa diferencia se explica
-  en la propia pantalla, no en la junta.
-
-**Tamaño** Chico una vez que llegue el archivo.
+Los resultados de revocación de mandato y los demás históricos se cargarán por CSV más adelante. La
+tabla `resultados_historicos` ya existe y se queda vacía a propósito.
 
 ---
 
-## Fase 3 · Casillas y representantes
+## Fase A · Lenguaje y limpieza
 
-**Base de datos**
+Sin dependencias. Se empieza de inmediato. Toca muchos archivos pero no tiene decisiones abiertas.
 
-- `casillas` — `id`, `seccion_clave`, `tipo` (`basica | contigua | extraordinaria | especial`),
-  `numero`, `nombre_ubicacion`, `domicilio`, `lat`, `lng`, `lista_nominal`, `ubicacion_confirmada`.
-- `representantes_casilla` — `persona_id`, `casilla_id`, `cargo`
-  (`propietario_1 | propietario_2 | suplente | general`), `acreditado`, `asignado_por`, `asignado_en`.
+- **"Personas" pasa a "Personas alcanzadas"** en navegación, tablero, listas, reportes y filtros.
+- **"Colaborador" pasa a "brigadista"**, incluido el valor del enum en la base y la tabla
+  `actividad_colaboradores`, que pasa a `actividad_brigadistas`. Se renombra completo y no solo la
+  etiqueta: dejar `colaborador` en el esquema mientras la pantalla dice otra cosa confunde a quien
+  reciba esto después.
+- **Se eliminan del mapa las vistas de problemáticas y de colonias.** Los datos se quedan, las capas
+  no.
+- **Actividades**: se quita `subtipo` y se agrega `crucero` a los tipos, junto a reunión, activismo y
+  recorrido.
 
-**Interfaz**
-
-- Capa de casillas en el mapa, sobre los polígonos de sección, con conteo agrupado al alejar.
-- **Fijar coordenada.** Herramienta para colocar y mover el punto de una casilla con un toque en el
-  mapa, igual que se resuelve hoy la ubicación de una persona. Al confirmar se marca
-  `ubicacion_confirmada` con quién y cuándo. Es la respuesta al catálogo del INE, que trae domicilio
-  pero no siempre coordenada usable.
-- Bandeja de candidatos a representante: la gente que marcó que quiere serlo, filtrada por sección,
-  lista para asignar a una casilla.
-- Ficha de casilla: ubicación, lista nominal, representantes asignados y huecos por cubrir.
-- Ficha de sección: sus casillas y cuántos representantes le faltan.
-
-**Lo que hay que pedir** El catálogo de casillas con domicilio y lista nominal. Si no trae
-coordenadas, se fijan a mano con la herramienta anterior, que para eso existe.
-
-**Tamaño** Mediano. Es la primera fase que toca el mapa de verdad.
+**Migración** `2026-09-11-faseA-lenguaje.sql`.
 
 ---
 
-## Fase 4 · Carga masiva de promovidos
+## Fase B · La sección como unidad de meta
 
-**Interfaz**
+Depende del Excel de lista nominal para llenarse, pero **el código se construye desde ahora** y los
+campos quedan capturables a mano mientras el archivo llega.
 
-- Pantalla de importación con plantilla descargable, para que el archivo llegue con las columnas
-  correctas en lugar de adivinarlas.
-- Validación renglón por renglón antes de escribir nada: teléfono válido, sección existente, nombre
-  presente.
-- Previsualización con tres montones a la vista: nuevos, ya existentes que se van a marcar como
-  promovidos, y rechazados con el motivo escrito en español.
-- Nada se escribe hasta que alguien confirma. Una persona que ya existe nunca se sobrescribe en
-  silencio: se le agrega la marca de promovida y el origen.
-- Cada importación queda registrada con quién la hizo, cuándo, cuántos renglones y de qué archivo.
-
-**Por qué tanto cuidado** La carga masiva es la vía más fácil por la que entran datos de origen
-dudoso a un sistema como este. El registro de origen no es burocracia: es lo que permite deshacer una
-carga completa si resulta que el archivo no debía estar ahí.
-
-**Tamaño** Mediano.
+- `secciones.lista_nominal`, `secciones.meta_votos` y `secciones.prioridad` (`a`, `b` o vacío).
+- **Ficha de sección**: lista nominal, meta de votos, promovidos, y el avance contra la meta. El
+  avance es lo que se mira en la junta, no el conteo suelto.
+- **Detalle de colonias que integran cada sección**, desde la cartografía que ya está cargada. Es lo
+  que sustituye a la capa de colonias que se retira.
+- Indicadores de meta y avance en el tablero, recortados por territorio como todo lo demás.
 
 ---
 
-## Fase 5 · Mapas de calor
+## Fase C · Secciones prioritarias
 
-Tres capas nuevas sobre la misma escala naranja que ya define el sistema de diseño.
+Depende de la clasificación A y B.
 
-**Colonias.** Calor por colonia. Con una advertencia que hay que poner en la propia pantalla: la
-colonia es referencia, no unidad exacta, y 28 colonias están partidas entre demarcaciones. El conteo
-se hace por la colonia declarada de cada persona, no por geometría, y cuando colonia y sección se
-contradicen sigue ganando la sección.
-
-**Revocación de mandato.** Capa con el resultado por sección. Se carga en una tabla genérica,
-`resultados_historicos` — `proceso`, `seccion_clave`, `lista_nominal`, `participacion`, `votos` —
-para que sirva igual con cualquier otra elección pasada sin volver a tocar el esquema. Los resultados
-de la consulta de 2022 por sección son públicos y los publica el INE.
-
-**Promovidos.** Calor de promovidos por sección, y avance contra meta cuando existan metas.
-
-**Tamaño** Mediano. La cañería del mapa ya existe; esto agrega capas, no motor.
+- **Listado nuevo**, después de Recorridos: secciones prioritarias, con A y B en listas separadas,
+  cada una con sus indicadores.
+- **Vista de mapa nueva**, que ocupa el lugar que dejan las dos que se retiran. La escala naranja
+  dice de un vistazo qué falta por recorrer: las prioritarias ya recorridas en naranja pleno, las
+  prioritarias pendientes en el naranja intermedio, y las que no son prioritarias en naranja casi
+  transparente, para que estén pero no compitan.
+- Una sección cuenta como recorrida cuando tiene al menos una actividad de tipo recorrido en estatus
+  realizada. Esa definición se escribe aquí para que no se invente dos veces.
 
 ---
 
-## Fase 6 · Jornada electoral
+## Fase D · Captura de personas alcanzadas
 
-**Requiere cuentas de usuario.** No se puede construir antes del bloque de autenticación.
+Sin dependencias externas. Se puede construir en paralelo a la B.
 
-**Base de datos**
-
-- `jornada_checkin` — el jefe de casilla declara que está en su casilla, con hora y coordenada. La
-  coordenada se compara con la de la casilla y se marca si no coincide.
-- `incidencias` — casilla, hora, tipo, descripción, foto, gravedad, estado de atención.
-- `actas` — casilla, foto del acta, votos capturados, hora, quién.
-- Vista de preconteo: agregación en vivo de las actas capturadas, siempre acompañada del porcentaje
-  de casillas que ya reportaron, porque un preconteo sin ese porcentaje no significa nada.
-
-**Interfaz**
-
-- Mapa de jornada con las casillas coloreadas por estado: sin reportar, instalada, con incidencia,
-  acta recibida.
-- Pantalla de jefe de casilla, pensada para celular y para un pulgar: estoy en casilla, reportar
-  incidencia, subir acta.
-- Preconteo con su etiqueta bien visible de que es un cálculo interno y no un resultado oficial.
-- **Compartir mapa** con enlace de solo lectura, caducable, que muestra únicamente agregados por
-  casilla. Ningún nombre, ningún teléfono, ninguna ficha de persona.
-
-**La consecuencia técnica que hay que aceptar.** El día de la jornada la señal se cae, y se cae justo
-donde hay más gente. La cola de captura sin señal, que hasta hoy estaba fuera de alcance y cotizada
-aparte, deja de ser opcional en esta fase: sin ella, un acta capturada en una escuela sin señal se
-pierde. Hay que construirla aquí o asumir que el preconteo va a tener huecos.
-
-**Tamaño** Grande. Es la fase más pesada de todas y la que tiene fecha inamovible.
+- **Problemática nueva**: servicios de salud.
+- **Petición particular que requiere seguimiento**: casilla y texto en el formulario de registro. La
+  tabla `solicitudes` ya tiene `requiere_seguimiento`, así que esto es interfaz y conexión, no
+  esquema nuevo.
+- **Promotor**: se pregunta sí o no, y al decir sí se despliega el menú de promotores registrados.
+- **La sección se puede cambiar a mano.** Hoy sale del GPS o de un toque en el mapa y se muestra como
+  confirmación; ahora además se puede corregir, porque el GPS falla y quien captura sabe dónde está.
+  La regla de fondo no cambia: el sistema propone, la persona corrige, y queda registrado de dónde
+  salió.
+- **Filtro por sección en todas las listas de personas**, incluidas promovidos y representantes.
+- **Exportación a Excel de promovidos**, por sección y por colonia.
 
 ---
 
-## Fase 7 · Capturistas por actividad
+## Fase E · Actividades y quién ve qué
 
-**Requiere cuentas de usuario.**
+Sin dependencias externas.
 
-- Invitar a una persona a una actividad genera un acceso temporal, atado a esa actividad y a su
-  sección.
-- Ese acceso abre una sola pantalla: el formulario de registro. Sin listas, sin mapa, sin fichas, sin
-  buscador.
-- Al cerrar la actividad el acceso caduca solo. La sesión se invalida y la pantalla deja de servir.
-- Lo capturado no se borra. Queda atribuido a esa persona y a esa actividad, para siempre.
+- **El responsable de una actividad ya no tiene que ser el responsable de esa sección.** Puede ser
+  cualquiera, y la actividad lleva su propia sección, que se elige al crearla.
+- **Evidencia de inicio y de cierre.** Al arrancar la actividad, el responsable sube una foto con
+  sello de tiempo y coordenada; al cerrar, la evidencia final. La hora y el lugar los pone el
+  sistema, no se teclean.
+- **Brigadista**: solo su agenda y sus actividades programadas o en curso. Al cerrarse, la actividad
+  desaparece de su vista.
+- **Responsable de sección y de demarcación**: en actividades y en agenda, solo programadas y en
+  curso.
 
-**Una precisión sobre el requerimiento** «Se les borra su página» se implementa como caducidad del
-acceso, no como borrado de datos. Borrar lo capturado dejaría la actividad sin sus registros y
-rompería los conteos que el sistema consolida al cerrarla.
+---
 
-**Por qué esta fase mejora la seguridad en lugar de complicarla.** Hoy el modo de invitar a alguien a
-capturar sería darle una cuenta permanente. Un acceso que expira solo, atado a una actividad y a un
-territorio, es la versión estrecha de eso: menos gente con llave, y por menos tiempo.
+## Fase F · Casillas y representantes
 
-**Tamaño** Mediano, una vez que existan las cuentas.
+Bloqueada por el archivo de coordenadas de casilla.
+
+- Tabla de casillas con su punto, su sección y su lista nominal.
+- **Mapa de casillas.** Al seleccionar un punto se registran **titular y suplente**, editables.
+- Cada representante lleva tres estados, que son los que se preguntan en la junta:
+  capacitado o por capacitar, manual entregado o pendiente, acreditación o pendiente.
+- **Dos barras de avance** sobre el mapa: titulares cubiertos contra faltantes, y lo mismo para
+  suplentes. Es el indicador que contesta "¿cómo vamos?" sin abrir nada.
+
+---
+
+## Fase G · Jornada electoral
+
+Bloqueada por las cuentas de usuario y por la fase F.
+
+- **402 representantes con usuario propio**, cada uno atado a su casilla.
+- Reporte de incidencias con foto.
+- Subida de actas, **una por casilla**.
+- **Contador de votos por partido**, capturado del acta.
+- Métricas de la jornada: actas entregadas y casillas pendientes.
 
 ---
 
 ## Orden y dependencias
 
 ```
-Fase 1  Ficha de persona          sin dependencias, se empieza hoy
-Fase 2  169 secciones             espera el catálogo del cliente
-Fase 3  Casillas                  espera el catálogo de casillas
-Fase 4  Carga masiva              después de la fase 1
-Fase 5  Mapas de calor            después de las fases 3 y 4
-        Cuentas y permisos        prerrequisito de lo que sigue
-Fase 6  Jornada                   después de cuentas, y con cola sin señal
-Fase 7  Capturistas efímeros      después de cuentas
+Fase A  Lenguaje y limpieza        se empieza hoy
+Fase D  Captura de personas        se empieza hoy, en paralelo a la A
+Fase E  Actividades y visibilidad  después de la A, porque toca los mismos archivos
+Fase B  Sección como meta          código desde hoy, datos con el Excel de lista nominal
+Fase C  Secciones prioritarias     espera la clasificación A y B
+        Cuentas de usuario         prerrequisito de lo que sigue
+Fase F  Casillas y representantes  espera el archivo de coordenadas
+Fase G  Jornada                    después de cuentas y de la F
 ```
-
-Las fases 1, 2, 4 y 5 se pueden seguir presentando como maqueta con datos sembrados. Las fases 6 y 7
-ya no: implican gente identificada haciendo cosas reales, y ahí se cruza la línea a producción.
-
-## Lo que hay que pedir para destrabar
-
-1. Catálogo de las 169 secciones con su demarcación.
-2. Catálogo de casillas con domicilio, tipo y lista nominal.
-3. Resultados de revocación de mandato por sección, si se quieren de una fuente distinta a la pública
-   del INE.
-4. Decisión sobre el aviso de privacidad y el tratamiento de la intención de voto.
-5. Confirmación de si «promovido» es un campo independiente o un escalón de estatus.

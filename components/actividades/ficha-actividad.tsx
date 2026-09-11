@@ -23,9 +23,9 @@ import {
   type ParticipacionEnLista,
 } from "@/lib/datos/actividades";
 import {
-  colaboradoresDeActividad,
+  brigadistasDeActividad,
   obtenerUsuario,
-  type Colaborador,
+  type Brigadista,
   type UsuarioBreve,
 } from "@/components/actividades/datos";
 
@@ -58,8 +58,8 @@ export function FichaActividad({ id }: { id: string }) {
     [actividad.datos?.responsable_id, recargar],
   );
 
-  const colaboradores = useConsulta<Colaborador[]>(
-    () => colaboradoresDeActividad(id),
+  const brigadistas = useConsulta<Brigadista[]>(
+    () => brigadistasDeActividad(id),
     [],
     [id, recargar],
   );
@@ -127,10 +127,7 @@ export function FichaActividad({ id }: { id: string }) {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-xl">{a.nombre}</h1>
-          <p className="text-sm text-tinta-suave">
-            {ETIQUETA_TIPO_ACTIVIDAD[a.tipo]}
-            {a.subtipo && ` · ${a.subtipo}`}
-          </p>
+          <p className="text-sm text-tinta-suave">{ETIQUETA_TIPO_ACTIVIDAD[a.tipo]}</p>
         </div>
         <span className="pildora shrink-0">{ETIQUETA_ESTATUS[a.estatus]}</span>
       </header>
@@ -150,11 +147,11 @@ export function FichaActividad({ id }: { id: string }) {
         />
         <Dato etiqueta="Responsable" valor={responsable.datos?.nombre ?? "Sin asignar"} />
         <Dato
-          etiqueta="Colaboradores"
+          etiqueta="Brigadistas"
           valor={
-            colaboradores.datos.length > 0
-              ? colaboradores.datos.map((c) => c.nombre).join(", ")
-              : "Sin colaboradores"
+            brigadistas.datos.length > 0
+              ? brigadistas.datos.map((c) => c.nombre).join(", ")
+              : "Sin brigadistas"
           }
         />
         {a.objetivo && <Dato etiqueta="Objetivo" valor={a.objetivo} ancho />}

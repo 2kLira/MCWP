@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, LoaderCircle, MapPin, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, LoaderCircle, MapPin, Search, TriangleAlert } from "lucide-react";
 import { SelectorPunto } from "@/components/registro/selector-punto";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId, DEMARCACIONES } from "@/lib/demarcaciones";
@@ -11,8 +11,17 @@ import {
   rasgoPorClave,
   seccionPorPunto,
   validarTelefonoMexicano,
+  type ColeccionSecciones,
+  type PropiedadesSeccion,
 } from "@/lib/territorio";
-import { crearPersona, buscarPorTelefono, type Persona } from "@/lib/datos/personas";
+import {
+  crearPersona,
+  crearSolicitud,
+  buscarPorTelefono,
+  coincidenciasPorNombre,
+  type Persona,
+  type PersonaEnLista,
+} from "@/lib/datos/personas";
 import { registrarParticipacion } from "@/lib/datos/actividades";
 import { crearSeguimiento } from "@/lib/datos/seguimientos";
 import { coloniasDeSeccion, problematicas, type ColoniaBreve, type Problematica } from "@/lib/datos/catalogos";
@@ -21,6 +30,13 @@ import { cn } from "@/lib/utils";
 
 /** El texto del aviso va provisional, con nota visible de que falta revisión legal. */
 const AVISO_VERSION = "provisional-1";
+
+/** Texto corto según de dónde salió la sección que se muestra como confirmación. */
+const ETIQUETA_ORIGEN_UBICACION: Record<"gps" | "mapa" | "manual", string> = {
+  gps: "Ubicación del dispositivo",
+  mapa: "Punto marcado en el mapa",
+  manual: "Sección corregida a mano",
+};
 
 /** Edad en años cumplidos a hoy, o null si la fecha viene vacía o mal formada. Solo confirmación. */
 function edadCumplida(fechaIso: string): number | null {
@@ -37,10 +53,10 @@ function edadCumplida(fechaIso: string): number | null {
 }
 
 type Ubicacion = {
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   clave: string;
-  origen: "gps" | "mapa";
+  origen: "gps" | "mapa" | "manual";
 };
 
 type Estado = "capturando" | "guardando" | "guardada";
@@ -63,10 +79,25 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const [comentario, setComentario] = useState("");
   const [consiente, setConsiente] = useState(false);
 
+  // Petición particular: casilla y texto libre. Va a la tabla solicitudes, no a personas.
+  const [pidioAlgo, setPidioAlgo] = useState(false);
+  const [descripcionSolicitud, setDescripcionSolicitud] = useState("");
+
+  // Promotor: sí/no y, al decir que sí, un buscador de personas ya registradas.
+  const [llegoPorPromotor, setLlegoPorPromotor] = useState(false);
+  const [promotor, setPromotor] = useState<PersonaEnLista | null>(null);
+  const [textoPromotor, setTextoPromotor] = useState("");
+  const [resultadosPromotor, setResultadosPromotor] = useState<PersonaEnLista[]>([]);
+  const [buscandoPromotor, setBuscandoPromotor] = useState(false);
+
   const [ubicacion, setUbicacion] = useState<Ubicacion | null>(null);
   const [ubicando, setUbicando] = useState(true);
   const [errorGps, setErrorGps] = useState<string | null>(null);
   const [abrirMapa, setAbrirMapa] = useState(false);
+  // La clave que dio el GPS, aparte de `ubicacion`, para poder avisar si la corrección a mano
+  // termina en otra sección. Una vez que el GPS contesta, esta clave ya no cambia.
+  const [claveGps, setClaveGps] = useState<string | null>(null);
+  const [coleccionSecciones, setColeccionSecciones] = useState<ColeccionSecciones | null>(null);
 
   const [catalogo, setCatalogo] = useState<Problematica[]>([]);
   const [colonias, setColonias] = useState<ColoniaBreve[]>([]);
@@ -82,7 +113,8 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     let vigente = true;
 
     cargarSecciones()
-      .then(() => {
+      .then((coleccion) => {
+        if (vigente) setColeccionSecciones(coleccion);
         if (!vigente || !navigator.geolocation) {
           if (vigente) {
             setUbicando(false);
@@ -97,6 +129,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
             const clave = seccionPorPunto(longitude, latitude);
             setUbicando(false);
             if (clave) {
+              setClaveGps(clave);
               setUbicacion({ lat: latitude, lng: longitude, clave, origen: "gps" });
             } else {
               setErrorGps("La ubicación quedó fuera del municipio.");
@@ -134,6 +167,34 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     };
   }, [ubicacion]);
 
+  // Buscador de promotor: nombre libre, con retardo para no consultar en cada tecla. Miles de
+  // personas registradas hacen inusable un <select>, por eso es buscador y no desplegable.
+  useEffect(() => {
+    if (!llegoPorPromotor || promotor) {
+      setResultadosPromotor([]);
+      return;
+    }
+    const consulta = textoPromotor.trim();
+    if (consulta.length < 2) {
+      setResultadosPromotor([]);
+      setBuscandoPromotor(false);
+      return;
+    }
+    let vigente = true;
+    setBuscandoPromotor(true);
+    const temporizador = setTimeout(() => {
+      coincidenciasPorNombre(consulta, null).then((r) => {
+        if (!vigente) return;
+        setResultadosPromotor(r.datos);
+        setBuscandoPromotor(false);
+      });
+    }, 250);
+    return () => {
+      vigente = false;
+      clearTimeout(temporizador);
+    };
+  }, [textoPromotor, llegoPorPromotor, promotor]);
+
   // Deduplicación en el momento: en cuanto hay diez dígitos, se busca.
   const revisarTelefono = useCallback(async (valor: string) => {
     const norm = normalizarTelefono(valor);
@@ -163,7 +224,43 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const demarcacionId =
     DEMARCACIONES.find((d) => d.nombre === demarcacionNombre)?.id ?? null;
 
-  const listo = nombre.trim().length > 1 && consiente && !!ubicacion;
+  // Opciones del selector de corrección, ordenadas por clave. Sale de la misma cartografía
+  // cacheada que ya resuelve el punto del GPS: no pide nada nuevo a la red.
+  const opcionesSeccion = useMemo(() => {
+    if (!coleccionSecciones) return [];
+    return [...coleccionSecciones.features]
+      .map((f) => f.properties)
+      .sort((a, b) => a.clave.localeCompare(b.clave));
+  }, [coleccionSecciones]);
+
+  // Aviso discreto: la persona corrigió a mano y quedó en otra sección que la que dio el GPS.
+  // No bloquea nada, solo lo deja dicho.
+  const noCoincideConGps =
+    !!ubicacion &&
+    ubicacion.origen === "manual" &&
+    claveGps !== null &&
+    ubicacion.clave !== claveGps;
+
+  function corregirSeccion(clave: string) {
+    if (!clave) return;
+    setUbicacion((previa) => ({
+      lat: previa?.lat ?? null,
+      lng: previa?.lng ?? null,
+      clave,
+      origen: "manual",
+    }));
+    setErrorGps(null);
+  }
+
+  const requierePeticion = !pidioAlgo || descripcionSolicitud.trim().length > 0;
+  const requierePromotor = !llegoPorPromotor || !!promotor;
+
+  const listo =
+    nombre.trim().length > 1 &&
+    consiente &&
+    !!ubicacion &&
+    requierePeticion &&
+    requierePromotor;
 
   async function guardar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -198,6 +295,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         consentimiento_en: new Date().toISOString(),
         registrada_por: actuante.id,
         actividad_origen: actividadId ?? null,
+        promotor_id: llegoPorPromotor ? (promotor?.id ?? null) : null,
       });
       if (!r.datos) {
         setEstado("capturando");
@@ -218,8 +316,9 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
       }
     }
 
+    let participacionId: string | null = null;
     if (personaId && actividadId) {
-      await registrarParticipacion({
+      const rp = await registrarParticipacion({
         personaId,
         actividadId,
         tipo: agregarAExistente ? "asistencia" : "registro",
@@ -228,6 +327,19 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
           id,
           comentario: comentario.trim() || null,
         })),
+      });
+      participacionId = rp.datos?.id ?? null;
+    }
+
+    // La petición particular cae en solicitudes con requiere_seguimiento en verdadero, para que
+    // la persona aparezca en la bandeja de seguimiento igual que quien quiere participar.
+    if (personaId && pidioAlgo && descripcionSolicitud.trim()) {
+      await crearSolicitud({
+        personaId,
+        participacionId,
+        tema: "Petición particular",
+        descripcion: descripcionSolicitud.trim(),
+        requiereSeguimiento: true,
       });
     }
 
@@ -250,6 +362,12 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     setComentario("");
     setConsiente(false);
     setDuplicada(null);
+    setPidioAlgo(false);
+    setDescripcionSolicitud("");
+    setLlegoPorPromotor(false);
+    setPromotor(null);
+    setTextoPromotor("");
+    setResultadosPromotor([]);
     setEstado("capturando");
     nombreRef.current?.focus();
   }
@@ -293,23 +411,43 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
               Leyendo la ubicación…
             </p>
           ) : ubicacion ? (
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm">
-                <span className="block text-tinta-suave">
-                  {ubicacion.origen === "gps" ? "Ubicación del dispositivo" : "Punto marcado en el mapa"}
-                </span>
-                <span className="cifras block text-lg font-medium text-tinta">
-                  Sección {ubicacion.clave}
-                </span>
-                <span className="block text-tinta-suave">{demarcacionNombre}</span>
-              </p>
-              <button
-                type="button"
-                onClick={() => setAbrirMapa(true)}
-                className="transicion-ui shrink-0 rounded-control border border-borde px-3 text-sm text-tinta-suave toque-actividad"
-              >
-                Cambiar
-              </button>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm">
+                  <span className="block text-tinta-suave">
+                    {ETIQUETA_ORIGEN_UBICACION[ubicacion.origen]}
+                  </span>
+                  <span className="cifras block text-lg font-medium text-tinta">
+                    Sección {ubicacion.clave}
+                  </span>
+                  <span className="block text-tinta-suave">{demarcacionNombre}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAbrirMapa(true)}
+                  className="transicion-ui shrink-0 rounded-control border border-borde px-3 text-sm text-tinta-suave toque-actividad"
+                >
+                  Cambiar
+                </button>
+              </div>
+
+              {opcionesSeccion.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-borde pt-3">
+                  <label className="flex flex-wrap items-center gap-2 text-xs text-tinta-suave">
+                    Corregir sección a mano
+                    <SelectorSeccion
+                      opciones={opcionesSeccion}
+                      valor={ubicacion.clave}
+                      onCambiar={corregirSeccion}
+                    />
+                  </label>
+                </div>
+              )}
+              {noCoincideConGps && (
+                <p className="text-xs text-tinta-tenue">
+                  No coincide con la sección {claveGps} que dio el GPS.
+                </p>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -325,6 +463,16 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
                 <MapPin className="size-4" aria-hidden />
                 Marcar en el mapa
               </button>
+              {opcionesSeccion.length > 0 && (
+                <label className="flex flex-wrap items-center gap-2 text-xs text-tinta-suave">
+                  O elige la sección a mano
+                  <SelectorSeccion
+                    opciones={opcionesSeccion}
+                    valor=""
+                    onCambiar={corregirSeccion}
+                  />
+                </label>
+              )}
             </div>
           )}
         </div>
@@ -453,6 +601,88 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
         <div className="flex flex-col gap-2">
           <Interruptor
+            etiqueta="¿Llegó por un promotor?"
+            valor={llegoPorPromotor}
+            alCambiar={(v) => {
+              setLlegoPorPromotor(v);
+              if (!v) {
+                setPromotor(null);
+                setTextoPromotor("");
+              }
+            }}
+          />
+          {llegoPorPromotor && (
+            <div className="rounded-tarjeta border border-borde bg-superficie p-3">
+              {promotor ? (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-tinta">
+                    {promotor.nombre}
+                    {promotor.seccion_clave && (
+                      <span className="ml-2 text-xs text-tinta-suave">
+                        Sección {promotor.seccion_clave}
+                      </span>
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromotor(null);
+                      setTextoPromotor("");
+                    }}
+                    className="transicion-ui shrink-0 rounded-control border border-borde px-3 text-xs text-tinta-suave toque-actividad"
+                  >
+                    Cambiar
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="relative">
+                    <Search
+                      className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tinta-tenue"
+                      aria-hidden
+                    />
+                    <input
+                      value={textoPromotor}
+                      onChange={(e) => setTextoPromotor(e.target.value)}
+                      autoComplete="off"
+                      placeholder="Buscar promotor por nombre"
+                      className="campo pl-9"
+                    />
+                  </div>
+                  {buscandoPromotor && <p className="text-xs text-tinta-tenue">Buscando…</p>}
+                  {!buscandoPromotor && resultadosPromotor.length > 0 && (
+                    <ul className="flex flex-col gap-1">
+                      {resultadosPromotor.map((p) => (
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            onClick={() => setPromotor(p)}
+                            className="transicion-ui w-full rounded-control border border-borde bg-superficie px-3 py-2 text-left text-sm text-tinta toque-actividad"
+                          >
+                            {p.nombre}
+                            {p.seccion_clave && (
+                              <span className="ml-2 text-xs text-tinta-suave">
+                                Sección {p.seccion_clave}
+                              </span>
+                            )}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {!buscandoPromotor &&
+                    textoPromotor.trim().length >= 2 &&
+                    resultadosPromotor.length === 0 && (
+                      <p className="text-xs text-tinta-tenue">Sin coincidencias.</p>
+                    )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Interruptor
             etiqueta="Quiere participar"
             valor={quiereParticipar}
             alCambiar={setQuiereParticipar}
@@ -472,6 +702,28 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
             valor={quiereSerRepresentante}
             alCambiar={setQuiereSerRepresentante}
           />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Interruptor
+            etiqueta="¿Pidió algo en particular?"
+            valor={pidioAlgo}
+            alCambiar={(v) => {
+              setPidioAlgo(v);
+              if (!v) setDescripcionSolicitud("");
+            }}
+          />
+          {pidioAlgo && (
+            <Campo etiqueta="Qué pidió">
+              <textarea
+                value={descripcionSolicitud}
+                onChange={(e) => setDescripcionSolicitud(e.target.value)}
+                rows={2}
+                required
+                className="campo min-h-16 resize-y py-2"
+              />
+            </Campo>
+          )}
         </div>
 
         {catalogo.length > 0 && (
@@ -552,7 +804,11 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
       {abrirMapa && (
         <SelectorPunto
-          inicial={ubicacion ? [ubicacion.lng, ubicacion.lat] : null}
+          inicial={
+            ubicacion && ubicacion.lat !== null && ubicacion.lng !== null
+              ? [ubicacion.lng, ubicacion.lat]
+              : null
+          }
           alCancelar={() => setAbrirMapa(false)}
           alConfirmar={(punto, clave) => {
             if (clave) {
@@ -651,5 +907,37 @@ function Opcion({
         <span className="block text-xs text-tinta-tenue">{apoyo}</span>
       </span>
     </label>
+  );
+}
+
+/**
+ * Selector para corregir la sección a mano. Es un <select>, no un buscador: son unas 400
+ * secciones y un nativo las resuelve bien hasta en pantallas angostas, a diferencia de un
+ * buscador de personas donde sí puede haber miles de renglones.
+ */
+function SelectorSeccion({
+  opciones,
+  valor,
+  onCambiar,
+}: {
+  opciones: PropiedadesSeccion[];
+  valor: string;
+  onCambiar: (clave: string) => void;
+}) {
+  return (
+    <select
+      value={valor}
+      onChange={(e) => onCambiar(e.target.value)}
+      className="campo cifras w-auto"
+    >
+      <option value="" disabled>
+        Elegir sección…
+      </option>
+      {opciones.map((s) => (
+        <option key={s.clave} value={s.clave}>
+          {s.clave} · {s.demarcacion}
+        </option>
+      ))}
+    </select>
   );
 }

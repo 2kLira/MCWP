@@ -22,7 +22,7 @@ export function idDemarcacionDeNombre(nombre: string): number | null {
 /**
  * Una clave de sección por si el usuario actuante puede verla resaltada. Un administrador ve
  * todo; un responsable de demarcación ve resaltada su demarcación; uno de sección o un
- * colaborador de sección, solo su sección.
+ * brigadista de sección, solo su sección.
  */
 export function calcularAlcanceMapa(
   coleccion: ColeccionSecciones,

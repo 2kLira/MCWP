@@ -2,12 +2,10 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { demarcacionPorId } from "@/lib/demarcaciones";
 import { NOTA_SUSTITUTA } from "@/lib/tipos";
 import type { RasgoSeccion } from "@/lib/territorio";
 import { cn } from "@/lib/utils";
-import type { DatoColonia, DatoSeccion } from "./datos-mapa";
-import type { RasgoColonia } from "./mapa-lienzo";
+import type { DatoSeccion } from "./datos-mapa";
 import { leerDuracionMs, prefiereMenosMovimiento } from "./tokens";
 
 const formatoArea = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 2 });
@@ -18,23 +16,11 @@ const formatoFecha = new Intl.DateTimeFormat("es-MX", {
   year: "numeric",
 });
 
-/** La colonia es capa de referencia y autocompletado; nunca fuente de verdad territorial. */
-const NOTA_COLONIA_REFERENCIA =
-  "La colonia es referencia y autocompletado. La sección electoral es la única unidad territorial exacta: si hay conflicto entre ambas, gana la sección.";
-
 function formatearFecha(iso: string | null): string {
   if (!iso) return "Sin dato";
   const fecha = new Date(iso);
   if (Number.isNaN(fecha.getTime())) return "Sin dato";
   return formatoFecha.format(fecha);
-}
-
-/** Lista "A, B y C" de nombres de demarcación a partir de sus ids del catálogo. */
-function formatearDemarcaciones(ids: readonly number[]): string {
-  const nombres = ids.map((id) => demarcacionPorId(id)?.nombre ?? `Demarcación ${id}`);
-  if (nombres.length === 0) return "";
-  if (nombres.length === 1) return nombres[0];
-  return `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
 }
 
 /** Una fila clave/valor de la ficha. */
@@ -47,33 +33,23 @@ function Renglon({ etiqueta, valor }: { etiqueta: string; valor: React.ReactNode
   );
 }
 
-/**
- * El cascarón compartido de la ficha lateral en vidrio: crece desde el punto de la pantalla donde
- * ocurrió el clic (transform-origin, convertido a coordenadas locales del panel) y anima escala y
- * opacidad con la curva y duración del sistema. En celular es hoja que sube desde abajo, en
- * escritorio panel lateral flotante — la posición cambia por breakpoint, la animación no. Lo usan
- * tanto la ficha de sección como la de colonia: mismo vidrio, mismo movimiento, solo cambia el
- * contenido.
- */
-function PanelFicha({
+export function FichaSeccion({
+  rasgo,
+  dato,
   origen,
   enMovimiento,
   onCerrar,
-  ariaLabel,
-  cerrarEtiqueta,
-  titulo,
-  subtitulo,
-  children,
 }: {
+  rasgo: RasgoSeccion;
+  /** Resumen real de la sección, o null si la base todavía no tiene datos para ella. */
+  dato: DatoSeccion | null;
   origen: { x: number; y: number };
   enMovimiento: boolean;
   onCerrar: () => void;
-  ariaLabel: string;
-  cerrarEtiqueta: string;
-  titulo: React.ReactNode;
-  subtitulo: React.ReactNode;
-  children: React.ReactNode;
 }) {
+  const propiedades = rasgo.properties;
+  const sinDato = "Sin dato";
+
   const panelRef = useRef<HTMLDivElement>(null);
   const cerrarBotonRef = useRef<HTMLButtonElement>(null);
   const [abierta, setAbierta] = useState(false);
@@ -82,6 +58,10 @@ function PanelFicha({
   const menosMovimientoRef = useRef(false);
   const duracionRef = useRef(240);
 
+  // La ficha en vidrio crece desde el punto de la pantalla donde ocurrió el clic (transform-origin,
+  // convertido a coordenadas locales del panel) y anima escala y opacidad con la curva y duración
+  // del sistema. En celular es hoja que sube desde abajo, en escritorio panel lateral flotante: la
+  // posición cambia por breakpoint, la animación no.
   useLayoutEffect(() => {
     menosMovimientoRef.current = prefiereMenosMovimiento();
     duracionRef.current = leerDuracionMs("--dur-panel", 240);
@@ -128,7 +108,7 @@ function PanelFicha({
       ref={panelRef}
       role="dialog"
       aria-modal="true"
-      aria-label={ariaLabel}
+      aria-label={`Sección ${propiedades.clave}`}
       style={{ transformOrigin: `${origenLocal.x}px ${origenLocal.y}px` }}
       className={cn(
         "vidrio elevacion-flotante transicion-panel fixed z-30 flex flex-col overflow-hidden",
@@ -145,154 +125,81 @@ function PanelFicha({
 
       <div className="flex shrink-0 items-start justify-between gap-3 px-4 pt-3 pb-2 md:px-5 md:pt-4">
         <div className="min-w-0">
-          <p className="cifras text-lg font-semibold text-tinta">{titulo}</p>
-          <p className="truncate text-sm text-tinta-suave">{subtitulo}</p>
+          <p className="cifras text-lg font-semibold text-tinta">{`Sección ${propiedades.clave}`}</p>
+          <p className="truncate text-sm text-tinta-suave">{dato?.demarcacion ?? propiedades.demarcacion}</p>
         </div>
         <button
           ref={cerrarBotonRef}
           type="button"
           onClick={cerrar}
-          aria-label={cerrarEtiqueta}
+          aria-label="Cerrar ficha de sección"
           className="transicion-ui grid size-11 shrink-0 place-items-center rounded-control text-tinta-suave transition-colors hover:bg-superficie-hundida hover:text-tinta"
         >
           <X className="size-5" aria-hidden />
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 md:px-5 md:pb-5">{children}</div>
-    </div>
-  );
-}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 md:px-5 md:pb-5">
+        {propiedades.sustituta && (
+          <p className="hueco-punteado mb-4 rounded-control px-3 py-2 text-xs">{NOTA_SUSTITUTA}</p>
+        )}
 
-export function FichaSeccion({
-  rasgo,
-  dato,
-  origen,
-  enMovimiento,
-  onCerrar,
-}: {
-  rasgo: RasgoSeccion;
-  /** Resumen real de la sección, o null si la base todavía no tiene datos para ella. */
-  dato: DatoSeccion | null;
-  origen: { x: number; y: number };
-  enMovimiento: boolean;
-  onCerrar: () => void;
-}) {
-  const propiedades = rasgo.properties;
-  const sinDato = "Sin dato";
+        {/* Solo se muestra la píldora cuando la sección sí es prioritaria: no hay una que diga
+            "no prioritaria", la ausencia ya dice eso. */}
+        {dato?.prioridad && (
+          <div className="mb-4 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-tinta">
+              {`Prioridad ${dato.prioridad}`}
+            </span>
+          </div>
+        )}
 
-  return (
-    <PanelFicha
-      origen={origen}
-      enMovimiento={enMovimiento}
-      onCerrar={onCerrar}
-      ariaLabel={`Sección ${propiedades.clave}`}
-      cerrarEtiqueta="Cerrar ficha de sección"
-      titulo={`Sección ${propiedades.clave}`}
-      subtitulo={dato?.demarcacion ?? propiedades.demarcacion}
-    >
-      {propiedades.sustituta && (
-        <p className="hueco-punteado mb-4 rounded-control px-3 py-2 text-xs">{NOTA_SUSTITUTA}</p>
-      )}
-
-      <dl className="grid grid-cols-2 gap-3 border-b border-borde pb-4">
-        <Renglon etiqueta="Distrito local" valor={propiedades.distrito_local ?? sinDato} />
-        <Renglon etiqueta="Distrito federal" valor={propiedades.distrito_federal ?? sinDato} />
-        <Renglon
-          etiqueta="Área"
-          valor={
-            propiedades.area_km2 != null
-              ? `${formatoArea.format(propiedades.area_km2)} km²`
-              : sinDato
-          }
-        />
-        <Renglon etiqueta="Responsable" valor={dato?.responsable ?? sinDato} />
-      </dl>
-
-      {dato ? (
-        <>
-          <dl className="grid grid-cols-2 gap-3 border-b border-borde py-4">
-            <Renglon etiqueta="Personas" valor={formatoCifra.format(dato.personas)} />
-            <Renglon etiqueta="Promovidos" valor={formatoCifra.format(dato.promovidos)} />
-            <Renglon
-              etiqueta="Quieren participar"
-              valor={formatoCifra.format(dato.quierenParticipar)}
-            />
-            <Renglon etiqueta="Reuniones" valor={formatoCifra.format(dato.reuniones)} />
-            <Renglon etiqueta="Activismo" valor={formatoCifra.format(dato.activismo)} />
-            <Renglon etiqueta="Recorridos" valor={formatoCifra.format(dato.recorridos)} />
-          </dl>
-
-          <dl className="grid grid-cols-2 gap-3 pt-4">
-            <Renglon etiqueta="Última actividad" valor={formatearFecha(dato.ultimaActividad)} />
-            <Renglon etiqueta="Próxima actividad" valor={formatearFecha(dato.proximaActividad)} />
-          </dl>
-        </>
-      ) : (
-        <p className="pt-4 text-xs text-tinta-tenue">
-          Todavía no hay datos capturados para esta sección.
-        </p>
-      )}
-
-      {propiedades.nota && <p className="mt-4 text-xs text-tinta-tenue">{propiedades.nota}</p>}
-    </PanelFicha>
-  );
-}
-
-/**
- * Ficha de colonia: mismo vidrio, mismo movimiento que la de sección. El encabezado sale siempre
- * de la geometría (nombre, demarcación principal), porque existe aunque la base todavía no tenga
- * renglón para esa colonia; las cifras y la nota de partición dependen de `dato`.
- */
-export function FichaColonia({
-  rasgo,
-  dato,
-  origen,
-  enMovimiento,
-  onCerrar,
-}: {
-  rasgo: RasgoColonia;
-  /** Resumen real de la colonia, ya recortado al territorio del actuante, o null si no aplica. */
-  dato: DatoColonia | null;
-  origen: { x: number; y: number };
-  enMovimiento: boolean;
-  onCerrar: () => void;
-}) {
-  const propiedades = rasgo.properties;
-  const partida = (dato?.demarcaciones.length ?? 0) > 1;
-
-  return (
-    <PanelFicha
-      origen={origen}
-      enMovimiento={enMovimiento}
-      onCerrar={onCerrar}
-      ariaLabel={`Colonia ${propiedades.nombre}`}
-      cerrarEtiqueta="Cerrar ficha de colonia"
-      titulo={dato?.nombre ?? propiedades.nombre}
-      subtitulo={propiedades.demarcacion_principal}
-    >
-      {partida && dato && (
-        <p className="hueco-punteado mb-4 rounded-control px-3 py-2 text-xs">
-          Colonia partida entre demarcaciones: {formatearDemarcaciones(dato.demarcaciones)}.
-        </p>
-      )}
-
-      {dato ? (
         <dl className="grid grid-cols-2 gap-3 border-b border-borde pb-4">
-          <Renglon etiqueta="Personas" valor={formatoCifra.format(dato.personas)} />
-          <Renglon etiqueta="Promovidos" valor={formatoCifra.format(dato.promovidos)} />
+          <Renglon etiqueta="Distrito local" valor={propiedades.distrito_local ?? sinDato} />
+          <Renglon etiqueta="Distrito federal" valor={propiedades.distrito_federal ?? sinDato} />
           <Renglon
-            etiqueta="Quieren participar"
-            valor={formatoCifra.format(dato.quierenParticipar)}
+            etiqueta="Área"
+            valor={
+              propiedades.area_km2 != null
+                ? `${formatoArea.format(propiedades.area_km2)} km²`
+                : sinDato
+            }
           />
+          <Renglon etiqueta="Responsable" valor={dato?.responsable ?? sinDato} />
+          <Renglon
+            etiqueta="Lista nominal"
+            valor={dato?.listaNominal != null ? formatoCifra.format(dato.listaNominal) : sinDato}
+          />
+          <Renglon etiqueta="Casillas" valor={dato ? formatoCifra.format(dato.casillas) : sinDato} />
         </dl>
-      ) : (
-        <p className="border-b border-borde pb-4 text-xs text-tinta-tenue">
-          Todavía no hay datos capturados para esta colonia.
-        </p>
-      )}
 
-      <p className="pt-4 text-xs text-tinta-tenue">{NOTA_COLONIA_REFERENCIA}</p>
-    </PanelFicha>
+        {dato ? (
+          <>
+            <dl className="grid grid-cols-2 gap-3 border-b border-borde py-4">
+              <Renglon etiqueta="Personas alcanzadas" valor={formatoCifra.format(dato.personas)} />
+              <Renglon etiqueta="Promovidos" valor={formatoCifra.format(dato.promovidos)} />
+              <Renglon
+                etiqueta="Quieren participar"
+                valor={formatoCifra.format(dato.quierenParticipar)}
+              />
+              <Renglon etiqueta="Reuniones" valor={formatoCifra.format(dato.reuniones)} />
+              <Renglon etiqueta="Activismo" valor={formatoCifra.format(dato.activismo)} />
+              <Renglon etiqueta="Recorridos" valor={formatoCifra.format(dato.recorridos)} />
+            </dl>
+
+            <dl className="grid grid-cols-2 gap-3 pt-4">
+              <Renglon etiqueta="Última actividad" valor={formatearFecha(dato.ultimaActividad)} />
+              <Renglon etiqueta="Próxima actividad" valor={formatearFecha(dato.proximaActividad)} />
+            </dl>
+          </>
+        ) : (
+          <p className="pt-4 text-xs text-tinta-tenue">
+            Todavía no hay datos capturados para esta sección.
+          </p>
+        )}
+
+        {propiedades.nota && <p className="mt-4 text-xs text-tinta-tenue">{propiedades.nota}</p>}
+      </div>
+    </div>
   );
 }

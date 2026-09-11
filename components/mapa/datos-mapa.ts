@@ -1,46 +1,33 @@
 /**
- * Datos reales de las siete vistas del mapa.
+ * Datos reales de las seis vistas del mapa.
  *
- * Las cifras salen de `seccionesResumen`, `problematicasPorSeccion` y `coloniaResumen`
- * (lib/datos/catalogos.ts), ya recortadas al territorio del usuario actuante por `aplicarAlcance`
- * (lib/permisos.ts). Este módulo no decide quién ve qué: solo convierte lo que la base ya recortó
- * en un paso de 0 a 4 por sección o por colonia, con cortes por cuantiles sobre los valores
- * presentes en cada vista.
+ * Las cifras salen de `seccionesResumen` (lib/datos/catalogos.ts), ya recortadas al territorio del
+ * usuario actuante por `aplicarAlcance` (lib/permisos.ts). Este módulo no decide quién ve qué, solo
+ * convierte lo que la base ya recortó en un paso de 0 a 4 por sección. Cinco vistas usan cortes por
+ * cuantiles sobre los valores presentes; la de prioritarias no, ver `calcularPasosPrioritarias`.
  */
 
-import {
-  coloniaResumen,
-  problematicasPorSeccion,
-  seccionesResumen,
-  type ColoniaResumen,
-  type SeccionResumen,
-} from "@/lib/datos/catalogos";
+import { seccionesResumen, type SeccionResumen } from "@/lib/datos/catalogos";
+import type { ColeccionSecciones } from "@/lib/territorio";
 import type { UsuarioActuante } from "@/lib/tipos";
 
-/** Las siete vistas del mapa, en el orden en que aparecen en el selector. */
+/** Las seis vistas del mapa, en el orden en que aparecen en el selector. */
 export type VistaMapa =
   | "estructura"
   | "personas"
   | "promovidos"
   | "actividad"
-  | "problematicas"
   | "recorridos"
-  | "colonias";
+  | "prioritarias";
 
 export const VISTAS_MAPA: ReadonlyArray<{ id: VistaMapa; etiqueta: string }> = [
   { id: "estructura", etiqueta: "Estructura" },
-  { id: "personas", etiqueta: "Personas" },
+  { id: "personas", etiqueta: "Personas alcanzadas" },
   { id: "promovidos", etiqueta: "Promovidos" },
   { id: "actividad", etiqueta: "Actividad" },
-  { id: "problematicas", etiqueta: "Problemáticas" },
   { id: "recorridos", etiqueta: "Recorridos" },
-  { id: "colonias", etiqueta: "Colonias" },
+  { id: "prioritarias", etiqueta: "Prioritarias" },
 ];
-
-/** True si la vista pinta colonias en lugar de secciones: decide qué geometría pinta el lienzo. */
-export function vistaEsDeColonias(vista: VistaMapa): boolean {
-  return vista === "colonias";
-}
 
 /** Un paso de la escala del mapa: 0 neutro, 4 naranja pleno. */
 export type PasoMapa = 0 | 1 | 2 | 3 | 4;
@@ -58,58 +45,32 @@ export type DatoSeccion = {
   activismo: number;
   recorridos: number;
   actividadTotal: number;
-  problematicasTotal: number;
   promovidos: number;
   aspirantes: number;
   ultimaActividad: string | null;
   proximaActividad: string | null;
-};
-
-/**
- * Lo que trae cada colonia para la vista de colonias. Viene de sumar los renglones de
- * `v_colonia_resumen` de esa colonia, uno por cada demarcación y sección en la que tiene gente.
- */
-export type DatoColonia = {
-  coloniaId: number;
-  nombre: string;
-  personas: number;
-  promovidos: number;
-  quierenParticipar: number;
-  /** Las demarcaciones en las que esta colonia tiene gente. Más de una significa colonia partida. */
-  demarcaciones: number[];
+  /** "A", "B" o null si la sección no es prioritaria. */
+  prioridad: "A" | "B" | null;
+  /** Ya tiene al menos un recorrido en estatus realizada. */
+  recorrida: boolean;
+  listaNominal: number | null;
+  metaVotos: number | null;
+  casillas: number;
 };
 
 export type DatosMapa = {
   porClave: Map<string, DatoSeccion>;
-  porColonia: Map<number, DatoColonia>;
 };
 
 export const DATOS_MAPA_VACIOS: DatosMapa = {
   porClave: new Map(),
-  porColonia: new Map(),
 };
 
-/**
- * Pide el resumen por sección, las menciones de problemáticas y el resumen por colonia, ya
- * recortados al actuante. El resumen de colonia llega partido por demarcación y sección; aquí se
- * suma por colonia porque el mapa pinta una sola geometría por colonia.
- */
+/** Pide el resumen por sección, ya recortado al actuante. */
 export async function cargarDatosMapa(
   usuario: UsuarioActuante | null,
 ): Promise<DatosMapa> {
-  const [resumen, problematicas, colonias] = await Promise.all([
-    seccionesResumen(usuario),
-    problematicasPorSeccion(usuario),
-    coloniaResumen(usuario),
-  ]);
-
-  const menclonesPorClave = new Map<string, number>();
-  for (const fila of problematicas.datos) {
-    menclonesPorClave.set(
-      fila.clave,
-      (menclonesPorClave.get(fila.clave) ?? 0) + fila.menciones,
-    );
-  }
+  const resumen = await seccionesResumen(usuario);
 
   const porClave = new Map<string, DatoSeccion>();
   for (const fila of resumen.datos as SeccionResumen[]) {
@@ -125,37 +86,19 @@ export async function cargarDatosMapa(
       activismo: fila.activismo,
       recorridos: fila.recorridos,
       actividadTotal: fila.reuniones + fila.activismo + fila.recorridos,
-      problematicasTotal: menclonesPorClave.get(fila.clave) ?? 0,
       promovidos: fila.promovidos,
       aspirantes: fila.aspirantes_representante,
       ultimaActividad: fila.ultima_actividad,
       proximaActividad: fila.proxima_actividad,
+      prioridad: fila.prioridad,
+      recorrida: fila.recorrida,
+      listaNominal: fila.lista_nominal,
+      metaVotos: fila.meta_votos,
+      casillas: fila.casillas,
     });
   }
 
-  const porColonia = new Map<number, DatoColonia>();
-  for (const fila of colonias.datos as ColoniaResumen[]) {
-    const previo = porColonia.get(fila.colonia_id);
-    if (!previo) {
-      porColonia.set(fila.colonia_id, {
-        coloniaId: fila.colonia_id,
-        nombre: fila.colonia,
-        personas: fila.personas,
-        promovidos: fila.promovidos,
-        quierenParticipar: fila.quieren_participar,
-        demarcaciones: fila.demarcacion_id != null ? [fila.demarcacion_id] : [],
-      });
-      continue;
-    }
-    previo.personas += fila.personas;
-    previo.promovidos += fila.promovidos;
-    previo.quierenParticipar += fila.quieren_participar;
-    if (fila.demarcacion_id != null && !previo.demarcaciones.includes(fila.demarcacion_id)) {
-      previo.demarcaciones.push(fila.demarcacion_id);
-    }
-  }
-
-  return { porClave, porColonia };
+  return { porClave };
 }
 
 /* ---------------------------------------------------------------------------
@@ -207,19 +150,31 @@ function metricaDeVista(vista: VistaMapa, dato: DatoSeccion | undefined): number
       return dato.promovidos;
     case "actividad":
       return dato.actividadTotal;
-    case "problematicas":
-      return dato.problematicasTotal;
     case "recorridos":
       return dato.recorridos;
-    case "colonias":
-      return null; // vista de colonias: no pinta secciones, ver calcularPasosDeColonia.
+    case "prioritarias":
+      return null; // no es de cuantiles, ver calcularPasosPrioritarias.
   }
 }
 
 /**
+ * Los tres estados fijos de la vista de prioritarias, no cuantiles: prioritaria ya recorrida
+ * (paso 4, naranja pleno, es lo hecho), prioritaria sin recorrer (paso 2, naranja intermedio, es
+ * lo que falta) y no prioritaria (paso 0, para que el territorio se vea pero no compita).
+ */
+function calcularPasosPrioritarias(datos: DatosMapa): Map<string, PasoMapa> {
+  const pasos = new Map<string, PasoMapa>();
+  for (const [clave, dato] of datos.porClave) {
+    pasos.set(clave, dato.prioridad == null ? 0 : dato.recorrida ? 4 : 2);
+  }
+  return pasos;
+}
+
+/**
  * El paso de 0 a 4 de cada sección presente en `datos` para una vista. La de estructura es
- * binaria (0 sin responsable, 4 con responsable); las demás salen de cuantiles sobre los valores
- * presentes de esa vista. La vista de colonias no se resuelve aquí: no pinta secciones.
+ * binaria (0 sin responsable, 4 con responsable); la de prioritarias son tres estados fijos, ver
+ * `calcularPasosPrioritarias`; las demás salen de cuantiles sobre los valores presentes de esa
+ * vista.
  */
 export function calcularPasosDeVista(
   vista: VistaMapa,
@@ -232,6 +187,10 @@ export function calcularPasosDeVista(
       pasos.set(clave, dato.tieneResponsable ? 4 : 0);
     }
     return pasos;
+  }
+
+  if (vista === "prioritarias") {
+    return calcularPasosPrioritarias(datos);
   }
 
   const valores: number[] = [];
@@ -248,15 +207,52 @@ export function calcularPasosDeVista(
   return pasos;
 }
 
-/** Paso de 0 a 4 por colonia, con los mismos cuantiles que usan las secciones (sobre personas). */
-export function calcularPasosDeColonia(datos: DatosMapa): Map<number, PasoMapa> {
-  const pasos = new Map<number, PasoMapa>();
+/* ---------------------------------------------------------------------------
+ * Conteo de prioritarias: lo que responde "¿cómo vamos?" en la barra del mapa.
+ * ------------------------------------------------------------------------- */
 
-  const valores = [...datos.porColonia.values()].map((dato) => dato.personas);
-  const cortes = calcularCortes(valores);
+/** Cuántas prioritarias A y B hay, cuántas de cada una ya se recorrieron, y cuántas prioritarias
+ *  no tienen polígono publicado y por lo tanto no aparecen pintadas en el mapa. */
+export type ConteoPrioritarias = {
+  totalA: number;
+  recorridasA: number;
+  totalB: number;
+  recorridasB: number;
+  /** Prioritarias (A o B) sin geometría en `secciones.geojson`: cuentan aquí, no en el lienzo. */
+  sinGeometria: number;
+};
 
-  for (const [coloniaId, dato] of datos.porColonia) {
-    pasos.set(coloniaId, pasoDeCorte(dato.personas, cortes));
+/**
+ * Recorre `datos` (ya recortado al territorio del actuante) y separa por prioridad, sin volver a
+ * tocar el filtro territorial: eso ya lo hizo `seccionesResumen`. `coleccion` es el único lugar de
+ * donde se sabe qué claves tienen geometría publicada; una prioritaria ausente ahí es de las seis
+ * que no se pueden pintar.
+ */
+export function calcularConteoPrioritarias(
+  datos: DatosMapa,
+  coleccion: ColeccionSecciones,
+): ConteoPrioritarias {
+  const clavesConPoligono = new Set(coleccion.features.map((rasgo) => rasgo.properties.clave));
+
+  const conteo: ConteoPrioritarias = {
+    totalA: 0,
+    recorridasA: 0,
+    totalB: 0,
+    recorridasB: 0,
+    sinGeometria: 0,
+  };
+
+  for (const dato of datos.porClave.values()) {
+    if (dato.prioridad == null) continue;
+    if (dato.prioridad === "A") {
+      conteo.totalA++;
+      if (dato.recorrida) conteo.recorridasA++;
+    } else {
+      conteo.totalB++;
+      if (dato.recorrida) conteo.recorridasB++;
+    }
+    if (!clavesConPoligono.has(dato.clave)) conteo.sinGeometria++;
   }
-  return pasos;
+
+  return conteo;
 }

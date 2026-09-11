@@ -1,7 +1,8 @@
 /**
  * Carga la cartografía de data/ a la base, por la API REST de Supabase.
  *
- *   npm run db:importar    carga demarcaciones, secciones, geometría, colonias y traslapes
+ *   npm run db:importar    carga demarcaciones, secciones (catálogo + sustitutas), geometría,
+ *                         colonias, traslapes y casillas
  *
  * El esquema no lo aplica este script: se aplica aparte, pegando el contenido de
  * supabase/schema.sql en el editor SQL de Supabase (SQL Editor → Run). No tenemos la
@@ -202,6 +203,30 @@ async function insertarPorLotes(
 }
 
 /**
+ * Sube en lotes de a lo más `tamanoLote` filas, con upsert contra `llaveConflicto` (una columna o,
+ * para llaves compuestas, varias separadas por coma). A diferencia de `insertarPorLotes`, no borra
+ * nada antes: fila que ya existe se actualiza en su lugar, fila nueva se inserta. Se usa donde otras
+ * tablas cuelgan de la que se carga por llave foránea (secciones, demarcaciones, casillas), porque
+ * ahí borrar-y-recrear tronaría contra esas llaves o, en el caso de casillas, correría abajo el id
+ * serial y arrastraría en cascada a representantes_casilla.
+ */
+async function subirPorLotes(
+  tabla: string,
+  filas: Record<string, unknown>[],
+  tamanoLote: number,
+  llaveConflicto: string,
+): Promise<void> {
+  for (let inicio = 0; inicio < filas.length; inicio += tamanoLote) {
+    const lote = filas.slice(inicio, inicio + tamanoLote);
+    const { error } = await supabase.from(tabla).upsert(lote, { onConflict: llaveConflicto });
+    if (error) {
+      console.error(`Error al subir (upsert) en ${tabla}:`, error);
+      process.exit(1);
+    }
+  }
+}
+
+/**
  * Borra todas las filas de una tabla. supabase-js exige un filtro en todo delete, así que se
  * usa uno que siempre se cumple: comparación contra la llave primaria de cada tabla.
  */
@@ -227,6 +252,8 @@ async function main() {
     "colonias.geojson",
   ).features;
   const traslapes = leerCsv("colonia-seccion-demarcacion.csv");
+  const catalogoSecciones = leerCsv("secciones-catalogo.csv");
+  const casillasCsv = leerCsv("casillas.csv");
 
   // --- Antes de cargar, confirma que el esquema ya está aplicado. -----------
   const { error: errorComprobacion } = await supabase
@@ -247,12 +274,15 @@ async function main() {
   catalogo.demarcaciones.forEach((d, i) => idPorDemarcacion.set(d.demarcacion, i + 1));
 
   // --- Limpieza previa, en orden inverso a las llaves foráneas. -------------
-  console.log("Vaciando las tablas…");
+  // demarcaciones y secciones ya NO se vacían: personas y actividades apuntan a secciones.clave,
+  // y secciones apunta a demarcaciones.id, así que borrar cualquiera de las dos sobre una base ya
+  // sembrada tronaría contra esas llaves foráneas (o, peor, sí lo dejaría borrar y se llevaría
+  // personas e historia con un cascade que no queremos). Las dos se cargan con upsert más abajo:
+  // fila que ya existe se actualiza, fila nueva se inserta, y nada se borra nunca de por medio.
+  console.log("Vaciando las tablas sin dependientes…");
   await vaciar("colonia_seccion", "colonia_id", "gte");
   await vaciar("secciones_geom", "clave", "neq");
   await vaciar("colonias", "id", "gte");
-  await vaciar("secciones", "clave", "neq");
-  await vaciar("demarcaciones", "id", "gte");
 
   const filasDemarcaciones = catalogo.demarcaciones.map((d, i) => ({
     id: i + 1,
@@ -261,34 +291,91 @@ async function main() {
     centro_lat: d.centro.lat,
     centro_lng: d.centro.lon,
   }));
-  await insertarPorLotes("demarcaciones", filasDemarcaciones, 200);
+  await subirPorLotes("demarcaciones", filasDemarcaciones, 200, "id");
   console.log(`Demarcaciones: ${catalogo.demarcaciones.length}`);
 
-  // --- Secciones. Las 157 que tienen geometría, incluidas las 6 sustitutas.
-  const filasSecciones = secciones.map((rasgo) => {
-    const p = rasgo.properties;
-    const demarcacionId = idPorDemarcacion.get(p.demarcacion);
+  // --- Secciones. Ahora 175: las 169 del catálogo del cliente (con lista nominal, prioridad y
+  // en_catalogo = true) más las 6 sustitutas que el reseccionamiento del INE dejó fuera del
+  // catálogo pero que se siguen pintando en el mapa (en_catalogo = false, sin lista nominal ni
+  // prioridad). secciones_geom, más abajo, sigue recibiendo solo las 157 con polígono publicado:
+  // 151 del catálogo y las 6 sustitutas. Las 18 del catálogo sin geometría entran a secciones y no
+  // al mapa, tal cual pide el encargo.
+  const geojsonPorClave = new Map(
+    secciones.map((rasgo) => [rasgo.properties.clave, rasgo.properties]),
+  );
+
+  const filasSeccionesCatalogo = catalogoSecciones.map((fila) => {
+    const clave = fila.seccion.trim();
+    const demarcacionId = idPorDemarcacion.get(fila.demarcacion.trim());
     if (!demarcacionId) {
       throw new Error(
-        `La sección ${p.clave} trae la demarcación "${p.demarcacion}", que no está en el catálogo.`,
+        `La sección ${clave} del catálogo trae la demarcación "${fila.demarcacion}", que no está ` +
+          "en demarcaciones.json.",
       );
     }
+    // Solo las 151 del catálogo con geometría aparecen también en secciones.geojson; de ahí salen
+    // distrito, área y centro. Las 18 sin geometría se quedan con esos campos en null: no hay de
+    // dónde sacarlos y no es este script el que inventa cartografía.
+    const geo = geojsonPorClave.get(clave);
+    const prioridad = fila.prioridad.trim() === "" ? null : fila.prioridad.trim();
     return {
-      clave: p.clave,
-      numero: p.seccion,
+      clave,
+      numero: Number(clave),
       demarcacion_id: demarcacionId,
-      distrito_local: p.distrito_local,
-      distrito_federal: p.distrito_federal,
-      area_km2: p.area_km2,
-      centro_lat: p.lat,
-      centro_lng: p.lon,
-      es_sustituta: p.sustituta === true,
-      nota: p.nota ?? null,
+      distrito_local: geo?.distrito_local ?? null,
+      distrito_federal: geo?.distrito_federal ?? null,
+      area_km2: geo?.area_km2 ?? null,
+      centro_lat: geo?.lat ?? null,
+      centro_lng: geo?.lon ?? null,
+      es_sustituta: false,
+      nota: geo?.nota ?? null,
+      lista_nominal: Number(fila.lista_nominal),
+      prioridad,
+      en_catalogo: true,
     };
   });
-  await insertarPorLotes("secciones", filasSecciones, 200);
-  const sustitutas = secciones.filter((s) => s.properties.sustituta).length;
-  console.log(`Secciones: ${secciones.length} (${sustitutas} sustitutas)`);
+
+  // Las 6 sustitutas: ya venían en secciones.geojson, no están en el catálogo del cliente.
+  const clavesSustitutasFueraCatalogo = ["0471", "0478", "0493", "0500", "0593", "0616"];
+  const filasSustitutasFueraCatalogo = secciones
+    .filter((rasgo) => clavesSustitutasFueraCatalogo.includes(rasgo.properties.clave))
+    .map((rasgo) => {
+      const p = rasgo.properties;
+      const demarcacionId = idPorDemarcacion.get(p.demarcacion);
+      if (!demarcacionId) {
+        throw new Error(
+          `La sustituta ${p.clave} trae la demarcación "${p.demarcacion}", que no está en el catálogo.`,
+        );
+      }
+      return {
+        clave: p.clave,
+        numero: p.seccion,
+        demarcacion_id: demarcacionId,
+        distrito_local: p.distrito_local,
+        distrito_federal: p.distrito_federal,
+        area_km2: p.area_km2,
+        centro_lat: p.lat,
+        centro_lng: p.lon,
+        es_sustituta: true,
+        nota: p.nota ?? null,
+        lista_nominal: null,
+        prioridad: null,
+        en_catalogo: false,
+      };
+    });
+  if (filasSustitutasFueraCatalogo.length !== clavesSustitutasFueraCatalogo.length) {
+    throw new Error(
+      `Se esperaban ${clavesSustitutasFueraCatalogo.length} sustitutas fuera del catálogo en ` +
+        `secciones.geojson y se encontraron ${filasSustitutasFueraCatalogo.length}.`,
+    );
+  }
+
+  const filasSecciones = [...filasSeccionesCatalogo, ...filasSustitutasFueraCatalogo];
+  await subirPorLotes("secciones", filasSecciones, 200, "clave");
+  console.log(
+    `Secciones: ${filasSecciones.length} (${filasSeccionesCatalogo.length} del catálogo, ` +
+      `${filasSustitutasFueraCatalogo.length} sustitutas fuera del catálogo)`,
+  );
 
   // --- Geometría. Los polígonos entran como MultiPolygon en 4326, en EWKT. --
   const filasGeom = secciones.map((rasgo) => ({
@@ -320,6 +407,37 @@ async function main() {
   await insertarPorLotes("colonia_seccion", filasTraslapes, 200);
   console.log(`Traslapes colonia-sección: ${filasTraslapes.length} de ${traslapes.length}`);
 
+  // --- Casillas. Con upsert, no con borrar-y-recrear: casillas.id es serial y
+  // representantes_casilla cuelga de él con on delete cascade, así que vaciar esta tabla en una
+  // base ya sembrada se llevaría entre las patas a los representantes ya capturados desde la
+  // interfaz, que esta tarea tiene instrucción explícita de no tocar. La llave natural para el
+  // upsert es la misma que ya declara el esquema (seccion_clave, tipo, numero).
+  let casillasSinCoordenada = 0;
+  const filasCasillas = casillasCsv.map((fila) => {
+    const lat = Number(fila.lat);
+    const lng = Number(fila.lng);
+    const tieneCoordenada =
+      fila.lat.trim() !== "" &&
+      fila.lng.trim() !== "" &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng);
+    if (!tieneCoordenada) casillasSinCoordenada++;
+    return {
+      seccion_clave: fila.seccion.trim(),
+      tipo: fila.tipo.trim(),
+      numero: Number(fila.id_casilla),
+      domicilio: fila.domicilio || null,
+      ubicacion: fila.ubicacion || null,
+      referencia: fila.referencia || null,
+      lat: tieneCoordenada ? lat : null,
+      lng: tieneCoordenada ? lng : null,
+    };
+  });
+  await subirPorLotes("casillas", filasCasillas, 200, "seccion_clave,tipo,numero");
+  console.log(
+    `Casillas: ${filasCasillas.length} (${casillasSinCoordenada} sin coordenada)`,
+  );
+
   // --- Verificación: las dos rutas de punto en polígono deben coincidir. ----
   const prueba = secciones[0].properties;
   try {
@@ -338,8 +456,32 @@ async function main() {
     );
   }
 
+  // --- Resumen del catálogo y de las casillas. --------------------------------
+  const conGeometria = catalogoSecciones.filter((f) => f.tiene_geometria.trim() === "si").length;
+  const sinGeometria = catalogoSecciones.filter((f) => f.tiene_geometria.trim() === "no").length;
+  const prioridadA = catalogoSecciones.filter((f) => f.prioridad.trim() === "A").length;
+  const prioridadB = catalogoSecciones.filter((f) => f.prioridad.trim() === "B").length;
+  const listaNominalTotal = catalogoSecciones.reduce(
+    (suma, f) => suma + Number(f.lista_nominal),
+    0,
+  );
+  console.log("--- Resumen del catálogo ---");
+  console.log(`Secciones del catálogo: ${filasSeccionesCatalogo.length}`);
+  console.log(`Sustitutas fuera del catálogo: ${filasSustitutasFueraCatalogo.length}`);
+  console.log(`Con geometría: ${conGeometria}  Sin geometría: ${sinGeometria}`);
+  console.log(`Prioridad A: ${prioridadA}  Prioridad B: ${prioridadB}`);
+  console.log(`Lista nominal total: ${listaNominalTotal}`);
+  console.log(`Casillas cargadas: ${filasCasillas.length}  Sin coordenada: ${casillasSinCoordenada}`);
+
   // --- Conteo final. ----------------------------------------------------------
-  const tablas = ["demarcaciones", "secciones", "secciones_geom", "colonias", "colonia_seccion"];
+  const tablas = [
+    "demarcaciones",
+    "secciones",
+    "secciones_geom",
+    "colonias",
+    "colonia_seccion",
+    "casillas",
+  ];
   const conteo: { tabla: string; filas: number | null }[] = [];
   for (const tabla of tablas) {
     const { count, error } = await supabase

@@ -2,18 +2,51 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Search, Star } from "lucide-react";
+import { format } from "date-fns";
+import { Download, Search, Star } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { DEMARCACIONES, demarcacionPorId } from "@/lib/demarcaciones";
 import { alcanceDe } from "@/lib/permisos";
-import { etiquetaEdad } from "@/lib/personas";
+import { edadDesde, etiquetaEdad } from "@/lib/personas";
 import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido, useNavegarConTransicion } from "@/lib/transicion";
-import { listarPersonas, type PersonaEnLista } from "@/lib/datos/personas";
+import { descargarCsv } from "@/lib/csv";
+import {
+  listarPersonas,
+  listarPromovidosExportar,
+  type PersonaEnLista,
+  type PromovidoExportable,
+} from "@/lib/datos/personas";
 import { ETIQUETA_GENERO, GENEROS, type Genero } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
 
 const PAGINA = 300;
+
+/** Columnas del CSV de promovidos, en el orden que pidió el cliente. */
+const COLUMNAS_PROMOVIDOS = [
+  { llave: "nombre", etiqueta: "Nombre" },
+  { llave: "telefono", etiqueta: "Teléfono" },
+  { llave: "seccion", etiqueta: "Sección" },
+  { llave: "colonia", etiqueta: "Colonia" },
+  { llave: "demarcacion", etiqueta: "Demarcación" },
+  { llave: "genero", etiqueta: "Género" },
+  { llave: "edad", etiqueta: "Edad" },
+  { llave: "promovido_desde", etiqueta: "Fecha en que se marcó como promovido" },
+];
+
+/** Fila cruda de la exportación, ya con nombres de columna en español y nada por calcular en Excel. */
+function filaPromovidoExportable(p: PromovidoExportable) {
+  return {
+    nombre: p.nombre,
+    telefono: formatearTelefono(p.telefono_norm),
+    seccion: p.seccion_clave ?? "",
+    colonia: p.colonias?.nombre ?? "",
+    demarcacion: demarcacionPorId(p.demarcacion_id)?.nombre ?? "",
+    genero: p.genero ? ETIQUETA_GENERO[p.genero] : "",
+    edad: edadDesde(p.fecha_nacimiento) ?? "",
+    promovido_desde: p.promovido_en ? format(new Date(p.promovido_en), "dd/MM/yyyy") : "",
+  };
+}
 
 export default function Personas() {
   const { actuante } = useActuante();
@@ -22,6 +55,7 @@ export default function Personas() {
 
   const [texto, setTexto] = useState("");
   const [demarcacionId, setDemarcacionId] = useState<number | null>(null);
+  const [seccionTexto, setSeccionTexto] = useState("");
   const [participar, setParticipar] = useState(false);
   const [info, setInfo] = useState(false);
   const [promovido, setPromovido] = useState(false);
@@ -31,6 +65,7 @@ export default function Personas() {
   const [filas, setFilas] = useState<PersonaEnLista[]>([]);
   const [total, setTotal] = useState(0);
   const [cargando, setCargando] = useState(true);
+  const [exportando, setExportando] = useState(false);
 
   const contenedor = useRef<HTMLDivElement>(null);
 
@@ -41,21 +76,30 @@ export default function Personas() {
     return () => clearTimeout(id);
   }, [texto]);
 
+  // Cuatro dígitos con ceros, igual que la clave de sección en todo el sistema. Se completa aquí
+  // para que "524" y "0524" filtren lo mismo sin obligar a teclear el cero.
+  const seccionClave = useMemo(() => {
+    const digitos = seccionTexto.replace(/\D/g, "");
+    return digitos ? digitos.padStart(4, "0") : null;
+  }, [seccionTexto]);
+
+  const filtrosActivos = useMemo(
+    () => ({
+      texto: textoDiferido || undefined,
+      demarcacionId,
+      seccionClave,
+      quiereParticipar: participar || undefined,
+      quiereInfo: info || undefined,
+      promovido: promovido || undefined,
+      representante: representante || undefined,
+      genero,
+    }),
+    [textoDiferido, demarcacionId, seccionClave, participar, info, promovido, representante, genero],
+  );
+
   useEffect(() => {
     let vigente = true;
-    listarPersonas(
-      actuante,
-      {
-        texto: textoDiferido || undefined,
-        demarcacionId,
-        quiereParticipar: participar || undefined,
-        quiereInfo: info || undefined,
-        promovido: promovido || undefined,
-        representante: representante || undefined,
-        genero,
-      },
-      { desde: 0, limite: PAGINA },
-    ).then((r) => {
+    listarPersonas(actuante, filtrosActivos, { desde: 0, limite: PAGINA }).then((r) => {
       if (!vigente) return;
       setFilas(r.datos.filas);
       setTotal(r.datos.total);
@@ -64,7 +108,7 @@ export default function Personas() {
     return () => {
       vigente = false;
     };
-  }, [actuante, textoDiferido, demarcacionId, participar, info, promovido, representante, genero]);
+  }, [actuante, filtrosActivos]);
 
   const virtual = useVirtualizer({
     count: filas.length,
@@ -84,15 +128,34 @@ export default function Personas() {
     return [];
   }, [alcance]);
 
+  // Descarga los promovidos con los mismos filtros que están activos en pantalla: lo que se ve
+  // es lo que se baja. es_promovido siempre en verdadero, lo pida o no el filtro "Promovido".
+  async function exportarPromovidos() {
+    setExportando(true);
+    const r = await listarPromovidosExportar(actuante, filtrosActivos);
+    descargarCsv("promovidos", COLUMNAS_PROMOVIDOS, r.datos.map(filaPromovidoExportable));
+    setExportando(false);
+  }
+
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col gap-4 md:h-[calc(100dvh-9rem)]">
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-xl">Personas</h1>
+          <h1 className="text-xl">Personas alcanzadas</h1>
           <p className="cifras text-sm text-tinta-suave">
-            {cargando ? "Contando…" : `${total.toLocaleString("es-MX")} registradas`}
+            {cargando ? "Contando…" : `${total.toLocaleString("es-MX")} alcanzadas`}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={exportarPromovidos}
+          disabled={exportando}
+          className="transicion-ui inline-flex items-center gap-1.5 rounded-control border border-borde px-3 text-sm text-tinta-suave transition-colors hover:text-tinta disabled:opacity-50"
+          style={{ minHeight: 40 }}
+        >
+          <Download className="size-4" aria-hidden />
+          {exportando ? "Exportando…" : "Exportar promovidos"}
+        </button>
       </header>
 
       <div className="flex flex-col gap-2">
@@ -124,6 +187,15 @@ export default function Personas() {
               ))}
             </select>
           )}
+          <input
+            value={seccionTexto}
+            onChange={(e) => setSeccionTexto(e.target.value)}
+            inputMode="numeric"
+            maxLength={4}
+            placeholder="Sección"
+            aria-label="Filtrar por clave de sección"
+            className="campo cifras w-24"
+          />
           <select
             value={genero ?? ""}
             onChange={(e) => setGenero((e.target.value || null) as Genero | null)}

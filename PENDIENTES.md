@@ -243,3 +243,63 @@ documentos de `spec/`. El plan de construcción está en `PLAN-ELECTORAL.md`.
     porque cada proceso tiene opciones distintas. **Falta el archivo**: los resultados de la
     revocación de 2022 por sección son públicos y los publica el INE, pero nadie los ha cargado.
     Sin ellos la capa no se puede construir, y por eso es lo único de la fase 5 que queda fuera.
+
+## Etapa electoral versión 2
+
+Las entradas siguientes vienen de las notas del 11 de septiembre de 2026 y de los tres archivos que
+mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md` queda como registro.
+
+30. **La demarcación de 18 secciones está deducida, no declarada.** El catálogo del cliente
+    (`LN FEB 26_CAPITAL.xlsx`, 169 secciones) no trae demarcación, y 18 de esas secciones no tienen
+    polígono. Se resolvieron tomando la coordenada de su casilla básica y viendo en qué sección con
+    geometría cae: 17 salieron así, y 15 de ellas caen dentro de las 6 sustitutas, que es justo lo
+    que dice la cartografía que pasó. La 2543 se resolvió por la sucesión declarada en
+    `secciones.geojson`. La columna `origen_demarcacion` de `data/secciones-catalogo.csv` guarda de
+    dónde salió cada una. **Falta que el cliente confirme las 18**, sobre todo 2579 y 2587, que no
+    caen en una sustituta sino en una sección vigente.
+
+31. **Las 6 sustitutas quedan fuera del catálogo pero dentro del mapa.** `secciones.en_catalogo` las
+    marca en falso. Se siguen pintando y se siguen viendo, porque esconderlas deja hoyos en el mapa y
+    porque CLAUDE.md lo prohíbe, pero no entran en lista nominal ni en metas, donde contarían dos
+    veces junto con sus sucesoras. La base queda con 175 renglones: 169 del catálogo más 6. Esto
+    revierte parcialmente la entrada 10, que había dejado el asunto en 169 a secas.
+
+32. **Seis secciones prioritarias no se pueden pintar.** 2541, 2542, 2574, 2581, 2582 y 2583 son
+    prioritarias y están entre las 18 sin geometría. Cuentan en los indicadores y aparecen en los
+    listados; lo único que no se puede es colorearlas en el mapa, y la barra del mapa lo dice. Se
+    destraba solo cuando el INE publique el marco vigente.
+
+33. **El número 402 no cuadra con 185 casillas.** Las notas dicen que el día de la elección habrá
+    402 representantes con usuario. El archivo de coordenadas trae 185 casillas en Oaxaca de Juárez:
+    169 básicas y 16 contiguas. A titular y suplente por casilla salen 370, no 402. Para llegar a 402
+    harían falta 201 casillas, o bien el número incluye representantes generales, que son otra figura
+    y no cuelgan de una casilla. **Falta que el cliente lo aclare**, porque cambia las barras de
+    avance, las metas de reclutamiento y cuántos usuarios hay que crear.
+
+34. **La meta de votos existe como campo y está vacía.** El cliente la definirá después. El indicador
+    y la barra de avance ya están construidos y se muestran con la meta en guion, para poder
+    presentarlos. El día que se llenen las metas la pantalla no cambia, solo se llena.
+
+35. **El promotor es una persona ya registrada.** Así lo decidió el cliente. Se guarda en
+    `personas.promotor_id`. Se eligió buscador y no desplegable porque pueden ser miles y un
+    desplegable con miles de opciones es inusable en celular.
+
+36. **La importación pasó de vaciar a upsert.** Con 169 secciones ya no bastaba con cuidar el orden
+    de borrado: `personas` y `actividades` apuntan a `secciones.clave`, y `representantes_casilla`
+    cuelga de `casillas.id` con borrado en cascada. Vaciar esas tablas en una base ya sembrada se
+    habría llevado personas y representantes de por medio. No requiere confirmación, pero sí que
+    quien toque `scripts/importar.ts` lo sepa.
+
+37. **Una agregación quedó en el navegador, contra la regla de la casa.** El avance de meta por
+    demarcación se calcula en `app/territorio/page.tsx` sumando las secciones ya traídas, en lugar de
+    pedírselo a una vista. La razón: `v_demarcacion_resumen` no carga `lista_nominal`, `meta_votos`
+    ni `promovidos`, y agregarlos era una migración más en medio de la fase. Está comentado en el
+    archivo como excepción deliberada. **Lo correcto es sumarle esas tres columnas a
+    `v_demarcacion_resumen` en la siguiente migración y borrar el cálculo del cliente.** No urge
+    mientras sean 175 secciones; empezaría a importar si esto creciera a todo el estado.
+
+38. **`clavesConGeometria` deduce del GeoJSON lo que debería estar en la base.** Para saber qué
+    secciones del catálogo no tienen polígono, la pantalla compara las claves contra
+    `secciones.geojson` cacheado, porque no hay columna que lo diga. Funciona y no cuesta una
+    consulta, pero la fuente de verdad debería ser la base: bastaría una columna derivada de la
+    existencia del renglón en `secciones_geom`. Anotado para la siguiente migración.

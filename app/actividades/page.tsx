@@ -17,7 +17,7 @@ import { listarActividades, type Actividad } from "@/lib/datos/actividades";
 import { Hoja } from "@/components/actividades/hoja";
 import { FormularioActividad } from "@/components/actividades/formulario-actividad";
 
-const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido"];
+const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
 const ESTATUS: EstatusActividad[] = ["programada", "en_curso", "realizada", "cancelada"];
 
 function fechaCorta(fecha: string, hora: string | null): string {
@@ -125,7 +125,6 @@ export default function Actividades() {
                       </span>
                       <span className="block truncate text-xs text-tinta-suave">
                         {ETIQUETA_TIPO_ACTIVIDAD[a.tipo]}
-                        {a.subtipo && ` · ${a.subtipo}`}
                         {a.seccion_clave && (
                           <>
                             {" · "}

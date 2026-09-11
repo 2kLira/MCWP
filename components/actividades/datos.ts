@@ -1,6 +1,6 @@
 /**
  * Consultas auxiliares del módulo de actividades que no viven en lib/datos/actividades.ts:
- * usuarios asignables como responsable, colaboradores ya asignados y el nombre del responsable.
+ * usuarios asignables como responsable, brigadistas ya asignados y el nombre del responsable.
  * Mismas reglas de lib/permisos.ts, sin duplicar el filtrado por territorio.
  */
 
@@ -40,13 +40,13 @@ export function obtenerUsuario(id: string | null): Promise<Resultado<UsuarioBrev
   );
 }
 
-export type Colaborador = { usuario_id: string; nombre: string };
+export type Brigadista = { usuario_id: string; nombre: string };
 
-export async function colaboradoresDeActividad(
+export async function brigadistasDeActividad(
   actividadId: string,
-): Promise<Resultado<Colaborador[]>> {
+): Promise<Resultado<Brigadista[]>> {
   const { data, error } = await db()
-    .from("actividad_colaboradores")
+    .from("actividad_brigadistas")
     .select("usuario_id, usuarios(nombre)")
     .eq("actividad_id", actividadId);
 

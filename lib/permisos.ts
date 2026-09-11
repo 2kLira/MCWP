@@ -45,8 +45,8 @@ export function alcanceDe(usuario: UsuarioActuante | null): Alcance {
           }
         : { tipo: "ninguno" };
 
-    // El colaborador ve lo mismo que su territorio asignado, pero no crea ni edita nada.
-    case "colaborador":
+    // El brigadista ve lo mismo que su territorio asignado, pero no crea ni edita nada.
+    case "brigadista":
       if (usuario.seccionClave) {
         return {
           tipo: "seccion",
@@ -229,9 +229,9 @@ export type Entidad =
   | "foto";
 
 const CREA: Record<Entidad, readonly RolUsuario[]> = {
-  // Registrar gente en la calle es el corazón del sistema: lo hacen todos, incluido el colaborador.
-  persona: ["admin", "resp_demarcacion", "resp_seccion", "colaborador"],
-  foto: ["admin", "resp_demarcacion", "resp_seccion", "colaborador"],
+  // Registrar gente en la calle es el corazón del sistema: lo hacen todos, incluido el brigadista.
+  persona: ["admin", "resp_demarcacion", "resp_seccion", "brigadista"],
+  foto: ["admin", "resp_demarcacion", "resp_seccion", "brigadista"],
   actividad: ["admin", "resp_demarcacion", "resp_seccion"],
   seguimiento: ["admin", "resp_demarcacion", "resp_seccion"],
   usuario: ["admin"],
@@ -288,7 +288,7 @@ export function puedeVerReportesComparativos(
 }
 
 /**
- * La carga masiva se restringe más que la captura de una persona. Un colaborador registra gente en
+ * La carga masiva se restringe más que la captura de una persona. Un brigadista registra gente en
  * la calle de una en una, pero meter un archivo de miles de renglones es otra cosa: cambia el
  * padrón de golpe y hay que poder señalar a un responsable. Por eso solo el administrador y los
  * responsables de demarcación.

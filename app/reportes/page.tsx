@@ -84,13 +84,13 @@ export default function Reportes() {
       </Tarjeta>
 
       <Tarjeta
-        titulo="Personas por demarcación"
+        titulo="Personas alcanzadas por demarcación"
         accion={
           <BotonCsv
             nombre="personas-por-demarcacion"
             columnas={[
               { llave: "demarcacion", etiqueta: "Demarcación" },
-              { llave: "personas", etiqueta: "Personas" },
+              { llave: "personas", etiqueta: "Personas alcanzadas" },
               { llave: "quieren_participar", etiqueta: "Quieren participar" },
               { llave: "quieren_info", etiqueta: "Quieren información" },
               { llave: "secciones", etiqueta: "Secciones" },
@@ -136,7 +136,7 @@ export default function Reportes() {
             nombre="resumen-por-demarcacion"
             columnas={[
               { llave: "demarcacion", etiqueta: "Demarcación" },
-              { llave: "personas", etiqueta: "Personas" },
+              { llave: "personas", etiqueta: "Personas alcanzadas" },
               { llave: "reuniones", etiqueta: "Reuniones" },
               { llave: "activismo", etiqueta: "Activismo" },
               { llave: "recorridos", etiqueta: "Recorridos" },
@@ -150,7 +150,7 @@ export default function Reportes() {
             <thead>
               <tr className="text-left text-xs text-tinta-tenue">
                 <th className="py-2 font-medium">Demarcación</th>
-                <th className="py-2 font-medium">Personas</th>
+                <th className="py-2 font-medium">Personas alcanzadas</th>
                 <th className="py-2 font-medium">Participan</th>
                 <th className="py-2 font-medium">Reuniones</th>
                 <th className="py-2 font-medium">Activismo</th>

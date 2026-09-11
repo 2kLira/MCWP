@@ -8,7 +8,7 @@ import { crearActividad } from "@/lib/datos/actividades";
 import { usuariosAsignables, type UsuarioBreve } from "@/components/actividades/datos";
 import { cn } from "@/lib/utils";
 
-const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido"];
+const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
 
 /**
  * Alta de actividad. No se pregunta quién la crea ni cuándo se captura: el sistema lo pone solo.
@@ -20,7 +20,6 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
   const alcance = alcanceDe(actuante);
 
   const [tipo, setTipo] = useState<TipoActividad>("reunion");
-  const [subtipo, setSubtipo] = useState("");
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
   const [hora, setHora] = useState("");
@@ -55,7 +54,6 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
 
     const r = await crearActividad({
       tipo,
-      subtipo: subtipo.trim() || null,
       nombre: nombre.trim(),
       fecha,
       hora: hora || null,
@@ -98,15 +96,6 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
             </button>
           ))}
         </div>
-      </Campo>
-
-      <Campo etiqueta="Subtipo" apoyo="Texto libre. Opcional.">
-        <input
-          value={subtipo}
-          onChange={(e) => setSubtipo(e.target.value)}
-          placeholder="Por ejemplo: brigada de limpieza"
-          className="campo"
-        />
       </Campo>
 
       <Campo etiqueta="Nombre">

@@ -3,9 +3,10 @@
  * Las cifras salen de las vistas de la base, nunca de sumas hechas en el navegador.
  */
 
-import { aplicarAlcance, aplicarAlcanceDemarcacion } from "@/lib/permisos";
+import { aplicarAlcance, aplicarAlcanceDemarcacion, puedeVerSeccion } from "@/lib/permisos";
 import type { UsuarioActuante } from "@/lib/tipos";
 import { db, lista, type Resultado } from "@/lib/datos/cliente";
+import { cargarSecciones } from "@/lib/territorio";
 
 export type Problematica = {
   id: number;
@@ -39,6 +40,17 @@ export type SeccionResumen = {
   proxima_actividad: string | null;
   promovidos: number;
   aspirantes_representante: number;
+  /* Fase B/C · la sección como unidad de meta. Nulos legítimos: la lista nominal y la meta de
+   * votos llegan por Excel del cliente y todavía no están cargadas para todas las secciones. */
+  lista_nominal: number | null;
+  meta_votos: number | null;
+  prioridad: "A" | "B" | null;
+  /** Falso en las seis sustitutas: geometría de referencia que ya no está en el catálogo del
+   *  cliente. No entran en sumas de lista nominal ni de meta, para no contar territorio de más. */
+  en_catalogo: boolean;
+  /** Ya tiene al menos un recorrido en estatus realizada. Esa es toda la definición. */
+  recorrida: boolean;
+  casillas: number;
 };
 
 /**
@@ -106,6 +118,74 @@ export function coloniasDeSeccion(
   );
 }
 
+/** Una colonia dentro de la ficha de una sección, con qué tanto de la sección ocupa. */
+export type ColoniaDeSeccion = {
+  colonia_id: number;
+  colonia: string;
+  cp: string | null;
+  traslape_pct: number;
+};
+
+/**
+ * Colonias que integran una sección, ordenadas de mayor a menor traslape: primero la que ocupa
+ * más territorio de la sección. Es el reemplazo de la capa de colonias que se retira del mapa: el
+ * dato vive en la ficha, no en una capa aparte.
+ *
+ * Se recorta por territorio con `puedeVerSeccion` en vez de `aplicarAlcance` porque
+ * `colonia_seccion` no lleva `demarcacion_id` propio; la sección ya viene elegida de una lista que
+ * el usuario alcanza a ver, así que esto es una comprobación de cierre, no el primer filtro.
+ */
+export function coloniasDeSeccionConTraslape(
+  usuario: UsuarioActuante | null,
+  seccionClave: string,
+  demarcacionId?: number | null,
+): Promise<Resultado<ColoniaDeSeccion[]>> {
+  if (!puedeVerSeccion(usuario, seccionClave, demarcacionId)) {
+    return Promise.resolve({ datos: [], sinEsquema: false, aviso: null });
+  }
+  return lista<ColoniaDeSeccion>(
+    db()
+      .from("colonia_seccion")
+      .select("colonia_id, traslape_pct, colonias!inner(nombre, cp)")
+      .eq("seccion_clave", seccionClave)
+      .order("traslape_pct", { ascending: false })
+      .then(({ data, error }) => ({
+        data:
+          (
+            data as
+              | { colonia_id: number; traslape_pct: number; colonias: { nombre: string; cp: string | null } }[]
+              | null
+          )?.map((f) => ({
+            colonia_id: f.colonia_id,
+            colonia: f.colonias.nombre,
+            cp: f.colonias.cp,
+            traslape_pct: f.traslape_pct,
+          })) ?? null,
+        error,
+      })),
+  );
+}
+
+/**
+ * Claves de sección que sí tienen polígono en la cartografía cacheada (secciones.geojson). Sirve
+ * para distinguir, dentro del catálogo, las 18 secciones que el reseccionamiento del INE dejó sin
+ * geometría publicada: siguen en el catálogo y en las cifras, solo no se pintan todavía en el
+ * mapa. No hay columna en la base para esto porque es un dato de la cartografía, no de la fase B.
+ */
+export async function clavesConGeometria(): Promise<Resultado<Set<string>>> {
+  try {
+    const coleccion = await cargarSecciones();
+    const claves = new Set(coleccion.features.map((f) => f.properties.clave));
+    return { datos: claves, sinEsquema: false, aviso: null };
+  } catch (error) {
+    return {
+      datos: new Set<string>(),
+      sinEsquema: false,
+      aviso: error instanceof Error ? error.message : "No se pudo cargar la cartografía.",
+    };
+  }
+}
+
 export function buscarColonias(
   texto: string,
   limite = 8,
@@ -120,11 +200,18 @@ export function buscarColonias(
   );
 }
 
-/** Resumen por sección, ya recortado al territorio del usuario actuante. */
+/**
+ * Resumen por sección, ya recortado al territorio del usuario actuante.
+ *
+ * `opciones.prioridad` filtra por secciones prioritarias A o B, para el listado de la fase C.
+ * Se pide a la base con `.eq`, no se filtra después en el navegador.
+ */
 export function seccionesResumen(
   usuario: UsuarioActuante | null,
+  opciones: { prioridad?: "A" | "B" } = {},
 ): Promise<Resultado<SeccionResumen[]>> {
-  const consulta = db().from("v_seccion_resumen").select("*");
+  let consulta = db().from("v_seccion_resumen").select("*");
+  if (opciones.prioridad) consulta = consulta.eq("prioridad", opciones.prioridad);
   return lista<SeccionResumen>(
     aplicarAlcance(consulta, usuario, { seccion: "clave" }).order("clave"),
   );

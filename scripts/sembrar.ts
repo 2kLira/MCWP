@@ -18,7 +18,7 @@
  * id) para no depender del orden en que Postgres devuelva las filas.
  *
  * Este script solo escribe usuarios, asignaciones_responsable, personas, actividades,
- * actividad_colaboradores, participaciones, menciones_problematica, solicitudes y seguimientos.
+ * actividad_brigadistas, participaciones, menciones_problematica, solicitudes y seguimientos.
  * No toca demarcaciones, secciones, secciones_geom, colonias ni colonia_seccion: esas las carga
  * scripts/importar.ts y este script solo las lee.
  *
@@ -409,10 +409,10 @@ async function main() {
    * 2. Los cuatro actuantes fijos de lib/actuantes.ts: id, rol y territorio deben coincidir.
    * ------------------------------------------------------------------------------------------ */
 
-  const [ACT_ADMIN, ACT_RESP_DEMARCACION, ACT_RESP_SECCION, ACT_COLABORADOR] = ACTUANTES;
+  const [ACT_ADMIN, ACT_RESP_DEMARCACION, ACT_RESP_SECCION, ACT_BRIGADISTA] = ACTUANTES;
   const DEMARCACION_RESP_FIJO = ACT_RESP_DEMARCACION.demarcacionId as number;
   const SECCION_RESP_FIJA = ACT_RESP_SECCION.seccionClave as string;
-  const DEMARCACION_COLABORADOR_FIJO = ACT_COLABORADOR.demarcacionId as number;
+  const DEMARCACION_BRIGADISTA_FIJO = ACT_BRIGADISTA.demarcacionId as number;
 
   /* ------------------------------------------------------------------------------------------
    * 3. Cuántos responsables de sección por demarcación (40 en total). Se concentran en Cabecera
@@ -587,7 +587,7 @@ async function main() {
 
   /* ------------------------------------------------------------------------------------------
    * 6. Usuarios: 1 admin, 14 responsables de demarcación, 40 responsables de sección y 25
-   *    colaboradores. Los cuatro fijos de lib/actuantes.ts entran con su id, rol y territorio
+   *    brigadistas. Los cuatro fijos de lib/actuantes.ts entran con su id, rol y territorio
    *    exactos; el resto se genera con nombre y teléfono verosímiles.
    * ------------------------------------------------------------------------------------------ */
 
@@ -654,32 +654,32 @@ async function main() {
     usuarioPorSeccion.set(clave, usuarioId);
   }
 
-  const NUM_COLABORADORES = 25;
-  const colaboradorIds: string[] = [];
+  const NUM_BRIGADISTAS = 25;
+  const brigadistaIds: string[] = [];
   usuarios.push({
-    id: ACT_COLABORADOR.id,
+    id: ACT_BRIGADISTA.id,
     nombre: nombreVerosimil(),
     telefono: siguienteTelefono().raw,
-    rol: "colaborador",
-    demarcacion_id: DEMARCACION_COLABORADOR_FIJO,
+    rol: "brigadista",
+    demarcacion_id: DEMARCACION_BRIGADISTA_FIJO,
     seccion_clave: null,
     activo: true,
     created_at: creadoHaceDias(30, 250),
   });
-  colaboradorIds.push(ACT_COLABORADOR.id);
-  for (let i = 1; i < NUM_COLABORADORES; i++) {
+  brigadistaIds.push(ACT_BRIGADISTA.id);
+  for (let i = 1; i < NUM_BRIGADISTAS; i++) {
     const id = uuidDeterminista();
     usuarios.push({
       id,
       nombre: nombreVerosimil(),
       telefono: siguienteTelefono().raw,
-      rol: "colaborador",
+      rol: "brigadista",
       demarcacion_id: null,
       seccion_clave: null,
       activo: true,
       created_at: creadoHaceDias(10, 250),
     });
-    colaboradorIds.push(id);
+    brigadistaIds.push(id);
   }
 
   /** Usuario real para registrada_por / responsable_id: prioriza el territorio exacto. */
@@ -690,7 +690,7 @@ async function main() {
     }
     const rd = usuarioPorDemarcacion.get(demarcacionId);
     if (rd) return rd;
-    return elegirUno(colaboradorIds);
+    return elegirUno(brigadistaIds);
   }
 
   /* ------------------------------------------------------------------------------------------
@@ -933,17 +933,18 @@ async function main() {
 
   /* ------------------------------------------------------------------------------------------
    * 9. Actividades: 55 en total — 46 realizadas en las últimas 10 semanas, 2 en curso hoy y 7
-   *    programadas en los próximos 14 días. Reparto de tipo aproximado a un tercio cada uno; los
-   *    recorridos se concentran en las cinco demarcaciones con más personas registradas.
+   *    programadas en los próximos 14 días. Reparto de tipo aproximado a un tercio cada uno entre
+   *    reunión, activismo y recorrido, y un puñado de cruceros aparte para que el tipo no se vea
+   *    vacío en la presentación; los recorridos se concentran en las cinco demarcaciones con más
+   *    personas registradas.
    * ------------------------------------------------------------------------------------------ */
 
-  type TipoActividad = "reunion" | "activismo" | "recorrido";
+  type TipoActividad = "reunion" | "activismo" | "recorrido" | "crucero";
   type EstatusActividad = "programada" | "en_curso" | "realizada" | "cancelada";
 
   type FilaActividad = {
     id: string;
     tipo: TipoActividad;
-    subtipo: string;
     nombre: string;
     fecha: string;
     hora: string;
@@ -965,10 +966,31 @@ async function main() {
     created_at: string;
   };
 
-  const SUBTIPOS_POR_TIPO: Record<TipoActividad, readonly string[]> = {
-    reunion: ["vecinal", "comunitaria", "de seguimiento", "informativa", "con líderes de colonia"],
-    activismo: ["domiciliaria", "volanteo", "perifoneo", "brigada informativa", "censo casa por casa"],
-    recorrido: ["limpieza", "reforestación", "supervisión de obra", "recorrido vecinal", "bacheo comunitario"],
+  // Ya no hay subtipo: lo que antes era un campo aparte (vecinal, volanteo, limpieza...) ahora
+  // vive directo en el nombre de la actividad, que es donde de verdad se lee.
+  const NOMBRES_POR_TIPO: Record<TipoActividad, readonly string[]> = {
+    reunion: [
+      "Reunión vecinal",
+      "Reunión comunitaria",
+      "Reunión de seguimiento",
+      "Reunión informativa",
+      "Reunión con líderes de colonia",
+    ],
+    activismo: [
+      "Activismo domiciliario",
+      "Volanteo",
+      "Perifoneo",
+      "Brigada informativa",
+      "Censo casa por casa",
+    ],
+    recorrido: [
+      "Recorrido de limpieza",
+      "Recorrido de reforestación",
+      "Supervisión de obra",
+      "Recorrido vecinal",
+      "Bacheo comunitario",
+    ],
+    crucero: ["Crucero informativo", "Crucero de volanteo", "Plantón en crucero"],
   };
 
   const OBJETIVOS_POR_TIPO: Record<TipoActividad, readonly string[]> = {
@@ -987,12 +1009,11 @@ async function main() {
       "Dar mantenimiento a espacios públicos de la colonia",
       "Verificar el avance de obras solicitadas por vecinos",
     ],
-  };
-
-  const NOMBRE_TIPO: Record<TipoActividad, string> = {
-    reunion: "Reunión",
-    activismo: "Activismo",
-    recorrido: "Recorrido",
+    crucero: [
+      "Difundir el mensaje en horas de mayor tránsito",
+      "Repartir material informativo a automovilistas y peatones",
+      "Dar visibilidad a la campaña en un punto de alto flujo",
+    ],
   };
 
   // Las cinco demarcaciones con más personas registradas: los recorridos se concentran aquí.
@@ -1024,7 +1045,6 @@ async function main() {
   ): FilaActividad {
     const demarcacionesPermitidas = tipo === "recorrido" ? TOP5_DEMARCACIONES : idsDemarcaciones;
     const seccion = elegirSeccionPonderadaPorPoblacion(demarcacionesPermitidas);
-    const subtipo = elegirUno(SUBTIPOS_POR_TIPO[tipo]);
     const lugar = nombreLugar(seccion);
     const punto = jitter(seccion.centro_lat, seccion.centro_lng);
     const responsable = usuarioLocal(seccion.demarcacion_id, seccion.clave);
@@ -1034,8 +1054,7 @@ async function main() {
     return {
       id: uuidDeterminista(),
       tipo,
-      subtipo,
-      nombre: `${NOMBRE_TIPO[tipo]} ${subtipo} en ${lugar}`,
+      nombre: `${elegirUno(NOMBRES_POR_TIPO[tipo])} en ${lugar}`,
       fecha: formatearFecha(fecha),
       hora: `${entero(8, 19).toString().padStart(2, "0")}:${elegirUno(["00", "15", "30", "45"])}:00`,
       direccion: calleVerosimil(),
@@ -1064,12 +1083,17 @@ async function main() {
   const NUM_PROGRAMADAS = 7;
   const TOTAL_ACTIVIDADES = NUM_REALIZADAS + NUM_EN_CURSO + NUM_PROGRAMADAS; // 55
 
-  // Un tercio de cada tipo, aproximado, repartido con resto más grande sobre el total de 55.
-  const [numReunion, numActivismo, numRecorrido] = repartirEntero(TOTAL_ACTIVIDADES, [1, 1, 1]);
+  // Un tercio de cada tipo para reunión, activismo y recorrido, y un puñado de cruceros aparte
+  // (peso menor a propósito) para que el tipo nuevo aparezca sin competir con los otros tres.
+  const [numReunion, numActivismo, numRecorrido, numCrucero] = repartirEntero(
+    TOTAL_ACTIVIDADES,
+    [1, 1, 1, 0.4],
+  );
   const bolsaTipos = barajar([
     ...Array(numReunion).fill("reunion" as TipoActividad),
     ...Array(numActivismo).fill("activismo" as TipoActividad),
     ...Array(numRecorrido).fill("recorrido" as TipoActividad),
+    ...Array(numCrucero).fill("crucero" as TipoActividad),
   ]);
 
   const actividades: FilaActividad[] = [];
@@ -1089,16 +1113,16 @@ async function main() {
   actividades.sort((a, b) => a.fecha.localeCompare(b.fecha));
 
   /* ------------------------------------------------------------------------------------------
-   * 10. Colaboradores por actividad
+   * 10. Brigadistas por actividad
    * ------------------------------------------------------------------------------------------ */
 
-  const actividadColaboradores: { actividad_id: string; usuario_id: string }[] = [];
+  const actividadBrigadistas: { actividad_id: string; usuario_id: string }[] = [];
   for (const actividad of actividades) {
     const cantidad = entero(0, 3);
     const elegidos = new Set<string>();
-    for (let i = 0; i < cantidad; i++) elegidos.add(elegirUno(colaboradorIds));
+    for (let i = 0; i < cantidad; i++) elegidos.add(elegirUno(brigadistaIds));
     for (const usuarioId of elegidos) {
-      actividadColaboradores.push({ actividad_id: actividad.id, usuario_id: usuarioId });
+      actividadBrigadistas.push({ actividad_id: actividad.id, usuario_id: usuarioId });
     }
   }
 
@@ -1186,6 +1210,7 @@ async function main() {
     "Transporte y movilidad",
     "Parques y espacios públicos",
     "Servicios públicos",
+    "Servicios de salud",
     "Otro",
   ] as const;
 
@@ -1213,6 +1238,11 @@ async function main() {
   }
 
   const COMENTARIOS_POR_PROBLEMATICA: Record<string, readonly string[]> = {
+    "Servicios de salud": [
+      "La clínica más cercana queda muy lejos y no hay transporte directo.",
+      "Piden jornadas de salud en la colonia, sobre todo para adultos mayores.",
+      "El centro de salud abre pocas horas y casi nunca hay medicamento.",
+    ],
     Agua: [
       "Llevamos varios días sin agua en la calle.",
       "La presión baja mucho por las tardes.",
@@ -1420,7 +1450,7 @@ async function main() {
 
   console.log("\nActividades por tipo:");
   console.table(
-    (["reunion", "activismo", "recorrido"] as TipoActividad[]).map((tipo) => ({
+    (["reunion", "activismo", "recorrido", "crucero"] as TipoActividad[]).map((tipo) => ({
       tipo,
       cantidad: actividades.filter((a) => a.tipo === tipo).length,
     })),
@@ -1488,7 +1518,7 @@ async function main() {
 
   console.log(
     `\nResumen: ${usuarios.length} usuarios, ${asignaciones.length} asignaciones, ${personas.length} personas, ` +
-      `${actividades.length} actividades, ${actividadColaboradores.length} actividad_colaboradores, ` +
+      `${actividades.length} actividades, ${actividadBrigadistas.length} actividad_brigadistas, ` +
       `${participaciones.length} participaciones, ${menciones.length} menciones, ${solicitudes.length} solicitudes, ` +
       `${seguimientos.length} seguimientos.`,
   );
@@ -1507,7 +1537,7 @@ async function main() {
   await vaciarUuid("solicitudes");
   await vaciarUuid("seguimientos");
   await vaciarUuid("participaciones");
-  await vaciarUuid("actividad_colaboradores", "usuario_id");
+  await vaciarUuid("actividad_brigadistas", "usuario_id");
   await vaciarUuid("fotos");
   {
     // Antes de borrar actividades hay que limpiar personas.actividad_origen: si quedara alguna
@@ -1530,7 +1560,7 @@ async function main() {
   await insertarPorLotes("usuarios", usuarios, TAMANO_LOTE);
   await insertarPorLotes("asignaciones_responsable", asignaciones, TAMANO_LOTE);
   await insertarPorLotes("actividades", actividades, TAMANO_LOTE);
-  await insertarPorLotes("actividad_colaboradores", actividadColaboradores, TAMANO_LOTE);
+  await insertarPorLotes("actividad_brigadistas", actividadBrigadistas, TAMANO_LOTE);
   await insertarPorLotes("personas", personas, TAMANO_LOTE);
   await insertarPorLotes("participaciones", participaciones, TAMANO_LOTE);
   await insertarPorLotes("menciones_problematica", menciones, TAMANO_LOTE);

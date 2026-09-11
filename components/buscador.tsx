@@ -89,7 +89,7 @@ export function Buscador({
           tipo: "persona",
           id: p.id,
           nombre: p.nombre,
-          apoyo: p.seccion_clave ? `Sección ${p.seccion_clave}` : "Persona",
+          apoyo: p.seccion_clave ? `Sección ${p.seccion_clave}` : "Persona alcanzada",
         });
       }
 

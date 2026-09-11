@@ -3,7 +3,7 @@ import { ETIQUETA_TIPO_ACTIVIDAD } from "@/lib/tipos";
 import type { Actividad } from "@/lib/datos/actividades";
 import { horaCorta } from "@/components/agenda/utilidades";
 
-/** Un renglón de actividad: hora, nombre, tipo, subtipo y sección. Enlaza a su ficha. */
+/** Un renglón de actividad: hora, nombre, tipo y sección. Enlaza a su ficha. */
 export function RenglonActividad({ actividad }: { actividad: Actividad }) {
   return (
     <Link
@@ -14,7 +14,6 @@ export function RenglonActividad({ actividad }: { actividad: Actividad }) {
         <span className="block truncate text-sm font-medium text-tinta">{actividad.nombre}</span>
         <span className="block truncate text-xs text-tinta-suave">
           {ETIQUETA_TIPO_ACTIVIDAD[actividad.tipo]}
-          {actividad.subtipo && ` · ${actividad.subtipo}`}
           {actividad.seccion_clave && (
             <>
               {" · "}

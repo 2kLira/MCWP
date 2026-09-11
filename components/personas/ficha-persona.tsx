@@ -260,7 +260,7 @@ function Volver() {
       className="transicion-ui inline-flex w-fit items-center gap-2 text-sm text-tinta-suave hover:text-tinta"
     >
       <ArrowLeft className="size-4" aria-hidden />
-      Personas
+      Personas alcanzadas
     </Link>
   );
 }

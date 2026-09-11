@@ -34,8 +34,8 @@ export const ACTUANTES: readonly UsuarioActuante[] = [
   },
   {
     id: "00000000-0000-4000-8000-000000000004",
-    nombre: "Colaborador de San Martín Mexicapam",
-    rol: "colaborador",
+    nombre: "Brigadista de San Martín Mexicapam",
+    rol: "brigadista",
     demarcacionId: 12,
     seccionClave: null,
     activo: true,

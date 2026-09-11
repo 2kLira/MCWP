@@ -1,29 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { cargarSecciones, type ColeccionSecciones, type RasgoSeccion } from "@/lib/territorio";
 import { BarraMapa } from "./barra-mapa";
 import {
+  calcularConteoPrioritarias,
   cargarDatosMapa,
   DATOS_MAPA_VACIOS,
-  vistaEsDeColonias,
   type DatosMapa,
   type VistaMapa,
 } from "./datos-mapa";
 import { EsqueletoMapa } from "./esqueleto-mapa";
-import { FichaColonia, FichaSeccion } from "./ficha-seccion";
-import { MapaLienzo, type RasgoColonia } from "./mapa-lienzo";
+import { FichaSeccion } from "./ficha-seccion";
+import { MapaLienzo } from "./mapa-lienzo";
+import { ResumenPrioritarias } from "./resumen-prioritarias";
 import { SelectorCapas } from "./selector-capas";
 
 type Seleccion = { rasgo: RasgoSeccion; origen: { x: number; y: number } };
-type SeleccionColonia = { rasgo: RasgoColonia; origen: { x: number; y: number } };
 
 /**
  * Orquesta el mapa: carga el GeoJSON de secciones una vez (nunca desde la base) y el resumen real
  * por sección cada vez que cambia el actuante (el recorte por territorio vive en lib/permisos.ts,
- * vía seccionesResumen/problematicasPorSeccion). Alrededor del lienzo arma la barra superior, el
- * selector de capas y la ficha lateral, las tres únicas superficies de vidrio de esta pantalla.
+ * vía seccionesResumen). Alrededor del lienzo arma la barra superior, el selector de capas y la
+ * ficha lateral, las tres únicas superficies de vidrio de esta pantalla.
  */
 /**
  * `cromoDesplazado` baja la barra y el selector de capas para que no choquen con el buscador
@@ -47,21 +47,10 @@ export function MapaPagina({
   const [seleccionCruda, setSeleccion] = useState<(Seleccion & { actuanteId: string }) | null>(
     null,
   );
-  const [seleccionColoniaCruda, setSeleccionColonia] = useState<
-    (SeleccionColonia & { actuanteId: string }) | null
-  >(null);
   // La ficha caduca sola si el actuante cambió de territorio con ella abierta, en vez de
-  // mostrar una sección o colonia ajena a su alcance.
+  // mostrar una sección ajena a su alcance.
   const seleccion = seleccionCruda?.actuanteId === actuante.id ? seleccionCruda : null;
-  const seleccionColonia =
-    seleccionColoniaCruda?.actuanteId === actuante.id ? seleccionColoniaCruda : null;
   const [enMovimiento, setEnMovimiento] = useState(false);
-
-  // Una colonia seleccionada solo tiene sentido dentro de la vista de colonias: al salir de ella
-  // se limpia, en vez de quedar viva de fondo esperando a que se vuelva a entrar.
-  useEffect(() => {
-    if (!vistaEsDeColonias(vista)) setSeleccionColonia(null);
-  }, [vista]);
 
   useEffect(() => {
     let cancelado = false;
@@ -105,10 +94,12 @@ export function MapaPagina({
     ? (datos?.porClave.get(claveSeleccionada) ?? null)
     : null;
 
-  const coloniaSeleccionada = seleccionColonia?.rasgo.properties.colonia_id ?? null;
-  const datoColoniaSeleccion =
-    coloniaSeleccionada != null ? (datos?.porColonia.get(coloniaSeleccionada) ?? null) : null;
-
+  // Solo se recalcula cuando de verdad cambia algo: el conteo no depende de la vista activa, así
+  // que no hay que esperar a que el usuario abra "Prioritarias" para tenerlo listo.
+  const conteoPrioritarias = useMemo(
+    () => (coleccion && datos ? calcularConteoPrioritarias(datos, coleccion) : null),
+    [coleccion, datos],
+  );
 
   return (
     <div
@@ -132,14 +123,8 @@ export function MapaPagina({
             datos={datos}
             vista={vista}
             claveSeleccionada={claveSeleccionada}
-            coloniaSeleccionada={coloniaSeleccionada}
             onClicSeccion={(rasgo, origen) => {
               setSeleccion({ rasgo, origen, actuanteId: actuante.id });
-              setSeleccionColonia(null);
-            }}
-            onClicColonia={(rasgo, origen) => {
-              setSeleccionColonia({ rasgo, origen, actuanteId: actuante.id });
-              setSeleccion(null);
             }}
             onMovimiento={setEnMovimiento}
           />
@@ -153,9 +138,18 @@ export function MapaPagina({
               (sangradoIzquierdo ? " md:pl-24" : "")
             }
           >
-            {conBarra && (
-              <BarraMapa enMovimiento={enMovimiento} className="pointer-events-auto" />
-            )}
+            <div className="flex w-full flex-wrap items-start gap-3">
+              {conBarra && (
+                <BarraMapa enMovimiento={enMovimiento} className="pointer-events-auto" />
+              )}
+              {vista === "prioritarias" && conteoPrioritarias && (
+                <ResumenPrioritarias
+                  conteo={conteoPrioritarias}
+                  enMovimiento={enMovimiento}
+                  className="pointer-events-auto"
+                />
+              )}
+            </div>
             <SelectorCapas
               vista={vista}
               onCambiar={setVista}
@@ -172,17 +166,6 @@ export function MapaPagina({
               origen={seleccion.origen}
               enMovimiento={enMovimiento}
               onCerrar={() => setSeleccion(null)}
-            />
-          )}
-
-          {seleccionColonia && (
-            <FichaColonia
-              key={seleccionColonia.rasgo.properties.colonia_id}
-              rasgo={seleccionColonia.rasgo}
-              dato={datoColoniaSeleccion}
-              origen={seleccionColonia.origen}
-              enMovimiento={enMovimiento}
-              onCerrar={() => setSeleccionColonia(null)}
             />
           )}
         </>

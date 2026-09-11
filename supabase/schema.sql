@@ -70,7 +70,7 @@ $$;
 -- Usuarios y responsables
 -- ---------------------------------------------------------------------------
 
-create type rol_usuario as enum ('admin','resp_demarcacion','resp_seccion','colaborador');
+create type rol_usuario as enum ('admin','resp_demarcacion','resp_seccion','brigadista');
 
 create table usuarios (
   id             uuid primary key default gen_random_uuid(),
@@ -132,6 +132,10 @@ create table personas (
 
   quiere_ser_representante boolean not null default false,
 
+  -- Quién trajo a esta persona. El promotor se elige de entre la gente ya registrada, no de una
+  -- lista aparte, así que apunta a personas y no a usuarios.
+  promotor_id        uuid references personas(id),
+
   -- Origen de la carga masiva, si la persona entró por un archivo y no por captura en la calle.
   -- La llave foránea se agrega al final, junto con actividad_origen, porque importaciones se
   -- declara después de personas.
@@ -176,13 +180,12 @@ create index importaciones_fecha_idx on importaciones (created_at desc);
 -- Actividades
 -- ---------------------------------------------------------------------------
 
-create type tipo_actividad   as enum ('reunion','activismo','recorrido');
+create type tipo_actividad   as enum ('reunion','activismo','recorrido','crucero');
 create type estatus_actividad as enum ('programada','en_curso','realizada','cancelada');
 
 create table actividades (
   id              uuid primary key default gen_random_uuid(),
   tipo            tipo_actividad not null,
-  subtipo         text,          -- domiciliaria, vecinal, limpieza, reforestación, etc.
   nombre          text not null,
   fecha           date not null,
   hora            time,
@@ -212,7 +215,7 @@ alter table personas
   add constraint personas_importacion_fkey
   foreign key (importacion_id) references importaciones(id) on delete set null;
 
-create table actividad_colaboradores (
+create table actividad_brigadistas (
   actividad_id uuid references actividades(id) on delete cascade,
   usuario_id   uuid references usuarios(id),
   primary key (actividad_id, usuario_id)
@@ -303,6 +306,7 @@ create index personas_created_at_idx     on personas (created_at desc);
 create index personas_participar_idx     on personas (quiere_participar) where quiere_participar;
 create index personas_info_idx           on personas (quiere_info) where quiere_info;
 create index personas_promovido_idx      on personas (es_promovido) where es_promovido;
+create index personas_promotor_idx       on personas (promotor_id) where promotor_id is not null;
 create index personas_importacion_idx    on personas (importacion_id) where importacion_id is not null;
 create index personas_representante_idx  on personas (quiere_ser_representante)
   where quiere_ser_representante;
@@ -517,7 +521,14 @@ left join lateral (
   order by s.fecha desc, s.created_at desc
   limit 1
 ) ult on true
-where (p.quiere_participar or p.quiere_info)
+where (
+    p.quiere_participar
+    or p.quiere_info
+    or exists (
+      select 1 from solicitudes so
+      where so.persona_id = p.id and so.requiere_seguimiento
+    )
+  )
   and (ult.estado is null or ult.estado = 'pendiente');
 
 -- Cumpleaños del día. Se compara mes y día, nunca el año, con la misma expresión que indexa
@@ -551,5 +562,6 @@ insert into problematicas (nombre, orden) values
   ('Transporte y movilidad', 6),
   ('Parques y espacios públicos', 7),
   ('Servicios públicos', 8),
-  ('Otro', 9)
+  ('Servicios de salud', 9),
+  ('Otro', 10)
 on conflict (nombre) do nothing;

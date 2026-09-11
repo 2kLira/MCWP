@@ -92,7 +92,7 @@ export default function Tablero() {
               {cargando ? "—" : (r.personas ?? 0).toLocaleString("es-MX")}
             </p>
             <p className="mt-1 text-sm text-tinta-suave">
-              personas registradas en {secciones || 157} secciones
+              personas alcanzadas en {secciones || 157} secciones
             </p>
           </div>
 
