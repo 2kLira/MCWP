@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
-import { puedeCrear } from "@/lib/permisos";
+import { estatusVisibles, puedeCrear, puedeVerListadosGenerales } from "@/lib/permisos";
 import { useConsulta } from "@/lib/usar-consulta";
 import { demarcacionPorId } from "@/lib/demarcaciones";
 import {
@@ -18,7 +18,6 @@ import { Hoja } from "@/components/actividades/hoja";
 import { FormularioActividad } from "@/components/actividades/formulario-actividad";
 
 const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
-const ESTATUS: EstatusActividad[] = ["programada", "en_curso", "realizada", "cancelada"];
 
 function fechaCorta(fecha: string, hora: string | null): string {
   const texto = new Date(`${fecha}T12:00:00`).toLocaleDateString("es-MX", {
@@ -45,6 +44,20 @@ export default function Actividades() {
     [],
     [actuante.id, tipo, estatus],
   );
+
+  // El brigadista no navega el sistema por listados generales: se le manda a una actividad
+  // concreta y captura ahí. Esta pantalla no es para él.
+  if (!puedeVerListadosGenerales(actuante)) {
+    return (
+      <section className="flex flex-col gap-3">
+        <h1 className="text-xl">Actividades</h1>
+        <p className="medida text-sm text-tinta-suave">
+          Esta pantalla no es para tu rol. Tu trabajo está en la agenda: ahí están tus actividades
+          programadas y en curso.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -89,7 +102,7 @@ export default function Actividades() {
           className="campo w-auto"
         >
           <option value="">Todos los estatus</option>
-          {ESTATUS.map((e) => (
+          {estatusVisibles(actuante).map((e) => (
             <option key={e} value={e}>
               {ETIQUETA_ESTATUS[e]}
             </option>

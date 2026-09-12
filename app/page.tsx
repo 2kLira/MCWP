@@ -19,6 +19,7 @@ import {
 } from "@/lib/datos/tablero";
 import { reporteSemanal, type SemanaReporte } from "@/lib/datos/reportes";
 import { actividadesDeAgenda, type Actividad } from "@/lib/datos/actividades";
+import { estatusVisibles } from "@/lib/permisos";
 
 const MapaPagina = dynamic(
   () => import("@/components/mapa/mapa-pagina").then((m) => m.MapaPagina),
@@ -52,7 +53,9 @@ export default function Tablero() {
     actuante.id,
   ]);
   const agenda = useConsulta<Actividad[]>(
-    () => actividadesDeAgenda(actuante, enDias(0), enDias(7)),
+    // Con el recorte de estatus: un responsable o un brigadista no deben ver aquí actividades
+    // realizadas que la agenda ya no les muestra, o los dos bloques dirían cosas distintas.
+    () => actividadesDeAgenda(actuante, enDias(0), enDias(7), estatusVisibles(actuante)),
     [],
     [actuante.id],
   );

@@ -263,6 +263,7 @@ type FilaSeccion = {
   centro_lat: number;
   centro_lng: number;
   en_catalogo: boolean;
+  prioridad: "A" | "B" | null;
 };
 type FilaColonia = { id: number; nombre: string };
 type FilaColoniaSeccion = { colonia_id: number; seccion_clave: string; traslape_pct: number };
@@ -348,7 +349,7 @@ async function main() {
   const filasSecciones = (
     await seleccionarTodo<FilaSeccion>(
       "secciones",
-      "clave,demarcacion_id,centro_lat,centro_lng,en_catalogo",
+      "clave,demarcacion_id,centro_lat,centro_lng,en_catalogo,prioridad",
       "clave",
     )
   ).filter((s) => s.en_catalogo);
@@ -1023,10 +1024,31 @@ async function main() {
     ],
   };
 
-  // Las cinco demarcaciones con más personas registradas: los recorridos se concentran aquí.
-  const TOP5_DEMARCACIONES = [...idsDemarcaciones]
-    .sort((a, b) => (PESO_POBLACION_POR_DEMARCACION[b] ?? 0) - (PESO_POBLACION_POR_DEMARCACION[a] ?? 0))
-    .slice(0, 5);
+
+  /**
+   * Peso extra de una sección prioritaria cuando se reparte un recorrido. El mapa de prioritarias
+   * pinta en naranja pleno lo ya recorrido, así que si los recorridos cayeran solo por población,
+   * ese mapa saldría todo pendiente y no enseñaría nada. Aquí las A pesan seis veces y las B tres,
+   * sobre el mismo peso de población: el avance se ve, y sigue saliendo de actividades reales y no
+   * de una bandera puesta a mano.
+   */
+  const PESO_PRIORIDAD: Record<string, number> = { A: 6, B: 3 };
+
+  function elegirSeccionParaRecorrido(): FilaSeccion {
+    const opciones: { valor: string; peso: number }[] = [];
+    for (const claves of seccionesNoCeroPorDemarcacion.values()) {
+      for (const clave of claves) {
+        const seccion = seccionPorClave.get(clave);
+        if (!seccion) continue;
+        const base = personasPorSeccion.get(clave) ?? 1;
+        opciones.push({
+          valor: clave,
+          peso: base * (seccion.prioridad ? PESO_PRIORIDAD[seccion.prioridad] : 1),
+        });
+      }
+    }
+    return seccionPorClave.get(elegirPonderado(opciones))!;
+  }
 
   function elegirSeccionPonderadaPorPoblacion(demarcacionesPermitidas: number[]): FilaSeccion {
     const opciones: { valor: string; peso: number }[] = [];
@@ -1050,8 +1072,10 @@ async function main() {
     fecha: Date,
     estatus: EstatusActividad,
   ): FilaActividad {
-    const demarcacionesPermitidas = tipo === "recorrido" ? TOP5_DEMARCACIONES : idsDemarcaciones;
-    const seccion = elegirSeccionPonderadaPorPoblacion(demarcacionesPermitidas);
+    const seccion =
+      tipo === "recorrido"
+        ? elegirSeccionParaRecorrido()
+        : elegirSeccionPonderadaPorPoblacion(idsDemarcaciones);
     const lugar = nombreLugar(seccion);
     const punto = jitter(seccion.centro_lat, seccion.centro_lng);
     const responsable = usuarioLocal(seccion.demarcacion_id, seccion.clave);

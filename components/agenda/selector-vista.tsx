@@ -31,7 +31,8 @@ export function SelectorVista({
           aria-selected={vista === v.clave}
           onClick={() => alCambiar(v.clave)}
           className={cn(
-            "transicion-ui min-h-9 shrink-0 rounded-control px-3 text-sm font-medium transition-colors",
+            // Más alto en celular: la agenda se cambia de vista con el pulgar y de pie.
+            "transicion-ui min-h-11 shrink-0 rounded-control px-3 text-sm font-medium transition-colors sm:min-h-9",
             vista === v.clave
               ? "bg-superficie text-tinta elevacion-apoyo"
               : "text-tinta-suave hover:text-tinta",

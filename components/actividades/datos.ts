@@ -4,8 +4,8 @@
  * Mismas reglas de lib/permisos.ts, sin duplicar el filtrado por territorio.
  */
 
-import { aplicarAlcance } from "@/lib/permisos";
-import type { UsuarioActuante } from "@/lib/tipos";
+import { puedeEncabezarActividad } from "@/lib/permisos";
+import type { RolUsuario } from "@/lib/tipos";
 import { db, lista, resultado, uno, type Resultado } from "@/lib/datos/cliente";
 
 export type UsuarioBreve = {
@@ -16,17 +16,34 @@ export type UsuarioBreve = {
   seccion_clave: string | null;
 };
 
-/** Quién puede quedar como responsable: los mismos roles que pueden crear actividades. */
-export function usuariosAsignables(
-  usuario: UsuarioActuante | null,
-): Promise<Resultado<UsuarioBreve[]>> {
-  let consulta = db()
-    .from("usuarios")
-    .select("id, nombre, rol, demarcacion_id, seccion_clave")
-    .eq("activo", true)
-    .in("rol", ["admin", "resp_demarcacion", "resp_seccion"]);
-  consulta = aplicarAlcance(consulta, usuario);
-  return lista<UsuarioBreve>(consulta.order("nombre"));
+/**
+ * Quién puede quedar como responsable de una actividad: cualquier usuario activo que pase
+ * puedeEncabezarActividad, sin importar su territorio. Una actividad de la sección 0524 la puede
+ * encabezar alguien de otra sección o de otra demarcación —pasa todo el tiempo en campo— así que
+ * a propósito no se recorta con aplicarAlcance: el territorio de quien está dando de alta la
+ * actividad no limita a quién puede nombrar responsable.
+ */
+export async function usuariosAsignables(): Promise<Resultado<UsuarioBreve[]>> {
+  const r = await lista<UsuarioBreve>(
+    db()
+      .from("usuarios")
+      .select("id, nombre, rol, demarcacion_id, seccion_clave")
+      .eq("activo", true)
+      .order("nombre"),
+  );
+
+  const asignables = r.datos.filter((u) =>
+    puedeEncabezarActividad({
+      id: u.id,
+      nombre: u.nombre,
+      rol: u.rol as RolUsuario,
+      demarcacionId: u.demarcacion_id,
+      seccionClave: u.seccion_clave,
+      activo: true,
+    }),
+  );
+
+  return { ...r, datos: asignables };
 }
 
 export function obtenerUsuario(id: string | null): Promise<Resultado<UsuarioBreve | null>> {

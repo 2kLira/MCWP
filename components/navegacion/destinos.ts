@@ -10,6 +10,7 @@ import {
   UserCog,
   UserPlus,
   Users,
+  Vote,
   type LucideIcon,
 } from "lucide-react";
 import type { Route } from "next";
@@ -28,6 +29,7 @@ export type Destino = {
 export const DESTINOS: readonly Destino[] = [
   { href: "/", etiqueta: "Tablero", icono: LayoutDashboard },
   { href: "/mapa", etiqueta: "Mapa", icono: Map },
+  { href: "/casillas", etiqueta: "Casillas", icono: Vote },
   { href: "/personas", etiqueta: "Personas alcanzadas", icono: Users },
   { href: "/actividades", etiqueta: "Actividades", icono: CalendarDays },
   { href: "/agenda", etiqueta: "Agenda", icono: CalendarDays },

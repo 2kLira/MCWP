@@ -303,3 +303,30 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     `secciones.geojson` cacheado, porque no hay columna que lo diga. Funciona y no cuesta una
     consulta, pero la fuente de verdad debería ser la base: bastaría una columna derivada de la
     existencia del renglón en `secciones_geom`. Anotado para la siguiente migración.
+
+## Fase E de la etapa electoral v2
+
+39. **El tablero todavía cuenta actividades que el rol no debería ver.** `app/page.tsx` llama a
+    `actividadesDeAgenda` sin recorte de estatus, así que sus bloques de hoy y de los próximos siete
+    días siguen contando realizadas para responsables y brigadistas. La agenda ya no tiene esa fuga.
+    Se arregla en cuanto `lib/datos/actividades.ts` acepte el filtro de estatus en la consulta.
+
+40. **Dos firmas de consulta que faltan en `lib/datos/actividades.ts`.** La agenda las resolvió
+    provisionalmente en memoria y lo dejó comentado en `components/agenda/datos.ts`:
+
+    ```ts
+    actividadesDeAgenda(usuario, desde, hasta, estatus?: readonly EstatusActividad[])
+    actividadesDeBrigadista(usuario, brigadistaId, desde, hasta, estatus?: readonly EstatusActividad[])
+    ```
+    La segunda se resuelve en un solo viaje con un embed `actividad_brigadistas!inner(usuario_id)`;
+    hoy se piden los ids aparte y se cruzan en el cliente, que son dos viajes. Además
+    `FiltrosActividades.estatus` debería aceptar varios valores y no uno solo, para que `/actividades`
+    recorte en la base igual que la agenda.
+
+41. **Los recorridos del sembrado se sesgan hacia las secciones prioritarias.** Antes se repartían
+    solo por población y por las cinco demarcaciones más pobladas, y el resultado era que ninguna
+    prioritaria salía recorrida: el mapa de prioritarias se veía enteramente pendiente y no enseñaba
+    nada. Ahora una sección de prioridad A pesa seis veces y una B tres, sobre el mismo peso de
+    población. El avance sigue saliendo de actividades reales sembradas, no de una bandera puesta a
+    mano. Es una decisión de presentación, no de modelo; si el socio prefiere ver el avance real en
+    cero, se quita el peso y ya.

@@ -1,10 +1,21 @@
 import Link from "next/link";
-import { ETIQUETA_TIPO_ACTIVIDAD } from "@/lib/tipos";
+import { ETIQUETA_ESTATUS, ETIQUETA_TIPO_ACTIVIDAD } from "@/lib/tipos";
 import type { Actividad } from "@/lib/datos/actividades";
 import { horaCorta } from "@/components/agenda/utilidades";
 
-/** Un renglón de actividad: hora, nombre, tipo y sección. Enlaza a su ficha. */
-export function RenglonActividad({ actividad }: { actividad: Actividad }) {
+/**
+ * Un renglón de actividad: hora, nombre, tipo y sección. Enlaza a su ficha.
+ *
+ * En la agenda propia del brigadista el renglón carga además la dirección, porque esa agenda se
+ * abre de pie en la calle y lo que se necesita ahí es a dónde ir.
+ */
+export function RenglonActividad({
+  actividad,
+  conDireccion = false,
+}: {
+  actividad: Actividad;
+  conDireccion?: boolean;
+}) {
   return (
     <Link
       href={`/actividades/${actividad.id}`}
@@ -21,9 +32,16 @@ export function RenglonActividad({ actividad }: { actividad: Actividad }) {
             </>
           )}
         </span>
+        {conDireccion && actividad.direccion && (
+          <span className="block truncate text-xs text-tinta-tenue">{actividad.direccion}</span>
+        )}
       </span>
-      <span className="cifras shrink-0 text-xs text-tinta-tenue">
-        {horaCorta(actividad.hora)}
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <span className="cifras text-xs text-tinta-tenue">{horaCorta(actividad.hora)}</span>
+        {/* Solo se marca lo que ya arrancó: lo programado es el caso normal y no necesita sello. */}
+        {actividad.estatus === "en_curso" && (
+          <span className="pildora">{ETIQUETA_ESTATUS.en_curso}</span>
+        )}
       </span>
     </Link>
   );

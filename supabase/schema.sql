@@ -292,8 +292,17 @@ create table fotos (
   actividad_id uuid references actividades(id) on delete cascade,
   url          text not null,
   subida_por   uuid references usuarios(id),
+  -- Evidencia de inicio o de cierre de la actividad. Nulo para el resto de la galería. La hora
+  -- sale de created_at y la coordenada del GPS del dispositivo; si el GPS no respondió, van nulas.
+  momento      text check (momento is null or momento in ('inicio','cierre')),
+  lat          double precision,
+  lng          double precision,
   created_at   timestamptz not null default now()
 );
+
+-- Una actividad tiene a lo más una evidencia de inicio y una de cierre.
+create unique index fotos_momento_unico_idx on fotos (actividad_id, momento)
+  where momento is not null;
 
 -- ---------------------------------------------------------------------------
 -- Índices de apoyo para las consultas del tablero, el mapa y los reportes

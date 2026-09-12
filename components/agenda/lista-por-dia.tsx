@@ -7,10 +7,12 @@ export function ListaPorDia({
   actividades,
   cargando,
   vacio,
+  conDireccion = false,
 }: {
   actividades: Actividad[];
   cargando: boolean;
   vacio: string;
+  conDireccion?: boolean;
 }) {
   if (cargando) {
     return (
@@ -41,7 +43,11 @@ export function ListaPorDia({
           </p>
           <div className="flex flex-col divide-y divide-borde vidrio filo rounded-tarjeta">
             {filas.map((actividad) => (
-              <RenglonActividad key={actividad.id} actividad={actividad} />
+              <RenglonActividad
+                key={actividad.id}
+                actividad={actividad}
+                conDireccion={conDireccion}
+              />
             ))}
           </div>
         </div>

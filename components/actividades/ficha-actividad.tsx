@@ -6,6 +6,7 @@ import { ArrowLeft, ClipboardList, UserPlus } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { Tarjeta } from "@/components/tablero/tarjeta";
 import { FotosActividad } from "@/components/actividades/fotos-actividad";
+import { BotonEvidencia, LineaEvidencia } from "@/components/actividades/evidencia";
 import { demarcacionPorId } from "@/lib/demarcaciones";
 import { puedeEditar, puedeVerRegistro } from "@/lib/permisos";
 import { ETIQUETA_ESTATUS, ETIQUETA_TIPO_ACTIVIDAD, type EstatusActividad } from "@/lib/tipos";
@@ -47,9 +48,9 @@ export function FichaActividad({ id }: { id: string }) {
   const [recargar, setRecargar] = useState(0);
 
   const actividad = useConsulta<Actividad | null>(
-    () => obtenerActividad(id),
+    () => obtenerActividad(actuante, id),
     null,
-    [id, recargar],
+    [id, actuante.id, recargar],
   );
 
   const responsable = useConsulta<UsuarioBreve | null>(
@@ -71,6 +72,10 @@ export function FichaActividad({ id }: { id: string }) {
   );
 
   const fotos = useConsulta<Foto[]>(() => fotosDeActividad(id), [], [id, recargar]);
+  // La evidencia de inicio y de cierre se distingue por momento; el resto es galería general.
+  const fotoInicio = fotos.datos.find((f) => f.momento === "inicio") ?? null;
+  const fotoCierre = fotos.datos.find((f) => f.momento === "cierre") ?? null;
+  const galeria = fotos.datos.filter((f) => !f.momento);
 
   const consolidado = useConsulta<Consolidado>(
     () => consolidadoDeActividad(id),
@@ -158,12 +163,42 @@ export function FichaActividad({ id }: { id: string }) {
         {a.notas && <Dato etiqueta="Notas" valor={a.notas} ancho />}
       </section>
 
+      {/* Nota discreta, no un error: encabezar una actividad de otra sección pasa todo el
+          tiempo en campo y no se marca como falla. */}
+      {responsable.datos?.seccion_clave &&
+        a.seccion_clave &&
+        responsable.datos.seccion_clave !== a.seccion_clave && (
+          <p className="text-xs text-tinta-tenue">
+            {responsable.datos.nombre} no es responsable de la sección {a.seccion_clave}.
+          </p>
+        )}
+
       {editable && a.estatus !== "realizada" && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
+          {a.estatus === "programada" &&
+            (fotoInicio ? (
+              <div className="flex flex-wrap gap-2">
+                <BotonEstatus
+                  etiqueta="Marcar en curso"
+                  onClick={() => moverA("en_curso")}
+                  deshabilitado={moviendo}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 rounded-control border border-borde bg-superficie p-3">
+                <p className="text-sm text-tinta-suave">
+                  Sube la foto de inicio para poder marcarla en curso.
+                </p>
+                <BotonEvidencia
+                  actividadId={id}
+                  momento="inicio"
+                  usuarioId={actuante.id}
+                  alSubir={() => setRecargar((v) => v + 1)}
+                />
+              </div>
+            ))}
+
           <div className="flex flex-wrap gap-2">
-            {a.estatus === "programada" && (
-              <BotonEstatus etiqueta="Marcar en curso" onClick={() => moverA("en_curso")} deshabilitado={moviendo} />
-            )}
             {(a.estatus === "programada" || a.estatus === "en_curso") && (
               <BotonEstatus etiqueta="Cancelar" onClick={() => moverA("cancelada")} deshabilitado={moviendo} />
             )}
@@ -205,10 +240,25 @@ export function FichaActividad({ id }: { id: string }) {
         )}
       </Tarjeta>
 
+      <Tarjeta titulo="Evidencia de inicio y cierre">
+        <div className="flex flex-col gap-2">
+          <LineaEvidencia
+            etiqueta="Inicio"
+            foto={fotoInicio}
+            faltaAviso={
+              !fotoInicio && (a.estatus === "en_curso" || a.estatus === "realizada")
+                ? "Esta actividad ya arrancó y no tiene foto de inicio."
+                : undefined
+            }
+          />
+          <LineaEvidencia etiqueta="Cierre" foto={fotoCierre} />
+        </div>
+      </Tarjeta>
+
       <Tarjeta titulo="Fotos">
         <FotosActividad
           actividadId={id}
-          fotos={fotos.datos}
+          fotos={galeria}
           cargando={fotos.cargando}
           puedeSubir={editable}
           usuarioId={actuante.id}
@@ -221,6 +271,8 @@ export function FichaActividad({ id }: { id: string }) {
           id={id}
           consolidado={consolidado.datos}
           cargandoConsolidado={consolidado.cargando}
+          fotoCierre={fotoCierre}
+          alSubirFoto={() => setRecargar((v) => v + 1)}
           alCerrar={() => setRecargar((v) => v + 1)}
         />
       ) : a.estatus === "realizada" ? (
@@ -244,11 +296,15 @@ function BloqueCierre({
   id,
   consolidado,
   cargandoConsolidado,
+  fotoCierre,
+  alSubirFoto,
   alCerrar,
 }: {
   id: string;
   consolidado: Consolidado;
   cargandoConsolidado: boolean;
+  fotoCierre: Foto | null;
+  alSubirFoto: () => void;
   alCerrar: () => void;
 }) {
   const { actuante } = useActuante();
@@ -257,7 +313,7 @@ function BloqueCierre({
   const [error, setError] = useState<string | null>(null);
 
   async function confirmar() {
-    if (!conclusion.trim() || cerrando) return;
+    if (!conclusion.trim() || !fotoCierre || cerrando) return;
     setCerrando(true);
     setError(null);
     const r = await cerrarActividad(actuante, id, conclusion.trim());
@@ -295,11 +351,25 @@ function BloqueCierre({
           />
         </label>
 
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm text-tinta-suave">Foto de evidencia final</span>
+          {fotoCierre ? (
+            <LineaEvidencia etiqueta="Evidencia final" foto={fotoCierre} />
+          ) : (
+            <BotonEvidencia
+              actividadId={id}
+              momento="cierre"
+              usuarioId={actuante.id}
+              alSubir={alSubirFoto}
+            />
+          )}
+        </div>
+
         {error && <p className="text-sm text-alerta">{error}</p>}
 
         <button
           type="button"
-          disabled={!conclusion.trim() || cerrando}
+          disabled={!conclusion.trim() || !fotoCierre || cerrando}
           onClick={confirmar}
           className="transicion-ui rounded-control bg-naranja text-base font-medium text-tinta toque-actividad disabled:opacity-50"
         >

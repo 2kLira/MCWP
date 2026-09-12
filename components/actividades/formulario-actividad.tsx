@@ -3,17 +3,23 @@
 import { useEffect, useState } from "react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { alcanceDe } from "@/lib/permisos";
+import { demarcacionPorId, DEMARCACIONES } from "@/lib/demarcaciones";
+import { rasgoPorClave } from "@/lib/territorio";
 import { ETIQUETA_TIPO_ACTIVIDAD, type TipoActividad } from "@/lib/tipos";
 import { crearActividad } from "@/lib/datos/actividades";
 import { usuariosAsignables, type UsuarioBreve } from "@/components/actividades/datos";
+import { CampoSeccion } from "@/components/actividades/campo-seccion";
 import { cn } from "@/lib/utils";
 
 const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
 
 /**
  * Alta de actividad. No se pregunta quién la crea ni cuándo se captura: el sistema lo pone solo.
- * El territorio tampoco se pregunta: sale del responsable elegido o, si no hay, del territorio
- * propio de quien está capturando.
+ *
+ * La sección se elige aquí, con su propio buscador, y la demarcación se resuelve sola a partir
+ * de ella: nunca es un campo que alguien tenga que llenar. El responsable es una pregunta
+ * aparte, sin relación con esa sección: cualquier persona activa que pueda encabezar actividades
+ * puede quedar al frente, sea o no de ese territorio.
  */
 export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void }) {
   const { actuante } = useActuante();
@@ -27,30 +33,42 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
   const [objetivo, setObjetivo] = useState("");
   const [notas, setNotas] = useState("");
   const [responsableId, setResponsableId] = useState("");
+  // Prellenada con la sección propia de quien captura, cuando la tiene: sigue siendo una
+  // elección, no un dato fijo, y se puede cambiar con el buscador.
+  const [seccionClave, setSeccionClave] = useState(
+    alcance.tipo === "seccion" ? alcance.seccionClave : "",
+  );
 
   const [usuarios, setUsuarios] = useState<UsuarioBreve[]>([]);
   useEffect(() => {
-    usuariosAsignables(actuante).then((r) => setUsuarios(r.datos));
-  }, [actuante]);
+    usuariosAsignables().then((r) => setUsuarios(r.datos));
+  }, []);
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const listo = nombre.trim().length > 1 && fecha.length > 0;
+  // La demarcación sale de la sección elegida, contra la misma cartografía cacheada que resuelve
+  // el registro de personas. Se muestra dentro de CampoSeccion como confirmación.
+  const rasgo = seccionClave ? rasgoPorClave(seccionClave) : null;
+  const demarcacionNombre = rasgo?.properties.demarcacion ?? null;
+  const demarcacionId = DEMARCACIONES.find((d) => d.nombre === demarcacionNombre)?.id ?? null;
+
+  const responsable = usuarios.find((u) => u.id === responsableId) ?? null;
+  // Aviso discreto, no un error: quien encabeza no es el responsable de esta sección. Pasa todo
+  // el tiempo en campo y no se impide ni se marca como falla.
+  const responsableDeOtraSeccion =
+    !!responsable &&
+    !!responsable.seccion_clave &&
+    !!seccionClave &&
+    responsable.seccion_clave !== seccionClave;
+
+  const listo = nombre.trim().length > 1 && fecha.length > 0 && seccionClave.length > 0;
 
   async function guardar(evento: React.FormEvent) {
     evento.preventDefault();
     if (!listo || guardando) return;
     setGuardando(true);
     setError(null);
-
-    const elegido = usuarios.find((u) => u.id === responsableId) ?? null;
-    const territorioPropio =
-      alcance.tipo === "seccion"
-        ? { seccionClave: alcance.seccionClave, demarcacionId: alcance.demarcacionId }
-        : alcance.tipo === "demarcacion"
-          ? { seccionClave: null, demarcacionId: alcance.demarcacionId }
-          : { seccionClave: null, demarcacionId: null };
 
     const r = await crearActividad({
       tipo,
@@ -61,8 +79,8 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
       objetivo: objetivo.trim() || null,
       notas: notas.trim() || null,
       responsable_id: responsableId || null,
-      seccion_clave: elegido?.seccion_clave ?? territorioPropio.seccionClave,
-      demarcacion_id: elegido?.demarcacion_id ?? territorioPropio.demarcacionId,
+      seccion_clave: seccionClave,
+      demarcacion_id: demarcacionId,
       created_by: actuante.id,
       estatus: "programada",
     });
@@ -127,6 +145,10 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
         </Campo>
       </div>
 
+      <Campo etiqueta="Sección">
+        <CampoSeccion valor={seccionClave} onCambiar={setSeccionClave} />
+      </Campo>
+
       <Campo etiqueta="Dirección">
         <input
           value={direccion}
@@ -135,20 +157,35 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
         />
       </Campo>
 
-      <Campo etiqueta="Responsable" apoyo="Opcional. Define también el territorio de la actividad.">
-        <select
-          value={responsableId}
-          onChange={(e) => setResponsableId(e.target.value)}
-          className="campo"
+      <div className="flex flex-col gap-1.5">
+        <Campo
+          etiqueta="Responsable"
+          apoyo="Opcional. Puede ser de otra sección o demarcación."
         >
-          <option value="">Sin asignar</option>
-          {usuarios.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.nombre}
-            </option>
-          ))}
-        </select>
-      </Campo>
+          <select
+            value={responsableId}
+            onChange={(e) => setResponsableId(e.target.value)}
+            className="campo"
+          >
+            <option value="">Sin asignar</option>
+            {usuarios.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre}
+                {u.seccion_clave
+                  ? ` · Sección ${u.seccion_clave}`
+                  : u.demarcacion_id
+                    ? ` · ${demarcacionPorId(u.demarcacion_id)?.nombre ?? ""}`
+                    : ""}
+              </option>
+            ))}
+          </select>
+        </Campo>
+        {responsableDeOtraSeccion && (
+          <p className="text-xs text-tinta-tenue">
+            {responsable?.nombre} no es responsable de la sección {seccionClave}.
+          </p>
+        )}
+      </div>
 
       <Campo etiqueta="Objetivo">
         <textarea
