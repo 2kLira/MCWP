@@ -14,6 +14,7 @@ import {
 } from "./datos-mapa";
 import { EsqueletoMapa } from "./esqueleto-mapa";
 import { FichaSeccion } from "./ficha-seccion";
+import { LeyendaMapa } from "./leyenda-mapa";
 import { MapaLienzo } from "./mapa-lienzo";
 import { ResumenPrioritarias } from "./resumen-prioritarias";
 import { SelectorCapas } from "./selector-capas";
@@ -162,6 +163,12 @@ export function MapaPagina({
               className="pointer-events-auto"
             />
           </div>
+
+          <LeyendaMapa
+            vista={vista}
+            enMovimiento={enMovimiento}
+            sangradoIzquierdo={sangradoIzquierdo}
+          />
 
           {seleccion && (
             <FichaSeccion

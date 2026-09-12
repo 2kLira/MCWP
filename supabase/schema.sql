@@ -536,7 +536,11 @@ select
   p.created_at,
   ult.fecha                  as ultimo_seguimiento_fecha,
   ult.estado                 as ultimo_seguimiento_estado,
-  ult.tipo                   as ultimo_seguimiento_tipo
+  ult.tipo                   as ultimo_seguimiento_tipo,
+  exists (
+    select 1 from solicitudes so
+    where so.persona_id = p.id and so.requiere_seguimiento
+  )                          as tiene_solicitud
 from personas p
 left join lateral (
   select s.fecha, s.estado, s.tipo

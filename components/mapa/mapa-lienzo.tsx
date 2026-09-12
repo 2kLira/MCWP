@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type {
   DataDrivenPropertyValueSpecification,
+  FilterSpecification,
   GeoJSONSource,
   Map as MapaLibreMap,
 } from "maplibre-gl";
@@ -42,6 +43,15 @@ const PROP_SIN_RESPONSABLE = "sinResponsable";
 // una sección que ni siquiera está en el catálogo de 169 (las seis sustitutas con
 // en_catalogo = false). No tiene `dato`, y por eso no se pinta ni responde al clic.
 const PROP_SIN_DATO = "sinDato";
+// Capa punteada de la vista de prioritarias: sección del grupo activo que todavía no se recorre.
+// Mismo mecanismo que CAPA_SIN_RESPONSABLE (line-dasharray no admite feature-state, así que el
+// filtro necesita propiedades estáticas del rasgo) pero con sus propias propiedades: no se
+// reutilizan PROP_SIN_RESPONSABLE ni el feature-state "hueco" porque significan otra cosa
+// (estructura, no prioritarias) y mezclarlos confunde. El grupo A o B depende de la vista activa,
+// así que el filtro se recalcula con setFilter cada vez que cambia la vista, ver más abajo.
+const CAPA_PRIORITARIA_PENDIENTE = "secciones-prioritaria-pendiente";
+const PROP_GRUPO_PRIORIDAD = "grupoPrioridad";
+const PROP_PRIORITARIA_RECORRIDA = "prioritariaRecorrida";
 
 function idCapaRelleno(grupo: number): string {
   return `secciones-relleno-${grupo}`;
@@ -55,6 +65,8 @@ type PropiedadesAumentadas = RasgoSeccion["properties"] & {
   [PROP_GRUPO_RETRASO]: number;
   [PROP_SIN_RESPONSABLE]: boolean;
   [PROP_SIN_DATO]: boolean;
+  [PROP_GRUPO_PRIORIDAD]: "A" | "B" | "";
+  [PROP_PRIORITARIA_RECORRIDA]: boolean;
 };
 // La geometría de RasgoSeccion no es una unión discriminada (type y coordinates son uniones
 // independientes), así que se reutiliza tal cual en vez de forzarla contra GeoJSON.Polygon |
@@ -70,13 +82,14 @@ type ColeccionAumentada = {
 };
 
 /**
- * El mismo GeoJSON de lib/territorio.ts, con tres propiedades estáticas de más por rasgo:
+ * El mismo GeoJSON de lib/territorio.ts, con cinco propiedades estáticas de más por rasgo:
  * `grupoRetraso` (con qué demora entra en la transición de color, según su distancia al centro
- * del municipio), `sinResponsable` (si la base ya dice que esa sección no tiene responsable) y
+ * del municipio), `sinResponsable` (si la base ya dice que esa sección no tiene responsable),
  * `sinDato` (si la sección no está en el catálogo de 169 y por lo tanto no tiene `dato`: son las
- * seis sustitutas que la cartografía sí trae pero que no se cuentan ni se pintan). Las tres son
- * propiedades del rasgo, no feature-state: el filtro de capa (line-dasharray incluido) no puede
- * leer feature-state.
+ * seis sustitutas que la cartografía sí trae pero que no se cuentan ni se pintan), `grupoPrioridad`
+ * (su prioridad "A", "B" o "" si no es prioritaria) y `prioritariaRecorrida` (si ya se recorrió).
+ * Todas son propiedades del rasgo, no feature-state: el filtro de capa (line-dasharray incluido)
+ * no puede leer feature-state.
  */
 function aumentarColeccion(
   coleccion: ColeccionSecciones,
@@ -95,6 +108,8 @@ function aumentarColeccion(
           [PROP_GRUPO_RETRASO]: grupos.get(rasgo.properties.clave) ?? 0,
           [PROP_SIN_RESPONSABLE]: dato ? !dato.tieneResponsable : false,
           [PROP_SIN_DATO]: dato == null,
+          [PROP_GRUPO_PRIORIDAD]: dato?.prioridad ?? "",
+          [PROP_PRIORITARIA_RECORRIDA]: dato?.recorrida ?? false,
         },
       };
     }),
@@ -102,16 +117,34 @@ function aumentarColeccion(
 }
 
 /**
- * Expresión de fill-opacity de secciones: hueca si no tiene responsable (vista de estructura),
- * atenuada si no es del grupo de la vista de prioritarias activa (para que se vea el territorio
- * pero no compita con lo que importa) y, aparte de las dos, rebajada otra vez si además está fuera
- * del alcance del actuante. Las secciones sin `dato` (fuera del catálogo) no llegan aquí: las capas
- * de relleno y borde las excluyen por filtro, ver PROP_SIN_DATO.
+ * Filtro de CAPA_PRIORITARIA_PENDIENTE: secciones del grupo de prioridad activo que todavía no se
+ * recorren. `grupo` es null cuando la vista activa no es de prioritarias; "__ninguna__" no
+ * coincide con ningún valor real de PROP_GRUPO_PRIORIDAD ("A", "B" o ""), así que el filtro no
+ * deja pasar nada y la capa queda vacía sin depender de su visibilidad.
+ */
+function filtroPrioritariaPendiente(grupo: "A" | "B" | null): FilterSpecification {
+  return [
+    "all",
+    ["==", ["get", PROP_GRUPO_PRIORIDAD], grupo ?? "__ninguna__"],
+    ["==", ["get", PROP_PRIORITARIA_RECORRIDA], false],
+  ];
+}
+
+/**
+ * Expresión de fill-opacity de secciones: hueca si no tiene responsable (vista de estructura) o si
+ * es una prioritaria del grupo activo que todavía no se recorre (vistas de prioritarias, feature-
+ * state "prioritariaPendiente"); atenuada si no es del grupo de la vista de prioritarias activa
+ * (para que se vea el territorio pero no compita con lo que importa); y, aparte de las tres,
+ * rebajada otra vez si además está fuera del alcance del actuante. Las secciones sin `dato` (fuera
+ * del catálogo) no llegan aquí: las capas de relleno y borde las excluyen por filtro, ver
+ * PROP_SIN_DATO.
  */
 function opacidadRellenoSeccion(): DataDrivenPropertyValueSpecification<number> {
   return [
     "case",
     ["boolean", ["feature-state", "hueco"], false],
+    0.05,
+    ["boolean", ["feature-state", "prioritariaPendiente"], false],
     0.05,
     [
       "all",
@@ -199,6 +232,8 @@ export function MapaLienzo({
           seleccionada: clave === claveActual,
           hueco: esEstructura && dato != null && !dato.tieneResponsable,
           atenuada: grupoPrioritario != null && dato?.prioridad !== grupoPrioritario,
+          prioritariaPendiente:
+            grupoPrioritario != null && dato != null && dato.prioridad === grupoPrioritario && !dato.recorrida,
         },
       );
     }
@@ -310,11 +345,34 @@ export function MapaLienzo({
       },
     });
 
+    // Borde punteado de la vista de prioritarias: mismo trazo que el de arriba, mismo mecanismo
+    // (filtro estático porque line-dasharray no admite feature-state), pero sobre sus propias
+    // propiedades y su propia capa. El filtro depende del grupo A o B de la vista activa, así que
+    // se recalcula con setFilter cada vez que la vista cambia.
+    const grupoInicial = grupoDePrioritarias(estadoRef.current.vista);
+    mapa.addLayer({
+      id: CAPA_PRIORITARIA_PENDIENTE,
+      type: "line",
+      source: FUENTE_ID,
+      filter: filtroPrioritariaPendiente(grupoInicial),
+      layout: { visibility: "none" },
+      paint: {
+        "line-color": colorHueco,
+        "line-width": 1.5,
+        "line-dasharray": [2, 2],
+      },
+    });
+
     aplicarEstadoCompleto(mapa);
     mapa.setLayoutProperty(
       CAPA_SIN_RESPONSABLE,
       "visibility",
       estadoRef.current.vista === "estructura" ? "visible" : "none",
+    );
+    mapa.setLayoutProperty(
+      CAPA_PRIORITARIA_PENDIENTE,
+      "visibility",
+      grupoInicial ? "visible" : "none",
     );
   }
 
@@ -429,8 +487,9 @@ export function MapaLienzo({
   }, [datos]);
 
   // ---------------------------------------------------------------------------
-  // Vista activa: MapLibre interpola el color con la transición nativa de la capa, no salta. La
-  // capa punteada de "sin responsable" solo se muestra en la vista de estructura.
+  // Vista activa: MapLibre interpola el color con la transición nativa de la capa, no salta. Las
+  // capas punteadas de "sin responsable" y de prioritaria pendiente solo se muestran en su vista
+  // correspondiente; la segunda además cambia de filtro porque el grupo A o B depende de la vista.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const mapa = mapaRef.current;
@@ -448,7 +507,18 @@ export function MapaLienzo({
           valor: pasos.get(clave) ?? 0,
           hueco: esEstructura && dato != null && !dato.tieneResponsable,
           atenuada: grupoPrioritario != null && dato?.prioridad !== grupoPrioritario,
+          prioritariaPendiente:
+            grupoPrioritario != null && dato != null && dato.prioridad === grupoPrioritario && !dato.recorrida,
         },
+      );
+    }
+
+    if (mapa.getLayer(CAPA_PRIORITARIA_PENDIENTE)) {
+      mapa.setFilter(CAPA_PRIORITARIA_PENDIENTE, filtroPrioritariaPendiente(grupoPrioritario));
+      mapa.setLayoutProperty(
+        CAPA_PRIORITARIA_PENDIENTE,
+        "visibility",
+        grupoPrioritario ? "visible" : "none",
       );
     }
 

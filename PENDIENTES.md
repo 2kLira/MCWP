@@ -330,3 +330,12 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     población. El avance sigue saliendo de actividades reales sembradas, no de una bandera puesta a
     mano. Es una decisión de presentación, no de modelo; si el socio prefiere ver el avance real en
     cero, se quita el peso y ya.
+
+42. **La bandeja solo puede mostrar dos estados, no cuatro.** `v_bandeja_seguimiento` trae
+    únicamente a quien no tiene seguimiento registrado o lo tiene en `pendiente`: su propio `where`
+    descarta `en_seguimiento` y `atendido`. Por eso el filtro de estado de la pantalla solo ofrece
+    "sin atender" y "pendiente". `FiltrosBandeja` sí acepta los cuatro valores, por si algún día la
+    vista se abre. **Falta decidir** si el socio quiere ver en la bandeja a quien ya está en
+    seguimiento o ya fue atendido; hoy esa gente desaparece de la pantalla en cuanto se le registra
+    algo, que es lo que una bandeja de pendientes debe hacer, pero deja sin manera de revisar lo ya
+    trabajado sin entrar persona por persona.

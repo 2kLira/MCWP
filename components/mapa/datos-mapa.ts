@@ -169,14 +169,17 @@ function metricaDeVista(vista: VistaMapa, dato: DatoSeccion | undefined): number
 
 /**
  * Los tres estados fijos de una vista de prioritarias, no cuantiles: sección del grupo ya
- * recorrida (paso 4, naranja pleno, es lo hecho), del grupo sin recorrer (paso 2, naranja
- * intermedio, es lo que falta) y todo lo demás (paso 0, para que el territorio se vea pero no
- * compita, incluida la otra prioridad).
+ * recorrida (paso 4, naranja pleno, es lo único que lleva color, es lo hecho) y todo lo demás en
+ * paso 0 (neutro), incluida la otra prioridad. "Recorrida o no" es un sí o no, no una cantidad, así
+ * que no usa un paso intermedio de la escala: la sección del grupo sin recorrer se pinta hueca
+ * (feature-state "prioritariaPendiente" en mapa-lienzo.tsx), con borde punteado, igual que una
+ * sección sin responsable. Dos tonos del mismo naranja obligaban a comparar para saber quién ganó;
+ * naranja pleno contra hueco se lee de un vistazo.
  */
 function calcularPasosPrioritarias(datos: DatosMapa, grupo: "A" | "B"): Map<string, PasoMapa> {
   const pasos = new Map<string, PasoMapa>();
   for (const [clave, dato] of datos.porClave) {
-    pasos.set(clave, dato.prioridad !== grupo ? 0 : dato.recorrida ? 4 : 2);
+    pasos.set(clave, dato.prioridad === grupo && dato.recorrida ? 4 : 0);
   }
   return pasos;
 }

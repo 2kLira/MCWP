@@ -27,6 +27,14 @@ export function RenglonBandeja({
           )}
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {/* La petición se marca más fuerte que las otras dos razones: es la que tiene a alguien
+              esperando una respuesta concreta, no solo información. Mismo tratamiento que
+              "Promovido" en la lista de personas: relleno naranja, texto casi negro. */}
+          {fila.tiene_solicitud && (
+            <span className="rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-tinta">
+              Petición
+            </span>
+          )}
           {fila.quiere_participar && <span className="pildora">Quiere participar</span>}
           {fila.quiere_info && <span className="pildora">Quiere información</span>}
           <span className="text-xs text-tinta-tenue">
