@@ -48,6 +48,8 @@ export type SeccionResumen = {
   /** Falso en las seis sustitutas: geometría de referencia que ya no está en el catálogo del
    *  cliente. No entran en sumas de lista nominal ni de meta, para no contar territorio de más. */
   en_catalogo: boolean;
+  /** Si la sección tiene polígono publicado. Lo dice la base, derivado de secciones_geom. */
+  tiene_geometria: boolean;
   /** Ya tiene al menos un recorrido en estatus realizada. Esa es toda la definición. */
   recorrida: boolean;
   casillas: number;
@@ -88,6 +90,14 @@ export type DemarcacionResumen = {
   recorridos: number;
   ultima_actividad: string | null;
   proxima_actividad: string | null;
+  /* Sumados por la vista, no en el navegador. Solo cuentan las secciones del catálogo. */
+  lista_nominal: number;
+  meta_votos: number | null;
+  promovidos: number;
+  secciones_prioritarias_a: number;
+  secciones_prioritarias_a_recorridas: number;
+  secciones_prioritarias_b: number;
+  secciones_prioritarias_b_recorridas: number;
 };
 
 export function problematicas(): Promise<Resultado<Problematica[]>> {
@@ -166,26 +176,6 @@ export function coloniasDeSeccionConTraslape(
   );
 }
 
-/**
- * Claves de sección que sí tienen polígono en la cartografía cacheada (secciones.geojson). Sirve
- * para distinguir, dentro del catálogo, las 18 secciones que el reseccionamiento del INE dejó sin
- * geometría publicada: siguen en el catálogo y en las cifras, solo no se pintan todavía en el
- * mapa. No hay columna en la base para esto porque es un dato de la cartografía, no de la fase B.
- */
-export async function clavesConGeometria(): Promise<Resultado<Set<string>>> {
-  try {
-    const coleccion = await cargarSecciones();
-    const claves = new Set(coleccion.features.map((f) => f.properties.clave));
-    return { datos: claves, sinEsquema: false, aviso: null };
-  } catch (error) {
-    return {
-      datos: new Set<string>(),
-      sinEsquema: false,
-      aviso: error instanceof Error ? error.message : "No se pudo cargar la cartografía.",
-    };
-  }
-}
-
 export function buscarColonias(
   texto: string,
   limite = 8,
@@ -203,6 +193,11 @@ export function buscarColonias(
 /**
  * Resumen por sección, ya recortado al territorio del usuario actuante.
  *
+ * **Solo las 169 del catálogo.** Las 6 sustitutas quedaron en la base con `en_catalogo = false`
+ * para no perder su geometría, pero el cliente pidió que no se cuenten: sus sucesoras ya están en
+ * el catálogo y contarlas a las dos sería contar la misma gente dos veces. El filtro va aquí, en
+ * un solo lugar, para que el mapa, el tablero y los listados no puedan discrepar.
+ *
  * `opciones.prioridad` filtra por secciones prioritarias A o B, para el listado de la fase C.
  * Se pide a la base con `.eq`, no se filtra después en el navegador.
  */
@@ -210,7 +205,7 @@ export function seccionesResumen(
   usuario: UsuarioActuante | null,
   opciones: { prioridad?: "A" | "B" } = {},
 ): Promise<Resultado<SeccionResumen[]>> {
-  let consulta = db().from("v_seccion_resumen").select("*");
+  let consulta = db().from("v_seccion_resumen").select("*").eq("en_catalogo", true);
   if (opciones.prioridad) consulta = consulta.eq("prioridad", opciones.prioridad);
   return lista<SeccionResumen>(
     aplicarAlcance(consulta, usuario, { seccion: "clave" }).order("clave"),

@@ -1,24 +1,25 @@
 /**
- * Datos reales de las seis vistas del mapa.
+ * Datos reales de las siete vistas del mapa.
  *
  * Las cifras salen de `seccionesResumen` (lib/datos/catalogos.ts), ya recortadas al territorio del
  * usuario actuante por `aplicarAlcance` (lib/permisos.ts). Este módulo no decide quién ve qué, solo
  * convierte lo que la base ya recortó en un paso de 0 a 4 por sección. Cinco vistas usan cortes por
- * cuantiles sobre los valores presentes; la de prioritarias no, ver `calcularPasosPrioritarias`.
+ * cuantiles sobre los valores presentes; las dos de prioritarias no, ver `calcularPasosPrioritarias`.
  */
 
 import { seccionesResumen, type SeccionResumen } from "@/lib/datos/catalogos";
 import type { ColeccionSecciones } from "@/lib/territorio";
 import type { UsuarioActuante } from "@/lib/tipos";
 
-/** Las seis vistas del mapa, en el orden en que aparecen en el selector. */
+/** Las siete vistas del mapa, en el orden en que aparecen en el selector. */
 export type VistaMapa =
   | "estructura"
   | "personas"
   | "promovidos"
   | "actividad"
   | "recorridos"
-  | "prioritarias";
+  | "prioritarias_a"
+  | "prioritarias_b";
 
 export const VISTAS_MAPA: ReadonlyArray<{ id: VistaMapa; etiqueta: string }> = [
   { id: "estructura", etiqueta: "Estructura" },
@@ -26,8 +27,16 @@ export const VISTAS_MAPA: ReadonlyArray<{ id: VistaMapa; etiqueta: string }> = [
   { id: "promovidos", etiqueta: "Promovidos" },
   { id: "actividad", etiqueta: "Actividad" },
   { id: "recorridos", etiqueta: "Recorridos" },
-  { id: "prioritarias", etiqueta: "Prioritarias" },
+  { id: "prioritarias_a", etiqueta: "Prioritarias A" },
+  { id: "prioritarias_b", etiqueta: "Prioritarias B" },
 ];
+
+/** El grupo de prioridad que pinta una vista, o null si no es una vista de prioritarias. */
+export function grupoDePrioritarias(vista: VistaMapa): "A" | "B" | null {
+  if (vista === "prioritarias_a") return "A";
+  if (vista === "prioritarias_b") return "B";
+  return null;
+}
 
 /** Un paso de la escala del mapa: 0 neutro, 4 naranja pleno. */
 export type PasoMapa = 0 | 1 | 2 | 3 | 4;
@@ -152,27 +161,29 @@ function metricaDeVista(vista: VistaMapa, dato: DatoSeccion | undefined): number
       return dato.actividadTotal;
     case "recorridos":
       return dato.recorridos;
-    case "prioritarias":
-      return null; // no es de cuantiles, ver calcularPasosPrioritarias.
+    case "prioritarias_a":
+    case "prioritarias_b":
+      return null; // no son de cuantiles, ver calcularPasosPrioritarias.
   }
 }
 
 /**
- * Los tres estados fijos de la vista de prioritarias, no cuantiles: prioritaria ya recorrida
- * (paso 4, naranja pleno, es lo hecho), prioritaria sin recorrer (paso 2, naranja intermedio, es
- * lo que falta) y no prioritaria (paso 0, para que el territorio se vea pero no compita).
+ * Los tres estados fijos de una vista de prioritarias, no cuantiles: sección del grupo ya
+ * recorrida (paso 4, naranja pleno, es lo hecho), del grupo sin recorrer (paso 2, naranja
+ * intermedio, es lo que falta) y todo lo demás (paso 0, para que el territorio se vea pero no
+ * compita, incluida la otra prioridad).
  */
-function calcularPasosPrioritarias(datos: DatosMapa): Map<string, PasoMapa> {
+function calcularPasosPrioritarias(datos: DatosMapa, grupo: "A" | "B"): Map<string, PasoMapa> {
   const pasos = new Map<string, PasoMapa>();
   for (const [clave, dato] of datos.porClave) {
-    pasos.set(clave, dato.prioridad == null ? 0 : dato.recorrida ? 4 : 2);
+    pasos.set(clave, dato.prioridad !== grupo ? 0 : dato.recorrida ? 4 : 2);
   }
   return pasos;
 }
 
 /**
  * El paso de 0 a 4 de cada sección presente en `datos` para una vista. La de estructura es
- * binaria (0 sin responsable, 4 con responsable); la de prioritarias son tres estados fijos, ver
+ * binaria (0 sin responsable, 4 con responsable); las de prioritarias son tres estados fijos, ver
  * `calcularPasosPrioritarias`; las demás salen de cuantiles sobre los valores presentes de esa
  * vista.
  */
@@ -189,8 +200,9 @@ export function calcularPasosDeVista(
     return pasos;
   }
 
-  if (vista === "prioritarias") {
-    return calcularPasosPrioritarias(datos);
+  const grupoPrioritario = grupoDePrioritarias(vista);
+  if (grupoPrioritario) {
+    return calcularPasosPrioritarias(datos, grupoPrioritario);
   }
 
   const valores: number[] = [];
@@ -211,46 +223,34 @@ export function calcularPasosDeVista(
  * Conteo de prioritarias: lo que responde "¿cómo vamos?" en la barra del mapa.
  * ------------------------------------------------------------------------- */
 
-/** Cuántas prioritarias A y B hay, cuántas de cada una ya se recorrieron, y cuántas prioritarias
- *  no tienen polígono publicado y por lo tanto no aparecen pintadas en el mapa. */
+/** Cuántas secciones de un grupo de prioridad hay, cuántas ya se recorrieron, y cuántas de ese
+ *  grupo no tienen polígono publicado y por lo tanto no aparecen pintadas en el mapa. */
 export type ConteoPrioritarias = {
-  totalA: number;
-  recorridasA: number;
-  totalB: number;
-  recorridasB: number;
-  /** Prioritarias (A o B) sin geometría en `secciones.geojson`: cuentan aquí, no en el lienzo. */
+  total: number;
+  recorridas: number;
+  /** Del grupo, sin geometría en `secciones.geojson`: cuentan aquí, no en el lienzo. */
   sinGeometria: number;
 };
 
 /**
- * Recorre `datos` (ya recortado al territorio del actuante) y separa por prioridad, sin volver a
- * tocar el filtro territorial: eso ya lo hizo `seccionesResumen`. `coleccion` es el único lugar de
- * donde se sabe qué claves tienen geometría publicada; una prioritaria ausente ahí es de las seis
- * que no se pueden pintar.
+ * Recorre `datos` (ya recortado al territorio del actuante) y cuenta solo el grupo pedido, sin
+ * volver a tocar el filtro territorial: eso ya lo hizo `seccionesResumen`. `coleccion` es el único
+ * lugar de donde se sabe qué claves tienen geometría publicada; una sección del grupo ausente ahí
+ * es de las seis que no se pueden pintar.
  */
 export function calcularConteoPrioritarias(
   datos: DatosMapa,
   coleccion: ColeccionSecciones,
+  grupo: "A" | "B",
 ): ConteoPrioritarias {
   const clavesConPoligono = new Set(coleccion.features.map((rasgo) => rasgo.properties.clave));
 
-  const conteo: ConteoPrioritarias = {
-    totalA: 0,
-    recorridasA: 0,
-    totalB: 0,
-    recorridasB: 0,
-    sinGeometria: 0,
-  };
+  const conteo: ConteoPrioritarias = { total: 0, recorridas: 0, sinGeometria: 0 };
 
   for (const dato of datos.porClave.values()) {
-    if (dato.prioridad == null) continue;
-    if (dato.prioridad === "A") {
-      conteo.totalA++;
-      if (dato.recorrida) conteo.recorridasA++;
-    } else {
-      conteo.totalB++;
-      if (dato.recorrida) conteo.recorridasB++;
-    }
+    if (dato.prioridad !== grupo) continue;
+    conteo.total++;
+    if (dato.recorrida) conteo.recorridas++;
     if (!clavesConPoligono.has(dato.clave)) conteo.sinGeometria++;
   }
 

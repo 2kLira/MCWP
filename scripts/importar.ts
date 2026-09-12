@@ -279,10 +279,11 @@ async function main() {
   // sembrada tronaría contra esas llaves foráneas (o, peor, sí lo dejaría borrar y se llevaría
   // personas e historia con un cascade que no queremos). Las dos se cargan con upsert más abajo:
   // fila que ya existe se actualiza, fila nueva se inserta, y nada se borra nunca de por medio.
+  // colonias tampoco se vacía: personas.colonia_id apunta ahí, así que sobre una base ya sembrada
+  // el borrado lo rechaza la llave foránea. Va con upsert por id, igual que las otras dos.
   console.log("Vaciando las tablas sin dependientes…");
   await vaciar("colonia_seccion", "colonia_id", "gte");
   await vaciar("secciones_geom", "clave", "neq");
-  await vaciar("colonias", "id", "gte");
 
   const filasDemarcaciones = catalogo.demarcaciones.map((d, i) => ({
     id: i + 1,
@@ -395,7 +396,7 @@ async function main() {
       demarcacion_principal_id: idPorDemarcacion.get(p.demarcacion_principal) ?? null,
     };
   });
-  await insertarPorLotes("colonias", filasColonias, 200);
+  await subirPorLotes("colonias", filasColonias, 200, "id");
   console.log(`Colonias: ${colonias.length}`);
 
   // --- Traslape colonia-sección. Umbral de corte ya aplicado en el archivo. -

@@ -10,7 +10,12 @@ import type {
 import { useActuante } from "@/components/proveedor-actuante";
 import { MUNICIPIO } from "@/lib/demarcaciones";
 import { bboxDeRasgo, rasgoPorClave, type ColeccionSecciones, type RasgoSeccion } from "@/lib/territorio";
-import { calcularPasosDeVista, type DatosMapa, type VistaMapa } from "./datos-mapa";
+import {
+  calcularPasosDeVista,
+  grupoDePrioritarias,
+  type DatosMapa,
+  type VistaMapa,
+} from "./datos-mapa";
 import { estiloCartoDe, usePreferenciaOscura } from "./estilo-base";
 import {
   GRUPOS_RETRASO,
@@ -33,6 +38,10 @@ const FUENTE_ID = "secciones";
 const CAPA_BORDE = "secciones-borde";
 const CAPA_SIN_RESPONSABLE = "secciones-sin-responsable";
 const PROP_SIN_RESPONSABLE = "sinResponsable";
+// Distinto de "hueco" (feature-state de la vista de estructura, sección sin responsable): esta es
+// una sección que ni siquiera está en el catálogo de 169 (las seis sustitutas con
+// en_catalogo = false). No tiene `dato`, y por eso no se pinta ni responde al clic.
+const PROP_SIN_DATO = "sinDato";
 
 function idCapaRelleno(grupo: number): string {
   return `secciones-relleno-${grupo}`;
@@ -45,6 +54,7 @@ function idsCapasRelleno(): string[] {
 type PropiedadesAumentadas = RasgoSeccion["properties"] & {
   [PROP_GRUPO_RETRASO]: number;
   [PROP_SIN_RESPONSABLE]: boolean;
+  [PROP_SIN_DATO]: boolean;
 };
 // La geometría de RasgoSeccion no es una unión discriminada (type y coordinates son uniones
 // independientes), así que se reutiliza tal cual en vez de forzarla contra GeoJSON.Polygon |
@@ -60,11 +70,13 @@ type ColeccionAumentada = {
 };
 
 /**
- * El mismo GeoJSON de lib/territorio.ts, con dos propiedades estáticas de más por rasgo:
+ * El mismo GeoJSON de lib/territorio.ts, con tres propiedades estáticas de más por rasgo:
  * `grupoRetraso` (con qué demora entra en la transición de color, según su distancia al centro
- * del municipio) y `sinResponsable` (si la base ya dice que esa sección no tiene responsable).
- * Ambas son propiedades del rasgo, no feature-state, porque el filtro de la capa punteada de
- * "sin responsable" no puede leer feature-state.
+ * del municipio), `sinResponsable` (si la base ya dice que esa sección no tiene responsable) y
+ * `sinDato` (si la sección no está en el catálogo de 169 y por lo tanto no tiene `dato`: son las
+ * seis sustitutas que la cartografía sí trae pero que no se cuentan ni se pintan). Las tres son
+ * propiedades del rasgo, no feature-state: el filtro de capa (line-dasharray incluido) no puede
+ * leer feature-state.
  */
 function aumentarColeccion(
   coleccion: ColeccionSecciones,
@@ -82,6 +94,7 @@ function aumentarColeccion(
           ...rasgo.properties,
           [PROP_GRUPO_RETRASO]: grupos.get(rasgo.properties.clave) ?? 0,
           [PROP_SIN_RESPONSABLE]: dato ? !dato.tieneResponsable : false,
+          [PROP_SIN_DATO]: dato == null,
         },
       };
     }),
@@ -90,9 +103,10 @@ function aumentarColeccion(
 
 /**
  * Expresión de fill-opacity de secciones: hueca si no tiene responsable (vista de estructura),
- * atenuada si no es prioritaria (vista de prioritarias, para que se vea el territorio pero no
- * compita con lo que importa) y, aparte de las dos, rebajada otra vez si además está fuera del
- * alcance del actuante.
+ * atenuada si no es del grupo de la vista de prioritarias activa (para que se vea el territorio
+ * pero no compita con lo que importa) y, aparte de las dos, rebajada otra vez si además está fuera
+ * del alcance del actuante. Las secciones sin `dato` (fuera del catálogo) no llegan aquí: las capas
+ * de relleno y borde las excluyen por filtro, ver PROP_SIN_DATO.
  */
 function opacidadRellenoSeccion(): DataDrivenPropertyValueSpecification<number> {
   return [
@@ -173,7 +187,7 @@ export function MapaLienzo({
     const alcance = calcularAlcanceMapa(coleccionRef.current, actuanteActual);
     const pasos = calcularPasosDeVista(vistaActual, datosActuales);
     const esEstructura = vistaActual === "estructura";
-    const esPrioritarias = vistaActual === "prioritarias";
+    const grupoPrioritario = grupoDePrioritarias(vistaActual);
     for (const rasgo of coleccionRef.current.features) {
       const clave = rasgo.properties.clave;
       const dato = datosActuales.porClave.get(clave);
@@ -184,7 +198,7 @@ export function MapaLienzo({
           enAlcance: alcance.get(clave) ?? true,
           seleccionada: clave === claveActual,
           hueco: esEstructura && dato != null && !dato.tieneResponsable,
-          atenuada: esPrioritarias && dato?.prioridad == null,
+          atenuada: grupoPrioritario != null && dato?.prioridad !== grupoPrioritario,
         },
       );
     }
@@ -220,7 +234,14 @@ export function MapaLienzo({
         id: idCapaRelleno(grupo),
         type: "fill",
         source: FUENTE_ID,
-        filter: ["==", ["get", PROP_GRUPO_RETRASO], grupo],
+        // Además del grupo de retraso, deja fuera a las secciones sin `dato`: no están en el
+        // catálogo de 169 (las seis sustitutas con en_catalogo = false) y no se pintan ni
+        // responden al clic. La geometría se queda cargada en la fuente, solo no se renderiza.
+        filter: [
+          "all",
+          ["==", ["get", PROP_GRUPO_RETRASO], grupo],
+          ["!=", ["get", PROP_SIN_DATO], true],
+        ],
         paint: {
           "fill-color": [
             "interpolate",
@@ -251,11 +272,13 @@ export function MapaLienzo({
     }
 
     // Borde de sección aparte: así el trazo no se duplica entre polígonos vecinos y la sección
-    // elegida puede llevar un trazo más grueso sin tocar el relleno.
+    // elegida puede llevar un trazo más grueso sin tocar el relleno. Mismo filtro de PROP_SIN_DATO
+    // que el relleno: una sección sin dato tampoco lleva borde.
     mapa.addLayer({
       id: CAPA_BORDE,
       type: "line",
       source: FUENTE_ID,
+      filter: ["!=", ["get", PROP_SIN_DATO], true],
       paint: {
         "line-color": [
           "case",
@@ -413,7 +436,7 @@ export function MapaLienzo({
     const mapa = mapaRef.current;
     if (!mapa || !mapa.getSource(FUENTE_ID)) return;
     const esEstructura = vista === "estructura";
-    const esPrioritarias = vista === "prioritarias";
+    const grupoPrioritario = grupoDePrioritarias(vista);
 
     const pasos = calcularPasosDeVista(vista, datos);
     for (const rasgo of coleccion.features) {
@@ -424,7 +447,7 @@ export function MapaLienzo({
         {
           valor: pasos.get(clave) ?? 0,
           hueco: esEstructura && dato != null && !dato.tieneResponsable,
-          atenuada: esPrioritarias && dato?.prioridad == null,
+          atenuada: grupoPrioritario != null && dato?.prioridad !== grupoPrioritario,
         },
       );
     }

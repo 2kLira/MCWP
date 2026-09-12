@@ -6,7 +6,6 @@ import { Check, ChevronRight } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
-  clavesConGeometria,
   coloniasDeSeccionConTraslape,
   demarcacionesResumen,
   seccionesResumen,
@@ -45,23 +44,30 @@ type MetaAvance = {
   metaVotos: number | null;
 };
 
-/**
- * Suma solo lo que está en catálogo: las seis sustitutas no tienen lista nominal ni meta propias,
- * meterlas aquí las contaría por partida doble contra las secciones que sí las heredan.
- */
-function sumarMetaAvance(
-  id: number | "total",
-  etiqueta: string,
-  filas: SeccionResumen[],
-): MetaAvance {
-  const enCatalogo = filas.filter((s) => s.en_catalogo);
-  const hayMeta = enCatalogo.some((s) => s.meta_votos != null);
+/** Un renglón de meta y avance a partir de lo que ya sumó la vista de la base. */
+function deDemarcacion(d: DemarcacionResumen): MetaAvance {
   return {
-    id,
-    etiqueta,
-    listaNominal: enCatalogo.reduce((acc, s) => acc + (s.lista_nominal ?? 0), 0),
-    promovidos: enCatalogo.reduce((acc, s) => acc + s.promovidos, 0),
-    metaVotos: hayMeta ? enCatalogo.reduce((acc, s) => acc + (s.meta_votos ?? 0), 0) : null,
+    id: d.demarcacion_id,
+    etiqueta: d.demarcacion,
+    listaNominal: d.lista_nominal,
+    promovidos: d.promovidos,
+    metaVotos: d.meta_votos,
+  };
+}
+
+/**
+ * El total del territorio a la vista es la suma de las demarcaciones que el usuario alcanza, no
+ * una consulta aparte: sumar cinco renglones ya recortados no es armar una agregación, es leer lo
+ * que la base ya agregó. Las sustitutas no entran porque la vista ya las dejó fuera.
+ */
+function sumarDemarcaciones(filas: DemarcacionResumen[]): MetaAvance {
+  const hayMeta = filas.some((d) => d.meta_votos != null);
+  return {
+    id: "total",
+    etiqueta: "Total del territorio a la vista",
+    listaNominal: filas.reduce((acc, d) => acc + d.lista_nominal, 0),
+    promovidos: filas.reduce((acc, d) => acc + d.promovidos, 0),
+    metaVotos: hayMeta ? filas.reduce((acc, d) => acc + (d.meta_votos ?? 0), 0) : null,
   };
 }
 
@@ -151,14 +157,12 @@ function PanelColonias({ estado }: { estado: ColoniaDeSeccion[] | "cargando" | u
 function ListaPrioridad({
   titulo,
   filas,
-  geometria,
   seccionAbierta,
   colonias,
   onAlternar,
 }: {
   titulo: string;
   filas: SeccionResumen[];
-  geometria: Set<string>;
   seccionAbierta: string | null;
   colonias: Record<string, ColoniaDeSeccion[] | "cargando">;
   onAlternar: (seccion: SeccionResumen) => void;
@@ -212,7 +216,7 @@ function ListaPrioridad({
                           />
                           <span className="cifras font-medium text-tinta">{s.clave}</span>
                         </span>
-                        <NotaSeccion seccion={s} tieneGeometria={geometria.has(s.clave)} />
+                        <NotaSeccion seccion={s} tieneGeometria={s.tiene_geometria} />
                       </td>
                       <td className="px-4 py-2 text-tinta-suave">{s.demarcacion}</td>
                       <td className="cifras px-4 py-2">{cifra(s.lista_nominal)}</td>
@@ -261,24 +265,15 @@ export default function Territorio() {
     [],
     [actuante.id],
   );
-  const geometria = useConsulta<Set<string>>(() => clavesConGeometria(), new Set<string>(), []);
 
   const sinResponsable = secciones.datos.filter((s) => !s.responsable_id).length;
 
-  /* b) Se arma aquí, sobre seccionesResumen ya recortado, porque v_demarcacion_resumen todavía no
-     agrega lista nominal ni meta de votos por demarcación. Cuando esa vista se amplíe, esto se
-     reemplaza por un campo más de demarcacionesResumen y esta función desaparece. */
+  /* b) Lista nominal, meta y promovidos los suma v_demarcacion_resumen, no el navegador. */
   const metaAvance = useMemo<MetaAvance[]>(() => {
-    const porDemarcacion = demarcaciones.datos.map((d) =>
-      sumarMetaAvance(
-        d.demarcacion_id,
-        d.demarcacion,
-        secciones.datos.filter((s) => s.demarcacion_id === d.demarcacion_id),
-      ),
-    );
+    const porDemarcacion = demarcaciones.datos.map(deDemarcacion);
     if (demarcaciones.datos.length <= 1) return porDemarcacion;
-    return [sumarMetaAvance("total", "Total del territorio a la vista", secciones.datos), ...porDemarcacion];
-  }, [secciones.datos, demarcaciones.datos]);
+    return [sumarDemarcaciones(demarcaciones.datos), ...porDemarcacion];
+  }, [demarcaciones.datos]);
 
   const prioridadA = useMemo(
     () => ordenarPorPendiente(secciones.datos.filter((s) => s.prioridad === "A")),
@@ -415,7 +410,7 @@ export default function Territorio() {
                                     />
                                     <span className="cifras font-medium text-tinta">{s.clave}</span>
                                   </span>
-                                  <NotaSeccion seccion={s} tieneGeometria={geometria.datos.has(s.clave)} />
+                                  <NotaSeccion seccion={s} tieneGeometria={s.tiene_geometria} />
                                 </td>
                                 <td className="px-4 py-2 text-tinta-suave">
                                   {s.responsable ?? (
@@ -473,7 +468,6 @@ export default function Territorio() {
             <ListaPrioridad
               titulo="Prioridad A"
               filas={prioridadA}
-              geometria={geometria.datos}
               seccionAbierta={seccionAbierta}
               colonias={colonias}
               onAlternar={alternarSeccion}
@@ -481,7 +475,6 @@ export default function Territorio() {
             <ListaPrioridad
               titulo="Prioridad B"
               filas={prioridadB}
-              geometria={geometria.datos}
               seccionAbierta={seccionAbierta}
               colonias={colonias}
               onAlternar={alternarSeccion}

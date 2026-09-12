@@ -262,6 +262,7 @@ type FilaSeccion = {
   demarcacion_id: number;
   centro_lat: number;
   centro_lng: number;
+  en_catalogo: boolean;
 };
 type FilaColonia = { id: number; nombre: string };
 type FilaColoniaSeccion = { colonia_id: number; seccion_clave: string; traslape_pct: number };
@@ -340,11 +341,17 @@ async function main() {
    * ------------------------------------------------------------------------------------------ */
 
   const filasDemarcaciones = await seleccionarTodo<FilaDemarcacion>("demarcaciones", "id,nombre", "id");
-  const filasSecciones = await seleccionarTodo<FilaSeccion>(
-    "secciones",
-    "clave,demarcacion_id,centro_lat,centro_lng",
-    "clave",
-  );
+  // Solo las 169 del catálogo. Las 6 sustitutas siguen en la tabla para no perder su geometría,
+  // pero el cliente pidió que no se cuenten, así que tampoco se les siembra gente: una persona
+  // colgada de una sección que nadie cuenta desaparece de todos los resúmenes por sección y deja
+  // los totales sin cuadrar.
+  const filasSecciones = (
+    await seleccionarTodo<FilaSeccion>(
+      "secciones",
+      "clave,demarcacion_id,centro_lat,centro_lng,en_catalogo",
+      "clave",
+    )
+  ).filter((s) => s.en_catalogo);
 
   if (filasSecciones.length === 0) {
     console.error(

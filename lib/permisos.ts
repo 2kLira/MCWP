@@ -8,7 +8,7 @@
  */
 
 import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
-import type { RolUsuario, UsuarioActuante } from "@/lib/tipos";
+import type { EstatusActividad, RolUsuario, UsuarioActuante } from "@/lib/tipos";
 
 /* ---------------------------------------------------------------------------
  * Alcance territorial
@@ -299,4 +299,61 @@ export function puedeVerReportesComparativos(
 export function puedeImportar(usuario: UsuarioActuante | null): boolean {
   if (!usuario || !usuario.activo) return false;
   return usuario.rol === "admin" || usuario.rol === "resp_demarcacion";
+}
+
+/* ---------------------------------------------------------------------------
+ * Qué actividades alcanza a ver cada rol
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Los estatus de actividad que este usuario alcanza a ver, en actividades y en agenda.
+ *
+ * Solo el administrador general ve lo cerrado. Brigadistas y responsables ven lo que todavía
+ * pueden trabajar: programada y en curso. Una actividad realizada o cancelada deja de aparecerles
+ * en cuanto se cierra, porque lo cerrado es historia y la historia es de quien coordina.
+ *
+ * Esta es la única lista que decide eso. Si mañana un rol debe ver lo realizado, se cambia aquí
+ * y ninguna pantalla se entera.
+ */
+const ESTATUS_ABIERTOS: readonly EstatusActividad[] = ["programada", "en_curso"];
+const ESTATUS_TODOS: readonly EstatusActividad[] = [
+  "programada",
+  "en_curso",
+  "realizada",
+  "cancelada",
+];
+
+export function estatusVisibles(
+  usuario: UsuarioActuante | null,
+): readonly EstatusActividad[] {
+  if (!usuario || !usuario.activo) return [];
+  return usuario.rol === "admin" ? ESTATUS_TODOS : ESTATUS_ABIERTOS;
+}
+
+/** True si este usuario alcanza a ver una actividad en ese estatus. */
+export function puedeVerEstatus(
+  usuario: UsuarioActuante | null,
+  estatus: EstatusActividad,
+): boolean {
+  return estatusVisibles(usuario).includes(estatus);
+}
+
+/**
+ * El brigadista no navega el sistema: se le manda a una actividad y captura. Solo ve su agenda y
+ * lo que tiene abierto, así que las pantallas de listado general no son para él.
+ */
+export function puedeVerListadosGenerales(usuario: UsuarioActuante | null): boolean {
+  if (!usuario || !usuario.activo) return false;
+  return usuario.rol !== "brigadista";
+}
+
+/**
+ * Responsable de una actividad. A diferencia de la asignación territorial, aquí no se exige que sea
+ * el responsable de esa sección: una actividad en la sección 0524 la puede encabezar alguien de otra
+ * demarcación, y eso pasa todo el tiempo en campo. Basta con que la cuenta esté activa y tenga un
+ * rol que encabece trabajo.
+ */
+export function puedeEncabezarActividad(usuario: UsuarioActuante | null): boolean {
+  if (!usuario || !usuario.activo) return false;
+  return usuario.rol !== "brigadista";
 }

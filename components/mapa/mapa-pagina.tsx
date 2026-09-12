@@ -8,6 +8,7 @@ import {
   calcularConteoPrioritarias,
   cargarDatosMapa,
   DATOS_MAPA_VACIOS,
+  grupoDePrioritarias,
   type DatosMapa,
   type VistaMapa,
 } from "./datos-mapa";
@@ -94,11 +95,14 @@ export function MapaPagina({
     ? (datos?.porClave.get(claveSeleccionada) ?? null)
     : null;
 
-  // Solo se recalcula cuando de verdad cambia algo: el conteo no depende de la vista activa, así
-  // que no hay que esperar a que el usuario abra "Prioritarias" para tenerlo listo.
+  // El grupo lo decide la vista activa: cada mapa de prioritarias cuenta solo el suyo.
+  const grupoPrioritario = grupoDePrioritarias(vista);
   const conteoPrioritarias = useMemo(
-    () => (coleccion && datos ? calcularConteoPrioritarias(datos, coleccion) : null),
-    [coleccion, datos],
+    () =>
+      coleccion && datos && grupoPrioritario
+        ? calcularConteoPrioritarias(datos, coleccion, grupoPrioritario)
+        : null,
+    [coleccion, datos, grupoPrioritario],
   );
 
   return (
@@ -142,8 +146,9 @@ export function MapaPagina({
               {conBarra && (
                 <BarraMapa enMovimiento={enMovimiento} className="pointer-events-auto" />
               )}
-              {vista === "prioritarias" && conteoPrioritarias && (
+              {grupoPrioritario && conteoPrioritarias && (
                 <ResumenPrioritarias
+                  grupo={grupoPrioritario}
                   conteo={conteoPrioritarias}
                   enMovimiento={enMovimiento}
                   className="pointer-events-auto"

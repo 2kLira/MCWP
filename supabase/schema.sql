@@ -383,7 +383,18 @@ select
   a.ultima_actividad,
   a.proxima_actividad,
   coalesce(p.promovidos, 0)                       as promovidos,
-  coalesce(p.aspirantes_representante, 0)         as aspirantes_representante
+  coalesce(p.aspirantes_representante, 0)         as aspirantes_representante,
+  s.lista_nominal,
+  s.meta_votos,
+  s.prioridad,
+  s.en_catalogo,
+  -- Una sección está recorrida cuando ya tiene al menos un recorrido realizado. La definición se
+  -- escribe aquí una sola vez para que no se invente distinta en cada pantalla.
+  coalesce(a.recorridos_realizados, 0) > 0        as recorrida,
+  coalesce(c.casillas, 0)                         as casillas,
+  -- Deuda 38: la fuente de verdad de si hay polígono es la base, no el GeoJSON cacheado del
+  -- cliente.
+  exists (select 1 from secciones_geom g where g.clave = s.clave) as tiene_geometria
 from secciones s
 join demarcaciones d on d.id = s.demarcacion_id
 left join asignaciones_responsable ar
@@ -404,28 +415,17 @@ left join lateral (
     count(*) filter (where ac.tipo = 'reunion')          as reuniones,
     count(*) filter (where ac.tipo = 'activismo')        as activismo,
     count(*) filter (where ac.tipo = 'recorrido')        as recorridos,
+    count(*) filter (where ac.tipo = 'recorrido' and ac.estatus = 'realizada')
+                                                         as recorridos_realizados,
     max(ac.fecha) filter (where ac.estatus = 'realizada')            as ultima_actividad,
     min(ac.fecha) filter (where ac.estatus = 'programada'
                             and ac.fecha >= current_date)            as proxima_actividad
   from actividades ac
   where ac.seccion_clave = s.clave and ac.estatus <> 'cancelada'
-) a on true;
-
-create or replace view v_colonia_resumen as
-select
-  pe.colonia_id,
-  co.nombre                                            as colonia,
-  pe.demarcacion_id,
-  pe.seccion_clave,
-  count(*)                                             as personas,
-  count(*) filter (where pe.quiere_participar)         as quieren_participar,
-  count(*) filter (where pe.quiere_info)               as quieren_info,
-  count(*) filter (where pe.es_promovido)              as promovidos,
-  count(*) filter (where pe.quiere_ser_representante)  as aspirantes_representante
-from personas pe
-join colonias co on co.id = pe.colonia_id
-where pe.colonia_id is not null
-group by pe.colonia_id, co.nombre, pe.demarcacion_id, pe.seccion_clave;
+) a on true
+left join lateral (
+  select count(*) as casillas from casillas ca where ca.seccion_clave = s.clave
+) c on true;
 
 create or replace view v_demarcacion_resumen as
 select
@@ -444,10 +444,25 @@ select
   coalesce(sum(v.activismo), 0)                            as activismo,
   coalesce(sum(v.recorridos), 0)                           as recorridos,
   max(v.ultima_actividad)                                  as ultima_actividad,
-  min(v.proxima_actividad)                                 as proxima_actividad
+  min(v.proxima_actividad)                                 as proxima_actividad,
+  -- Deuda 37: la meta por demarcación, sumada aquí y no en el navegador. Solo cuentan las
+  -- secciones del catálogo.
+  coalesce(sum(v.lista_nominal) filter (where v.en_catalogo), 0) as lista_nominal,
+  sum(v.meta_votos) filter (where v.en_catalogo)                 as meta_votos,
+  coalesce(sum(v.promovidos) filter (where v.en_catalogo), 0)    as promovidos,
+  count(v.clave) filter (where v.en_catalogo and v.prioridad = 'A')
+                                                            as secciones_prioritarias_a,
+  count(v.clave) filter (where v.en_catalogo and v.prioridad = 'A' and v.recorrida)
+                                                            as secciones_prioritarias_a_recorridas,
+  count(v.clave) filter (where v.en_catalogo and v.prioridad = 'B')
+                                                            as secciones_prioritarias_b,
+  count(v.clave) filter (where v.en_catalogo and v.prioridad = 'B' and v.recorrida)
+                                                            as secciones_prioritarias_b_recorridas
 from demarcaciones d
 left join v_seccion_resumen v on v.demarcacion_id = d.id
 group by d.id, d.nombre, d.slug, d.centro_lat, d.centro_lng;
+
+commit;
 
 create or replace view v_problematicas_por_seccion as
 select
