@@ -1,13 +1,14 @@
 import { MapaPagina } from "@/components/mapa/mapa-pagina";
 
 /**
- * El mapa ocupa la pantalla completa, por debajo del riel de navegación y de la barra superior.
- * En escritorio arranca a la derecha del riel para no quedar tapado por él.
+ * El mapa ocupa todo el hueco que dejan el riel y la barra superior, sin meterse debajo de
+ * ninguno de los dos: arranca donde termina la barra y, en celular, se detiene antes de la barra
+ * inferior flotante, para que la leyenda y la atribución de CARTO se sigan viendo.
  */
 export default function Pagina() {
   return (
-    <div className="fixed inset-0 z-[5] md:left-24">
-      <MapaPagina cromoDesplazado />
+    <div className="fixed inset-x-0 top-[var(--alto-barra)] bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[5] overflow-hidden border-t border-borde md:bottom-0 md:left-[var(--ancho-riel)]">
+      <MapaPagina />
     </div>
   );
 }

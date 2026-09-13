@@ -2,6 +2,8 @@ import {
   Building2,
   CalendarDays,
   ChartColumn,
+  ClipboardCheck,
+  ClipboardList,
   Ellipsis,
   LayoutDashboard,
   ListChecks,
@@ -14,7 +16,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { Route } from "next";
-import { puedeCrear, puedeImportar, puedeVerUsuarios } from "@/lib/permisos";
+import {
+  puedeCrear,
+  puedeEncabezarActividad,
+  puedeImportar,
+  puedeVerUsuarios,
+} from "@/lib/permisos";
 import type { UsuarioActuante } from "@/lib/tipos";
 
 export type Destino = {
@@ -31,7 +38,7 @@ export const DESTINOS: readonly Destino[] = [
   { href: "/mapa", etiqueta: "Mapa", icono: Map },
   { href: "/casillas", etiqueta: "Casillas", icono: Vote },
   { href: "/personas", etiqueta: "Personas alcanzadas", icono: Users },
-  { href: "/actividades", etiqueta: "Actividades", icono: CalendarDays },
+  { href: "/actividades", etiqueta: "Actividades", icono: ClipboardList },
   { href: "/agenda", etiqueta: "Agenda", icono: CalendarDays },
   { href: "/territorio", etiqueta: "Estructura territorial", icono: Building2 },
   { href: "/seguimiento", etiqueta: "Seguimiento", icono: ListChecks },
@@ -41,6 +48,14 @@ export const DESTINOS: readonly Destino[] = [
     etiqueta: "Registrar persona",
     icono: UserPlus,
     visible: (usuario) => puedeCrear(usuario, "persona"),
+  },
+  {
+    href: "/registrar-representante",
+    etiqueta: "Registrar representante",
+    icono: ClipboardCheck,
+    // Mismo criterio que puedeEditarRepresentantes en lib/datos/casillas.ts: coordinación, no
+    // captura suelta. El recorte por casilla concreta ya lo hace esa función al guardar.
+    visible: puedeEncabezarActividad,
   },
   {
     href: "/importar",

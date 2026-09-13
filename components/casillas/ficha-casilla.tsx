@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { leerDuracionMs, prefiereMenosMovimiento } from "@/components/mapa/tokens";
 import type { UsuarioActuante } from "@/lib/tipos";
@@ -99,6 +99,85 @@ const ETIQUETA_CARGO: Record<CargoRepresentante, string> = {
   titular: "Titular",
   suplente: "Suplente",
 };
+
+/**
+ * Etiqueta de un sub-estado dentro del resumen: relleno sólido cuando ya está listo, hueco
+ * punteado cuando falta. Nunca alerta: que falte manual o acreditación es trabajo pendiente,
+ * no un error.
+ */
+function Estadito({ texto, listo }: { texto: string; listo: boolean }) {
+  return (
+    <span
+      className={cn(
+        "rounded-pildora px-2 py-0.5 text-xs font-medium",
+        listo ? "bg-tinta text-fondo" : "hueco-punteado",
+      )}
+    >
+      {texto}
+    </span>
+  );
+}
+
+/**
+ * El renglón de un cargo en el resumen de cobertura: lo primero que se ve al abrir la ficha,
+ * antes de cualquier campo editable. Un aro relleno dice "aquí hay alguien", un aro hueco dice
+ * "todavía no": mismo lenguaje que el punto en el mapa, nunca color de alerta porque un lugar
+ * vacío es trabajo pendiente, no un error. Si está cubierto, debajo se leen de un golpe sus tres
+ * estados: alguien cubierto y sin acreditar no es lo mismo que alguien listo.
+ */
+function RenglonCobertura({
+  cargo,
+  representante,
+}: {
+  cargo: CargoRepresentante;
+  representante: RepresentanteCasilla | null;
+}) {
+  const cubierto = representanteCubierto(representante);
+  return (
+    <div className="flex items-start gap-3 py-2.5">
+      <span
+        aria-hidden
+        className={cn(
+          "mt-0.5 grid size-8 shrink-0 place-items-center rounded-full",
+          cubierto ? "bg-tinta text-fondo" : "hueco-punteado",
+        )}
+      >
+        {cubierto && <Check className="size-4" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-tinta-suave">{ETIQUETA_CARGO[cargo]}</p>
+        <p
+          className={cn(
+            "truncate text-sm font-semibold",
+            cubierto ? "text-tinta" : "text-tinta-suave",
+          )}
+        >
+          {cubierto ? representante!.nombre : "Sin registrar"}
+        </p>
+        {cubierto && representante && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            <Estadito
+              listo={representante.capacitacion === "capacitado"}
+              texto={
+                OPCIONES_CAPACITACION.find((o) => o.valor === representante.capacitacion)!.texto
+              }
+            />
+            <Estadito
+              listo={representante.manual === "entregado"}
+              texto={OPCIONES_MANUAL.find((o) => o.valor === representante.manual)!.texto}
+            />
+            <Estadito
+              listo={representante.acreditacion === "acreditado"}
+              texto={
+                OPCIONES_ACREDITACION.find((o) => o.valor === representante.acreditacion)!.texto
+              }
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function BloqueRepresentante({
   actuante,
@@ -246,7 +325,7 @@ function BloqueRepresentante({
             className="campo"
           />
           {editable && mostrarResultados && !personaId && (buscando || resultados.length > 0) && (
-            <ul className="vidrio-denso elevacion-flotante absolute inset-x-0 top-full z-10 mt-1 flex max-h-48 flex-col gap-1 overflow-y-auto rounded-control p-1.5">
+            <ul className="vidrio-denso absolute inset-x-0 top-full z-10 mt-1 flex max-h-48 flex-col gap-1 overflow-y-auto rounded-control p-1.5">
               {buscando && <li className="px-2 py-1.5 text-xs text-tinta-tenue">Buscando…</li>}
               {!buscando &&
                 resultados.map((p) => (
@@ -407,7 +486,7 @@ export function FichaCasilla({
       aria-label={`Casilla ${casilla.numero}`}
       style={{ transformOrigin: `${origenLocal.x}px ${origenLocal.y}px` }}
       className={cn(
-        "vidrio elevacion-flotante transicion-panel fixed z-30 flex flex-col overflow-hidden",
+        "vidrio-flotante transicion-panel fixed z-30 flex flex-col overflow-hidden",
         "inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] max-h-[72vh] rounded-t-hoja",
         "md:inset-x-auto md:right-6 md:top-24 md:bottom-6 md:max-h-none md:w-[440px] md:rounded-tarjeta",
         enMovimiento && "vidrio-en-movimiento",
@@ -440,6 +519,13 @@ export function FichaCasilla({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 md:px-5 md:pb-5">
+        {/* El estado primero, sin tener que leer nada más: si hay titular, si hay suplente, y
+            cuando sí lo hay, sus tres estados de un golpe. */}
+        <div className="mb-4 divide-y divide-borde border-b border-borde pb-1">
+          <RenglonCobertura cargo="titular" representante={casilla.titular} />
+          <RenglonCobertura cargo="suplente" representante={casilla.suplente} />
+        </div>
+
         {!editable && (
           <p className="hueco-punteado mb-4 rounded-control px-3 py-2 text-xs">
             Solo se puede consultar: esta casilla está fuera de lo que editas, o tu rol no

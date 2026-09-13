@@ -5,6 +5,7 @@ import { useActuante } from "@/components/proveedor-actuante";
 import { EsqueletoMapa } from "@/components/mapa/esqueleto-mapa";
 import { cargarSecciones } from "@/lib/territorio";
 import {
+  avanceDeCasilla,
   calcularAvance,
   listarCasillas,
   type CasillaConRepresentantes,
@@ -14,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { BarrasAvance } from "./barras-avance";
 import { FichaCasilla } from "./ficha-casilla";
 import { FiltroSeccion } from "./filtro-seccion";
-import { MapaCasillas } from "./mapa-casillas";
+import { LeyendaCasillas, MapaCasillas } from "./mapa-casillas";
 
 type Seleccion = { id: number; origen: { x: number; y: number } };
 
@@ -69,6 +70,13 @@ export function CasillasPagina({
   }, [casillas, filtroSeccion]);
 
   const avance = useMemo(() => calcularAvance(casillasFiltradas), [casillasFiltradas]);
+
+  // "¿Cómo vamos?" de verdad: una casilla con titular pero sin suplente no está resuelta, así
+  // que el conteo de completas se calcula aparte de los dos totales por cargo.
+  const completas = useMemo(
+    () => casillasFiltradas.filter((c) => avanceDeCasilla(c) === "completa").length,
+    [casillasFiltradas],
+  );
 
   // Encuadre de cámara cuando el filtro deja un subconjunto: se calcula a mano porque son puntos,
   // no polígonos con bbox propio como en el mapa de secciones.
@@ -138,6 +146,7 @@ export function CasillasPagina({
           >
             <BarrasAvance
               avance={avance}
+              completas={completas}
               enMovimiento={enMovimiento}
               className="pointer-events-auto md:max-w-md"
             />
@@ -148,11 +157,13 @@ export function CasillasPagina({
               className="pointer-events-auto"
             />
             {sinResultadosDeFiltro && (
-              <p className="vidrio elevacion-flotante rounded-pildora px-3 py-1.5 text-xs text-tinta-suave">
+              <p className="vidrio-flotante rounded-pildora px-3 py-1.5 text-sm text-tinta-suave">
                 Ninguna casilla coincide con esa sección.
               </p>
             )}
           </div>
+
+          <LeyendaCasillas enMovimiento={enMovimiento} />
 
           {casillaSeleccionada && (
             <FichaCasilla

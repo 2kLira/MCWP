@@ -37,22 +37,21 @@ function Muestra({
 }
 
 /**
- * Leyenda de la vista activa. Flota en vidrio sobre el mapa, esquina inferior izquierda: ahí no
- * choca con la barra superior, el resumen de prioritarias ni el selector de capas (los tres viven
- * arriba), ni con la ficha de sección (a la derecha en escritorio, hoja de abajo en celular) ni con
- * el riel de navegación (a la izquierda, ya despejado por `sangradoIzquierdo` igual que el resto
- * del cromo del mapa). En celular arranca colapsada en una pastilla corta para no taparle mapa a
- * nadie; en escritorio el botón de la pastilla se oculta y el contenido siempre se ve abierto.
+ * Leyenda de la vista activa, en la esquina inferior izquierda del mapa. Es de las dos únicas
+ * superficies con desenfoque de la aplicación, porque aquí sí hay territorio detrás. No choca con
+ * el selector de capas (que ya vive en el borde del panel, fuera del mapa), ni con la atribución
+ * de CARTO (abajo a la derecha), ni con la ficha de sección.
+ *
+ * En celular arranca colapsada en una pastilla corta para no taparle mapa a nadie; en escritorio
+ * el botón de la pastilla se oculta y el contenido siempre se ve abierto.
  */
 export function LeyendaMapa({
   vista,
   enMovimiento,
-  sangradoIzquierdo = false,
   className,
 }: {
   vista: VistaMapa;
   enMovimiento: boolean;
-  sangradoIzquierdo?: boolean;
   className?: string;
 }) {
   const [abierta, setAbierta] = useState(false);
@@ -63,9 +62,7 @@ export function LeyendaMapa({
   return (
     <div
       className={cn(
-        "vidrio elevacion-flotante transicion-ui absolute z-10 flex flex-col overflow-hidden",
-        "bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-3 md:bottom-4 md:left-4",
-        sangradoIzquierdo && "md:left-24",
+        "vidrio-flotante transicion-ui absolute bottom-3 left-3 z-10 flex flex-col overflow-hidden md:bottom-4 md:left-4",
         abierta ? "rounded-tarjeta" : "rounded-pildora",
         "md:rounded-tarjeta",
         enMovimiento && "vidrio-en-movimiento",
@@ -79,7 +76,7 @@ export function LeyendaMapa({
         onClick={() => setAbierta((valor) => !valor)}
         aria-expanded={abierta}
         aria-controls={idContenido}
-        className="transicion-ui flex min-h-11 items-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-medium text-tinta-suave md:hidden"
+        className="transicion-ui flex min-h-11 items-center gap-1.5 whitespace-nowrap px-3.5 text-sm font-medium text-tinta md:hidden"
       >
         Leyenda
         <ChevronDown
@@ -95,7 +92,7 @@ export function LeyendaMapa({
           abierta ? "flex" : "hidden md:flex",
         )}
       >
-        <p className="text-xs font-medium text-tinta-suave">{etiquetaVista}</p>
+        <p className="text-sm font-semibold text-tinta">{etiquetaVista}</p>
 
         {vista === "estructura" && (
           <div className="flex flex-col gap-1.5">
@@ -115,7 +112,7 @@ export function LeyendaMapa({
         {VISTAS_DE_ESCALA.has(vista) && (
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-tinta-tenue">Menos</span>
+              <span className="text-xs text-tinta-suave">Menos</span>
               <div className="flex h-3 flex-1 overflow-hidden rounded-control">
                 <span className="flex-1 bg-mapa-0" />
                 <span className="flex-1 bg-mapa-1" />
@@ -123,9 +120,9 @@ export function LeyendaMapa({
                 <span className="flex-1 bg-mapa-3" />
                 <span className="flex-1 bg-mapa-4" />
               </div>
-              <span className="text-xs text-tinta-tenue">Más</span>
+              <span className="text-xs text-tinta-suave">Más</span>
             </div>
-            <p className="text-[11px] text-tinta-tenue">Por cuantiles, no cifras fijas.</p>
+            <p className="text-xs text-tinta-suave">Por cuantiles, no cifras fijas.</p>
           </div>
         )}
       </div>

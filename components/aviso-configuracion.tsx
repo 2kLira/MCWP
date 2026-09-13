@@ -14,7 +14,7 @@ export function AvisoConfiguracion() {
   return (
     <div
       role="status"
-      className="vidrio filo mx-auto mb-4 flex max-w-tope items-start gap-3 rounded-tarjeta p-3"
+      className="panel mb-6 flex items-start gap-3 p-4"
     >
       <TriangleAlert className="mt-0.5 size-4 shrink-0 text-alerta" aria-hidden />
       <p className="medida text-sm text-tinta-suave">

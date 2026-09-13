@@ -178,6 +178,58 @@ export function calcularAvance(casillas: readonly CasillaConRepresentantes[]): A
 }
 
 /**
+ * Casillas de una sección exacta, con sus representantes ya resueltos: la pantalla de alta
+ * (app/registrar-representante) necesita saber de inmediato si el titular o el suplente ya están
+ * ocupados, antes de que alguien elija cargo, así que no vale la pena traer la casilla "pelona" y
+ * pedir los representantes aparte. Mismo recorte territorial que listarCasillas, nomás acotado a
+ * una clave.
+ */
+export async function buscarCasillasPorSeccion(
+  usuario: UsuarioActuante | null,
+  seccionClave: string,
+): Promise<Resultado<CasillaConRepresentantes[]>> {
+  let consulta = db().from("casillas").select(COLUMNAS_CASILLA).eq("seccion_clave", seccionClave);
+
+  const alcance = alcanceDe(usuario);
+  if (alcance.tipo === "demarcacion") {
+    // Una sola clave: más barato comparar su demarcación que traer todo el catálogo de la
+    // demarcación como hace listarCasillas para su filtro .in(...).
+    if (demarcacionIdDeSeccion(seccionClave) !== alcance.demarcacionId) {
+      return { datos: [], sinEsquema: false, aviso: null };
+    }
+  } else {
+    consulta = aplicarAlcance(consulta, usuario);
+  }
+
+  const r = await lista<FilaCasilla>(consulta.order("numero", { ascending: true }));
+  return { ...r, datos: r.datos.map(armarCasilla) };
+}
+
+/**
+ * Una casilla por id, con sus representantes. Sirve para refrescar el estado de ocupación justo
+ * después de guardar (guardarRepresentante solo devuelve el renglón que se acaba de escribir, no
+ * la casilla completa) sin volver a teclear la búsqueda por sección.
+ */
+export async function casillaPorId(
+  usuario: UsuarioActuante | null,
+  id: number,
+): Promise<Resultado<CasillaConRepresentantes | null>> {
+  const r = await uno<FilaCasilla>(
+    db().from("casillas").select(COLUMNAS_CASILLA).eq("id", id).maybeSingle(),
+  );
+  if (!r.datos) return { ...r, datos: null };
+
+  const territorio: ConTerritorio = {
+    seccion_clave: r.datos.seccion_clave,
+    demarcacion_id: demarcacionIdDeSeccion(r.datos.seccion_clave),
+  };
+  if (!puedeVerRegistro(usuario, territorio)) {
+    return { datos: null, sinEsquema: false, aviso: "Esta casilla está fuera de tu territorio." };
+  }
+  return { ...r, datos: armarCasilla(r.datos) };
+}
+
+/**
  * Quién puede registrar o editar representantes de una casilla: el mismo criterio que encabezar
  * una actividad (nadie de capturista suelto, esto es coordinación), y siempre dentro de su
  * territorio. No se duplica la regla de alcance: se le pregunta a lib/permisos.ts, con la

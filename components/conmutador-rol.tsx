@@ -19,10 +19,11 @@ function territorioDe(usuario: UsuarioActuante) {
  */
 export function ConmutadorRol({
   className,
-  conVidrio = false,
+  compacto = false,
 }: {
   className?: string;
-  conVidrio?: boolean;
+  /** Dentro de la barra superior: altura de toque, ancho al contenido y sin sombra. */
+  compacto?: boolean;
 }) {
   const { actuante, disponibles, cambiarActuante } = useActuante();
   const [abierto, setAbierto] = useState(false);
@@ -52,17 +53,24 @@ export function ConmutadorRol({
         aria-expanded={abierto}
         onClick={() => setAbierto((v) => !v)}
         className={cn(
-          "transicion-ui flex w-full items-center gap-3 rounded-control px-3 py-2 text-left transition-colors",
-          conVidrio
-            ? "vidrio filo hover:bg-[var(--vidrio-fondo-denso)]"
-            : "border border-borde bg-superficie hover:bg-superficie-hundida",
+          "transicion-ui flex items-center gap-2.5 rounded-control border border-borde px-3 text-left transition-colors",
+          compacto
+            ? "min-h-11 max-w-[11.5rem] bg-superficie-hundida hover:bg-superficie sm:max-w-[15rem] md:max-w-[19rem]"
+            : "w-full bg-superficie py-2 hover:bg-superficie-hundida",
         )}
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-tinta">
             {ETIQUETA_ROL[actuante.rol]}
           </span>
-          <span className="block truncate text-xs text-tinta-suave">
+          <span
+            className={cn(
+              "block truncate text-xs text-tinta-suave",
+              // En celular la barra mide 56: cabe el rol, no el territorio. Este ya se lee
+              // completo en el encabezado de la pantalla y dentro del menú.
+              compacto && "hidden md:block",
+            )}
+          >
             {territorioDe(actuante)}
           </span>
         </span>
@@ -79,7 +87,7 @@ export function ConmutadorRol({
         <ul
           role="listbox"
           aria-label="Cambiar de rol"
-          className="vidrio filo absolute right-0 z-50 mt-2 w-full min-w-72 overflow-hidden rounded-tarjeta py-1"
+          className="panel elevacion-flotante absolute right-0 z-50 mt-2 w-max min-w-full max-w-[min(22rem,calc(100vw-2rem))] overflow-hidden py-1"
         >
           {disponibles.map((usuario) => {
             const elegido = usuario.id === actuante.id;
@@ -93,11 +101,14 @@ export function ConmutadorRol({
                     cambiarActuante(usuario.id);
                     setAbierto(false);
                   }}
-                  className="transicion-ui flex w-full items-start gap-3 px-3 py-2 text-left transition-colors hover:bg-superficie-hundida"
+                  className={cn(
+                    "transicion-ui flex w-full items-start gap-3 px-3 py-2 text-left transition-colors",
+                    elegido ? "bg-naranja-suave" : "hover:bg-superficie-hundida",
+                  )}
                 >
                   <Check
                     className={cn(
-                      "mt-0.5 size-4 shrink-0 text-tinta-suave",
+                      "mt-0.5 size-4 shrink-0 text-naranja-texto",
                       !elegido && "invisible",
                     )}
                     aria-hidden

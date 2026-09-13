@@ -3,14 +3,12 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { MessageCircle } from "lucide-react";
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId } from "@/lib/demarcaciones";
-import { etiquetaAlcance } from "@/lib/permisos";
+import { estatusVisibles, etiquetaAlcance } from "@/lib/permisos";
 import { ETIQUETA_TIPO_ACTIVIDAD } from "@/lib/tipos";
-import { useMovimientoReducido } from "@/lib/movimiento";
 import { useConsulta } from "@/lib/usar-consulta";
-import { Indicador } from "@/components/tablero/indicador";
 import {
   resumenTablero,
   cumpleanosDeHoy,
@@ -19,14 +17,17 @@ import {
 } from "@/lib/datos/tablero";
 import { reporteSemanal, type SemanaReporte } from "@/lib/datos/reportes";
 import { actividadesDeAgenda, type Actividad } from "@/lib/datos/actividades";
-import { estatusVisibles } from "@/lib/permisos";
 
 const MapaPagina = dynamic(
   () => import("@/components/mapa/mapa-pagina").then((m) => m.MapaPagina),
-  { ssr: false, loading: () => <div className="size-full animate-pulse bg-superficie-hundida" /> },
+  {
+    ssr: false,
+    loading: () => <div className="size-full animate-pulse bg-superficie-hundida" />,
+  },
 );
 
 const RESUMEN_VACIO = {} as ResumenTablero;
+const formatoCifra = new Intl.NumberFormat("es-MX");
 
 function enDias(dias: number): string {
   const f = new Date();
@@ -76,92 +77,31 @@ export default function Tablero() {
 
   const r = resumen.datos;
   const cargando = resumen.cargando;
-  const secciones = (r.seccionesConResponsable ?? 0) + (r.seccionesSinResponsable ?? 0);
-  const cobertura = secciones > 0 ? (r.seccionesConResponsable ?? 0) / secciones : 0;
 
   return (
-    <div className="flex flex-col">
-      {/* Cabecera editorial: una cifra manda y el resto se lee como una línea de registro,
-          no como cuatro tarjetas iguales. */}
-      <header className="pb-8 pt-2">
-        <p className="text-sm text-tinta-suave">Oaxaca de Juárez · {territorio}</p>
-
-        <div className="mt-5 flex flex-wrap items-end gap-x-10 gap-y-6">
-          <div>
-            <p
-              className="cifra-atlas text-tinta"
-              style={{ fontSize: "clamp(3.25rem, 2rem + 6vw, 5.5rem)" }}
-            >
-              {cargando ? "—" : (r.personas ?? 0).toLocaleString("es-MX")}
-            </p>
-            <p className="mt-1 text-sm text-tinta-suave">
-              personas alcanzadas en {secciones || 157} secciones
-            </p>
-          </div>
-
-          <dl className="flex flex-wrap gap-x-8 gap-y-4 pb-2">
-            <Dato
-              valor={r.quierenParticipar}
-              etiqueta="quieren participar"
-              cargando={cargando}
-            />
-            <Dato valor={r.quierenInfo} etiqueta="quieren información" cargando={cargando} />
-            <Dato
-              valor={r.nuevasSemana}
-              etiqueta="nuevas esta semana"
-              cargando={cargando}
-              grafico={<Franja datos={semanal.datos} />}
-            />
-          </dl>
-
-          {/* Embudo de reclutamiento: son las dos cifras que el operador revisa a diario,
-              por eso llevan tarjeta propia en vez de perderse como texto plano. */}
-          <div className="flex flex-wrap gap-3">
-            <Indicador etiqueta="Promovidos" valor={r.promovidos ?? 0} cargando={cargando} orden={0} />
-            <Indicador
-              etiqueta="Quieren ser representantes"
-              valor={r.aspirantesRepresentante ?? 0}
-              cargando={cargando}
-              orden={1}
-            />
-          </div>
-        </div>
-
-        {/* Cobertura territorial: la barra es información, no adorno. Es la historia que el
-            socio va a preguntar en la junta. */}
-        <div className="mt-8 border-t border-borde pt-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm text-tinta">
-              <span className="cifras font-medium">{r.seccionesConResponsable ?? 0}</span>{" "}
-              <span className="text-tinta-suave">
-                de <span className="cifras">{secciones || 157}</span> secciones tienen responsable
-              </span>
-            </p>
-            <Link
-              href="/territorio"
-              className="text-sm text-naranja-texto underline-offset-4 hover:underline"
-            >
-              {(r.seccionesSinResponsable ?? 0).toLocaleString("es-MX")} sin responsable
-            </Link>
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-pildora bg-superficie-hundida">
-            <div
-              className="transicion-panel h-full rounded-pildora bg-naranja"
-              style={{ width: `${Math.round(cobertura * 100)}%` }}
-            />
-          </div>
-        </div>
+    <div className="flex flex-col gap-6 md:gap-8">
+      <header className="pt-1">
+        <h1 className="text-xl text-tinta">Resumen territorial</h1>
+        <p className="mt-1 text-sm text-tinta-suave">Oaxaca de Juárez · {territorio}</p>
       </header>
 
-      {/* El mapa va a sangre, sin tarjeta alrededor. Es el protagonista. */}
-      <section className="relative -mx-4 h-[58vh] min-h-[22rem] overflow-hidden border-y border-borde md:-ml-24 md:-mr-6 md:rounded-none">
-        <MapaPagina sangradoIzquierdo conBarra={false} />
+      <Resumen resumen={r} cargando={cargando} semanal={semanal.datos} />
+
+      {/* El mapa es el protagonista, pero alineado al mismo eje que todo lo demás. */}
+      <section aria-label="Mapa de secciones" className="panel overflow-hidden">
+        <div className="h-[25rem] sm:h-[30rem] lg:h-[36rem]">
+          <MapaPagina conBarra={false} />
+        </div>
       </section>
 
       {/* Tres columnas separadas por filetes, no tres tarjetas. */}
-      <section className="grid gap-y-8 pt-8 md:grid-cols-3 md:divide-x md:divide-borde">
+      <section className="panel grid gap-y-6 p-4 md:grid-cols-3 md:divide-x md:divide-separador md:p-6">
         <Columna titulo="Hoy" cola>
-          <ListaActividades actividades={hoy} vacio="Sin actividades hoy." cargando={agenda.cargando} />
+          <ListaActividades
+            actividades={hoy}
+            vacio="Sin actividades hoy."
+            cargando={agenda.cargando}
+          />
         </Columna>
         <Columna titulo="Esta semana" sangria cola>
           <ListaActividades
@@ -195,44 +135,134 @@ export default function Tablero() {
       </section>
 
       {/* Zona de apoyo, no protagonista: por eso va al final y desaparece por completo si hoy
-          no cumple nadie, en vez de dejar una tarjeta vacía ocupando lugar. */}
+          no cumple nadie, en vez de dejar un panel vacío ocupando lugar. */}
       {!cumpleanos.cargando && cumpleanos.datos.length > 0 && (
-        <section className="mt-8 border-t border-borde pt-6">
-          <h2 className="mb-3 text-sm font-medium text-tinta-tenue">
-            Cumplen años hoy · <span className="cifras text-tinta">{cumpleanos.datos.length}</span>
-          </h2>
-          <ul className="flex flex-col divide-y divide-borde">
-            {cumpleanos.datos.map((c) => (
-              <li key={c.persona_id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-tinta">{c.nombre}</p>
-                  <p className="mt-0.5 text-xs text-tinta-suave">
-                    <span className="cifras">{c.edad} años</span>
-                    {c.seccion_clave && (
-                      <>
-                        {" · "}
-                        <span className="cifras">{c.seccion_clave}</span>
-                      </>
-                    )}
-                  </p>
-                </div>
-                {c.telefono_norm && (
-                  <a
-                    href={`https://wa.me/52${c.telefono_norm}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="transicion-ui inline-flex shrink-0 items-center gap-2 rounded-control border border-borde bg-superficie px-3 text-sm text-tinta toque-actividad"
-                  >
-                    <MessageCircle className="size-4" aria-hidden />
-                    WhatsApp
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
+        <ListaCumpleanos personas={cumpleanos.datos} />
       )}
     </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Resumen: una sola superficie tranquila, no seis tarjetas
+ * ------------------------------------------------------------------------- */
+
+function Resumen({
+  resumen: r,
+  cargando,
+  semanal,
+}: {
+  resumen: ResumenTablero;
+  cargando: boolean;
+  semanal: SemanaReporte[];
+}) {
+  const conResponsable = r.seccionesConResponsable ?? 0;
+  const sinResponsable = r.seccionesSinResponsable ?? 0;
+  const secciones = conResponsable + sinResponsable;
+  // Sin secciones no hay porcentaje que valga: antes que un NaN, no se muestra nada.
+  const porcentaje = secciones > 0 ? Math.round((conResponsable / secciones) * 100) : null;
+  const idCobertura = useId();
+
+  return (
+    <section aria-labelledby={`${idCobertura}-titulo`} className="panel overflow-hidden">
+      <h2 id={`${idCobertura}-titulo`} className="sr-only">
+        Resumen de personas alcanzadas y cobertura
+      </h2>
+
+      <div className="flex flex-col gap-6 p-4 md:p-6 lg:flex-row lg:gap-10">
+        {/* Métrica principal. Manda, pero ya no aplasta al resto. */}
+        <div className="lg:w-60 lg:shrink-0 lg:border-r lg:border-separador lg:pr-10">
+          <p className="text-sm text-tinta-suave">Personas alcanzadas</p>
+          <p className="cifra-mayor mt-1 text-tinta">
+            {cargando ? "—" : formatoCifra.format(r.personas ?? 0)}
+          </p>
+          <p className="mt-1 text-sm text-tinta-suave">
+            {cargando || secciones === 0 ? (
+              " "
+            ) : (
+              <>
+                en <span className="cifras">{formatoCifra.format(secciones)}</span> secciones
+              </>
+            )}
+          </p>
+        </div>
+
+        {/* Secundarias: una cuadrícula integrada, sin tarjeta alrededor de cada cifra. */}
+        <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3 lg:gap-x-10 xl:grid-cols-5">
+          <Dato valor={r.quierenParticipar} etiqueta="Quieren participar" cargando={cargando} />
+          <Dato valor={r.quierenInfo} etiqueta="Quieren información" cargando={cargando} />
+          <Dato valor={r.nuevasSemana} etiqueta="Nuevas esta semana" cargando={cargando}>
+            <Franja datos={semanal} />
+          </Dato>
+          <Dato valor={r.promovidos} etiqueta="Promovidos" cargando={cargando} />
+          <Dato
+            valor={r.aspirantesRepresentante}
+            etiqueta="Quieren ser representantes"
+            cargando={cargando}
+          />
+        </dl>
+      </div>
+
+      {/* Cobertura territorial: la barra es información, no adorno. Es la historia que el socio
+          va a preguntar en la junta, así que el texto solo se basta sin mirar el color. */}
+      <div className="border-t border-separador p-4 md:px-6 md:py-5">
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+          <h3 id={idCobertura} className="text-sm font-medium text-tinta">
+            Cobertura de responsables
+          </h3>
+          <p className="text-sm text-tinta-suave">
+            {cargando ? (
+              "Contando…"
+            ) : secciones === 0 ? (
+              "Todavía no hay secciones cargadas."
+            ) : (
+              <>
+                <span className="cifras font-semibold text-tinta">
+                  {formatoCifra.format(conResponsable)}
+                </span>{" "}
+                de <span className="cifras">{formatoCifra.format(secciones)}</span> secciones
+                {porcentaje !== null && (
+                  <>
+                    {" · "}
+                    <span className="cifras">{porcentaje}%</span>
+                  </>
+                )}
+              </>
+            )}
+          </p>
+        </div>
+
+        <div
+          role="progressbar"
+          aria-labelledby={idCobertura}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={porcentaje ?? 0}
+          aria-valuetext={
+            porcentaje === null
+              ? "Sin datos de cobertura"
+              : `${porcentaje} por ciento de las secciones tienen responsable`
+          }
+          className="mt-3 h-1.5 w-full max-w-[44rem] overflow-hidden rounded-pildora bg-superficie-hundida"
+        >
+          <div
+            className="transicion-panel h-full w-full origin-left rounded-pildora bg-naranja transition-transform"
+            style={{ transform: `scaleX(${(porcentaje ?? 0) / 100})` }}
+          />
+        </div>
+
+        {!cargando && sinResponsable > 0 && (
+          <p className="mt-2.5 text-sm">
+            <Link
+              href="/territorio"
+              className="text-naranja-texto underline-offset-4 hover:underline"
+            >
+              <span className="cifras">{formatoCifra.format(sinResponsable)}</span> sin responsable
+            </Link>
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -240,49 +270,63 @@ function Dato({
   valor,
   etiqueta,
   cargando,
-  grafico,
+  children,
 }: {
   valor: number | undefined;
   etiqueta: string;
   cargando: boolean;
-  grafico?: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
-    <div>
-      <dd className="cifra-atlas text-2xl text-tinta">
-        {cargando ? "—" : (valor ?? 0).toLocaleString("es-MX")}
+    <div className="min-w-0">
+      <dd className="cifra-indicador text-tinta">
+        {cargando ? "—" : formatoCifra.format(valor ?? 0)}
       </dd>
       <dt className="mt-0.5 text-sm text-tinta-suave">{etiqueta}</dt>
-      {grafico}
+      {!cargando && children}
     </div>
   );
 }
 
-/** Diez semanas de altas, en una franja de barras. Sin ejes, sin leyenda, sin caja. */
+/**
+ * Diez semanas de altas reales, tomadas de reporteSemanal. Sin ejes, sin leyenda, sin caja: lo
+ * que aporta es la forma. Lleva periodo escrito y descripción accesible porque una serie sin
+ * periodo no dice nada, y si algún día no hay serie, simplemente no se pinta.
+ */
 function Franja({ datos }: { datos: SemanaReporte[] }) {
-  const reducido = useMovimientoReducido();
   if (datos.length === 0) return null;
+
   const tope = Math.max(...datos.map((d) => d.personas), 1);
+  const total = datos.reduce((suma, d) => suma + d.personas, 0);
 
   return (
-    <div className="mt-2 flex h-6 items-end gap-[3px]" aria-hidden>
-      {datos.map((d, i) => (
-        <span
-          key={d.inicio}
-          title={`${d.etiqueta}: ${d.personas}`}
-          className="w-1.5 rounded-[1px]"
-          style={{
-            height: `${Math.max(8, (d.personas / tope) * 100)}%`,
-            background:
-              i === datos.length - 1 ? "var(--naranja)" : "var(--tinta-tenue)",
-            opacity: i === datos.length - 1 ? 1 : 0.45,
-            transition: reducido ? "none" : "height var(--dur-panel) var(--curva)",
-          }}
-        />
-      ))}
+    <div className="mt-2.5">
+      <div
+        role="img"
+        aria-label={`Altas por semana en las últimas ${datos.length} semanas: ${formatoCifra.format(total)} personas en total, con un máximo de ${formatoCifra.format(tope)} en una semana.`}
+        className="flex h-6 items-end gap-[3px]"
+      >
+        {datos.map((d, i) => (
+          <span
+            key={d.inicio}
+            title={`${d.etiqueta}: ${d.personas}`}
+            className="w-1.5 rounded-[1px]"
+            style={{
+              height: `${Math.max(8, (d.personas / tope) * 100)}%`,
+              background: i === datos.length - 1 ? "var(--naranja)" : "var(--tinta-tenue)",
+              opacity: i === datos.length - 1 ? 1 : 0.4,
+            }}
+          />
+        ))}
+      </div>
+      <p className="mt-1.5 text-xs text-tinta-suave">Últimas {datos.length} semanas</p>
     </div>
   );
 }
+
+/* ---------------------------------------------------------------------------
+ * Contenido inferior
+ * ------------------------------------------------------------------------- */
 
 function Columna({
   titulo,
@@ -297,8 +341,8 @@ function Columna({
   children: React.ReactNode;
 }) {
   return (
-    <div className={[sangria ? "md:pl-10" : "", cola ? "md:pr-10" : ""].join(" ").trim()}>
-      <h2 className="mb-3 text-sm font-medium text-tinta-tenue">{titulo}</h2>
+    <div className={[sangria ? "md:pl-8" : "", cola ? "md:pr-8" : ""].join(" ").trim()}>
+      <h2 className="mb-3 text-sm font-semibold text-tinta">{titulo}</h2>
       {children}
     </div>
   );
@@ -317,33 +361,33 @@ function ListaActividades({
     return (
       <div className="flex flex-col gap-3">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-8 animate-pulse rounded bg-superficie-hundida" />
+          <div key={i} className="h-8 animate-pulse rounded-control bg-superficie-hundida" />
         ))}
       </div>
     );
   }
   if (actividades.length === 0) {
-    return <p className="text-sm text-tinta-tenue">{vacio}</p>;
+    return <p className="text-sm text-tinta-suave">{vacio}</p>;
   }
   return (
-    <ul className="flex flex-col divide-y divide-borde">
+    <ul className="flex flex-col divide-y divide-separador">
       {actividades.slice(0, 5).map((a) => (
         <li key={a.id} className="py-2.5 first:pt-0">
           <Link href={`/actividades/${a.id}` as never} className="group block">
             <span className="flex items-baseline justify-between gap-3">
-              <span className="truncate text-sm text-tinta group-hover:text-naranja-texto">
+              <span className="truncate text-sm font-medium text-tinta group-hover:text-naranja-texto">
                 {a.nombre}
               </span>
-              <span className="cifras shrink-0 text-xs text-tinta-tenue">
+              <span className="cifras shrink-0 text-xs text-tinta-suave">
                 {fechaCorta(a.fecha)}
               </span>
             </span>
-            <span className="mt-0.5 block text-xs text-tinta-suave">
+            <span className="mt-0.5 block text-sm text-tinta-suave">
               {ETIQUETA_TIPO_ACTIVIDAD[a.tipo]}
               {a.seccion_clave && (
                 <>
                   {" · "}
-                  <span className="cifras">{a.seccion_clave}</span>
+                  <span className="cifras">Sección {a.seccion_clave}</span>
                 </>
               )}
             </span>
@@ -366,20 +410,69 @@ function Pendiente({
   cargando: boolean;
 }) {
   return (
-    <li className="border-b border-borde last:border-0">
+    <li className="border-b border-separador last:border-0">
       <Link
         href={href as never}
         className="group flex items-baseline justify-between gap-3 py-2.5"
       >
-        <span className="text-sm text-tinta-suave group-hover:text-tinta">{etiqueta}</span>
+        <span className="text-sm text-tinta-suave group-hover:text-naranja-texto">{etiqueta}</span>
         {cargando ? (
           <span className="h-4 w-8 animate-pulse rounded bg-superficie-hundida" />
         ) : (
           <span className="cifra-atlas text-lg text-tinta">
-            {(valor ?? 0).toLocaleString("es-MX")}
+            {formatoCifra.format(valor ?? 0)}
           </span>
         )}
       </Link>
     </li>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Listado de personas: nombre, datos secundarios y contacto, en ese orden y
+ * sin un vacío entre el nombre y el botón.
+ * ------------------------------------------------------------------------- */
+
+function ListaCumpleanos({ personas }: { personas: CumpleanosHoy[] }) {
+  return (
+    <section className="panel p-4 md:p-6">
+      <h2 className="text-sm font-semibold text-tinta">
+        Cumplen años hoy · <span className="cifras">{formatoCifra.format(personas.length)}</span>
+      </h2>
+
+      <ul className="mt-1 flex max-w-[46rem] flex-col divide-y divide-separador">
+        {personas.map((c) => (
+          <li
+            key={c.persona_id}
+            className="grid min-h-[4.5rem] grid-cols-[minmax(0,1fr)_auto] items-center justify-start gap-x-4 gap-y-1 py-3 md:grid-cols-[minmax(0,17rem)_minmax(0,12rem)_auto]"
+          >
+            <p className="min-w-0 text-[0.9375rem] font-medium text-tinta">{c.nombre}</p>
+
+            <p className="col-start-1 text-sm text-tinta-suave md:col-start-2">
+              <span className="cifras">{c.edad} años</span>
+              {c.seccion_clave && (
+                <>
+                  {" · "}
+                  <span className="cifras">Sección {c.seccion_clave}</span>
+                </>
+              )}
+            </p>
+
+            {c.telefono_norm && (
+              <a
+                href={`https://wa.me/52${c.telefono_norm}`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Escribir por WhatsApp a ${c.nombre}`}
+                className="transicion-ui col-start-2 row-span-2 row-start-1 md:row-span-1 inline-flex shrink-0 items-center gap-2 self-center rounded-control border border-borde bg-superficie px-3 text-sm font-medium text-tinta transition-colors hover:bg-naranja-suave hover:text-naranja-texto toque-actividad md:col-start-3"
+              >
+                <MessageCircle className="size-4" aria-hidden />
+                WhatsApp
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

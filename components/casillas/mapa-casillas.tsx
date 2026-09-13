@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { ChevronDown } from "lucide-react";
 import type { Map as MapaLibreMap, GeoJSONSource } from "maplibre-gl";
 import { estiloCartoDe, usePreferenciaOscura } from "@/components/mapa/estilo-base";
 import { bboxConMargen } from "@/components/mapa/geometria";
@@ -15,6 +16,7 @@ import {
 } from "@/components/mapa/tokens";
 import { MUNICIPIO } from "@/lib/demarcaciones";
 import { avanceDeCasilla, type CasillaConRepresentantes } from "@/lib/datos/casillas";
+import { cn } from "@/lib/utils";
 
 const FUENTE_ID = "casillas";
 const CAPA_PUNTO = "casillas-punto";
@@ -119,12 +121,30 @@ export function MapaCasillas({
       },
     });
 
+    // Los tres estados se separan por forma, no solo por tono de naranja: "vacía" no lleva
+    // relleno (un aro hueco, mismo lenguaje que la sección sin responsable), "parcial" es un
+    // punto lleno pero chico, "completa" es el punto lleno de tamaño pleno. Así se distinguen
+    // incluso a la distancia de un proyector, o para quien no distingue bien los tonos de naranja.
     mapa.addLayer({
       id: CAPA_PUNTO,
       type: "circle",
       source: FUENTE_ID,
       paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 4, 15, 7, 18, 9],
+        // El zoom manda el tamaño base y, en cada parada, "parcial" se pinta más chico: así el
+        // punto crece igual que los demás con el acercamiento, pero nunca se confunde con uno
+        // completo. Anidado así (match dentro de interpolate) es la forma soportada de combinar
+        // una expresión de zoom con una de dato; multiplicarlas por fuera no lo es.
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          11,
+          ["match", ["get", "avance"], 1, 2.5, 4],
+          15,
+          ["match", ["get", "avance"], 1, 4.3, 7],
+          18,
+          ["match", ["get", "avance"], 1, 5.6, 9],
+        ],
         "circle-color": [
           "match",
           ["get", "avance"],
@@ -136,10 +156,13 @@ export function MapaCasillas({
           escala[4],
           escala[0],
         ],
+        "circle-opacity": ["match", ["get", "avance"], 0, 0, 1],
         "circle-stroke-width": [
           "case",
           ["boolean", ["feature-state", "seleccionada"], false],
           2.5,
+          ["==", ["get", "avance"], 0],
+          2,
           1.25,
         ],
         "circle-stroke-color": [
@@ -148,6 +171,8 @@ export function MapaCasillas({
           colorSeleccion,
           colorTrazo,
         ],
+        "circle-radius-transition": { duration: durUi, delay: 0 },
+        "circle-opacity-transition": { duration: durUi, delay: 0 },
         "circle-color-transition": { duration: durUi, delay: 0 },
         "circle-stroke-width-transition": { duration: durUi, delay: 0 },
       },
@@ -274,5 +299,88 @@ export function MapaCasillas({
       role="application"
       aria-label="Mapa de casillas de Oaxaca de Juárez"
     />
+  );
+}
+
+/**
+ * Muestra de un estado en la leyenda, calcada de la forma real del punto en el mapa: un aro hueco
+ * para "vacía", un punto lleno pero chico para "parcial", un punto lleno de tamaño pleno para
+ * "completa". No son cuadros de color: si el punto comunica con forma, la leyenda tiene que
+ * comunicar con la misma forma.
+ */
+function MuestraCasilla({
+  tipo,
+  etiqueta,
+}: {
+  tipo: "vacia" | "parcial" | "completa";
+  etiqueta: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 text-xs text-tinta">
+      <span aria-hidden className="grid size-4 shrink-0 place-items-center">
+        {tipo === "vacia" && <span className="hueco-punteado size-4 rounded-full" />}
+        {tipo === "parcial" && <span className="size-2.5 rounded-full bg-mapa-2" />}
+        {tipo === "completa" && <span className="size-4 rounded-full bg-mapa-4" />}
+      </span>
+      {etiqueta}
+    </div>
+  );
+}
+
+/**
+ * Leyenda de esta pantalla, en la misma esquina, el mismo colapso en celular y el mismo tono que
+ * components/mapa/leyenda-mapa.tsx (esa pantalla es de otra ficha y no se toca; aquí se copia el
+ * patrón). Las tres entradas son los tres estados del punto: sin nadie, solo uno de los dos, o
+ * completo.
+ */
+export function LeyendaCasillas({
+  enMovimiento,
+  className,
+}: {
+  enMovimiento: boolean;
+  className?: string;
+}) {
+  const [abierta, setAbierta] = useState(false);
+  const idContenido = useId();
+
+  return (
+    <div
+      className={cn(
+        "vidrio-flotante transicion-ui absolute bottom-3 left-3 z-10 flex flex-col overflow-hidden md:bottom-4 md:left-4",
+        abierta ? "rounded-tarjeta" : "rounded-pildora",
+        "md:rounded-tarjeta",
+        enMovimiento && "vidrio-en-movimiento",
+        className,
+      )}
+    >
+      {/* Pastilla que abre y cierra la leyenda, solo en celular: en escritorio el contenido ya
+          se ve abierto y este botón no hace falta. */}
+      <button
+        type="button"
+        onClick={() => setAbierta((valor) => !valor)}
+        aria-expanded={abierta}
+        aria-controls={idContenido}
+        className="transicion-ui flex min-h-11 items-center gap-1.5 whitespace-nowrap px-3.5 text-sm font-medium text-tinta md:hidden"
+      >
+        Leyenda
+        <ChevronDown
+          aria-hidden
+          className={cn("transicion-ui size-3.5", abierta && "rotate-180")}
+        />
+      </button>
+
+      <div
+        id={idContenido}
+        className={cn(
+          "min-w-40 flex-col gap-1.5 px-3.5 pt-1 pb-3.5 md:min-w-48 md:pt-3.5",
+          abierta ? "flex" : "hidden md:flex",
+        )}
+      >
+        <p className="mb-0.5 text-sm font-semibold text-tinta">Avance por casilla</p>
+        <MuestraCasilla tipo="completa" etiqueta="Titular y suplente" />
+        <MuestraCasilla tipo="parcial" etiqueta="Solo uno de los dos" />
+        <MuestraCasilla tipo="vacia" etiqueta="Ninguno todavía" />
+      </div>
+    </div>
   );
 }

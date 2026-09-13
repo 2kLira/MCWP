@@ -339,3 +339,78 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     seguimiento o ya fue atendido; hoy esa gente desaparece de la pantalla en cuanto se le registra
     algo, que es lo que una bandeja de pendientes debe hacer, pero deja sin manera de revisar lo ya
     trabajado sin entrar persona por persona.
+
+## Rediseño de resumen, mapa y listado
+
+43. **El fondo pasó de neutro a marfil cálido, contra lo que dice el sistema de diseño.**
+    `spec/sistema-diseno.md` es explícito: "Nada de fondo crema". El rediseño encargado pide
+    justo lo contrario, un marfil casi blanco con carbón cálido, y esos son los valores que hoy
+    están en `app/globals.css`: `--fondo: #F7F5F2`, `--superficie: #FFFDFA`, `--tinta: #24211E`,
+    `--tinta-suave: #69615A`, bordes y separadores en marrón con alfa. El naranja **no** cambió:
+    sigue siendo Pantone 151 C `#FF8200`, porque es marca y el encargo permitía ajustar los
+    tokens para respetarla. Lo que sí bajó es el naranja tipográfico, de `#B35700` a `#A84400`,
+    que da 5.5 a 1 sobre el marfil en lugar de 4.9. **Falta confirmar con el socio** cuál de las
+    dos paletas se presenta; volver a la neutra es cambiar diez variables en un solo archivo.
+
+44. **Tres medidas del sistema se movieron.** Radios de 6/12/20 a 10/16/18, porque el encargo pide
+    10 a 12 en controles y 16 a 18 en paneles. Texto de apoyo de 13 a 14 píxeles, porque el
+    diagnóstico era que el texto secundario se leía demasiado tenue. Contenedor tope de 1280 a
+    1520, porque el encargo pide de 1440 a 1600; el listado de personas tiene su propio tope de
+    1180 (`--container-lista`). Nada de esto está en el spec y todo vive en `app/globals.css`.
+
+45. **El anillo de foco ya no usa `--naranja`.** El spec pide foco en `#FF8200`, que contra el
+    marfil da 2.3 a 1 y no alcanza el mínimo de 3 a 1 que se le exige a un indicador de foco. Se
+    cambió a `--naranja-tipografico` (`#A84400` en claro, `#FF9B33` en oscuro). Es una corrección
+    de accesibilidad, no una preferencia.
+
+46. **El vidrio se redujo a dos superficies y el desenfoque es opcional.** El spec permitía vidrio
+    en la ficha de sección, la barra del mapa y el selector de capas. Hoy el desenfoque, de 8
+    píxeles y no de 20, solo se enciende en `.barra-superior` y `.vidrio-flotante`, únicamente
+    desde 768 píxeles de ancho, dentro de un `@supports`, y se apaga entero con
+    `prefers-reduced-transparency`. Todo lo demás quedó como superficie casi opaca (`.panel`,
+    `.vidrio`). El selector de capas dejó de ser vidrio porque dejó de flotar: ahora vive en el
+    borde superior del panel del mapa.
+
+47. **Se retiró la lámina territorial del sustrato.** `components/sustrato/lamina-territorial.tsx`
+    pintaba las 157 secciones en un canvas a pantalla completa detrás de toda la aplicación, y
+    `--bloom-naranja` las envolvía en una neblina. El encargo prohíbe texturas de fondo y pide
+    consumo bajo, así que el componente se borró junto con las utilidades `lamina` y `bruma`. En
+    su lugar quedó `.lavado`: un degradado estático, muy tenue y localizado en los primeros 22rem
+    del contenido. **Si el socio extraña el atlas de fondo**, el archivo se recupera del historial
+    de git; era el argumento que justificaba el vidrio en pantallas sin mapa, y ese argumento ya
+    no aplica porque el vidrio se limitó a barra y mapa.
+
+48. **`components/tablero/indicador.tsx` se borró.** Era la tarjeta de vidrio con cuenta
+    ascendente de "Promovidos" y "Quieren ser representantes". El diagnóstico del rediseño era que
+    esas dos tarjetas parecían botones, y la instrucción es no convertir cada métrica en una
+    tarjeta independiente: las cinco cifras secundarias ahora son una cuadrícula dentro de la
+    misma superficie. Con eso también se fue la animación de conteo y el escalonado de entrada,
+    que el encargo prohíbe explícitamente.
+
+49. **El armazón dejó de ser flotante.** El riel de navegación ocupa 76 píxeles reales de ancho
+    (`--ancho-riel`) y la barra superior 56 en celular y 64 en escritorio (`--alto-barra`), en
+    lugar de flotar en posición fija encima del contenido. Las dos pantallas que se montan a
+    pantalla completa, `/mapa` y `/casillas`, se descuelgan de esas dos variables. Por eso
+    desaparecieron las props `cromoDesplazado` y `sangradoIzquierdo` de `MapaPagina`; en
+    `CasillasPagina` siguen declaradas pero ya nadie se las pasa, y **conviene borrarlas** la
+    próxima vez que se toque esa pantalla.
+
+50. **El riel de escritorio no mostraba Casillas ni Carga masiva.** Los dos destinos estaban en
+    `DESTINOS` pero fuera de la constante `GRUPOS` de `components/navegacion/dock.tsx`, así que en
+    escritorio solo se llegaba a ellos escribiendo la ruta; en celular sí aparecían, dentro de
+    Más. Se agregaron al último grupo del riel. Es un arreglo, no una decisión de diseño, pero
+    cambia lo que el socio va a ver en la barra, así que queda anotado.
+
+51. **Actividades y Agenda ya no comparten icono.** Las dos usaban `CalendarDays` y en un riel de
+    solo iconos eran indistinguibles. Actividades pasó a `ClipboardList`; Agenda se quedó con el
+    calendario. Las rutas y los permisos no cambiaron.
+
+52. **La nota de las secciones sin polígono se reescribió.** Decía "N sin polígono publicado:
+    cuentan aquí, no se pintan en el mapa". Ahora dice que esas secciones están incluidas en el
+    total y todavía no tienen límites disponibles en el mapa. Es la misma limitación y el mismo
+    conteo, dicho sin jerga cartográfica; no se ocultó ni se cambió qué registros entran.
+
+53. **El selector de capas dejó de anunciarse como pestañas.** Tenía `role="tablist"` y
+    `role="tab"` sin ningún `tabpanel` y sin navegación con flechas, que es lo que un lector de
+    pantalla espera de un tablist. Ahora es un `role="group"` de botones con `aria-pressed`. La
+    selección no depende solo del color: la dicen `aria-pressed` y el peso 600.

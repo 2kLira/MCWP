@@ -22,10 +22,11 @@ type Resultado =
  */
 export function Buscador({
   className,
-  conVidrio = false,
+  compacto = false,
 }: {
   className?: string;
-  conVidrio?: boolean;
+  /** Dentro de la barra superior el campo baja a la altura de toque mínima, 44. */
+  compacto?: boolean;
 }) {
   const router = useRouter();
   const { actuante } = useActuante();
@@ -133,18 +134,20 @@ export function Buscador({
         onFocus={() => resultados.length > 0 && setAbierto(true)}
         placeholder="Buscar sección, colonia o persona"
         aria-label="Buscador general"
-        className={cn("campo pl-9", conVidrio && "vidrio filo border-transparent")}
-        style={{ minHeight: 44 }}
+        className={cn(
+          "campo transicion-ui pl-9 transition-colors placeholder:text-tinta-tenue",
+          compacto && "min-h-11 bg-superficie-hundida hover:bg-superficie",
+        )}
       />
 
       {abierto && resultados.length > 0 && (
-        <ul className="vidrio filo absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-tarjeta py-1">
+        <ul className="panel absolute left-0 right-0 z-50 mt-2 overflow-hidden py-1 elevacion-flotante">
           {resultados.map((r) => (
             <li key={`${r.tipo}-${"id" in r ? r.id : r.clave}`}>
               <button
                 type="button"
                 onClick={() => abrir(r)}
-                className="transicion-ui flex w-full items-baseline gap-2 px-3 py-2 text-left transition-colors hover:bg-superficie-hundida"
+                className="transicion-ui flex w-full items-baseline gap-3 px-3 py-2 text-left transition-colors hover:bg-naranja-suave"
               >
                 <span className="truncate text-sm text-tinta">
                   {r.tipo === "seccion" ? (
@@ -153,7 +156,7 @@ export function Buscador({
                     r.nombre
                   )}
                 </span>
-                <span className="ml-auto shrink-0 text-xs text-tinta-tenue">
+                <span className="ml-auto shrink-0 text-xs text-tinta-suave">
                   {r.tipo === "demarcacion" ? "Demarcación" : r.apoyo}
                 </span>
               </button>

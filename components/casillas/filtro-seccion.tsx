@@ -22,7 +22,7 @@ export function FiltroSeccion({
   return (
     <div
       className={cn(
-        "vidrio elevacion-flotante transicion-ui flex min-h-11 items-center gap-2 rounded-tarjeta pl-3.5 pr-1.5",
+        "vidrio-flotante transicion-ui flex min-h-11 items-center gap-2 rounded-tarjeta pl-3.5 pr-1.5",
         enMovimiento && "vidrio-en-movimiento",
         className,
       )}
