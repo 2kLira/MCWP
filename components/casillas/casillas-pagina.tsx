@@ -157,7 +157,7 @@ export function CasillasPagina({
               className="pointer-events-auto"
             />
             {sinResultadosDeFiltro && (
-              <p className="vidrio-flotante rounded-pildora px-3 py-1.5 text-sm text-tinta-suave">
+              <p className="vidrio elevacion-flotante rounded-pildora px-3 py-1.5 text-xs text-tinta-suave">
                 Ninguna casilla coincide con esa sección.
               </p>
             )}

@@ -25,7 +25,7 @@ export function BarraInferior() {
       aria-label="Navegación principal"
       className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 md:hidden"
     >
-      <ul className="dock grid grid-cols-5 items-center gap-1 rounded-hoja p-1.5">
+      <ul className="dock grid grid-cols-5 items-center rounded-hoja p-1.5">
         {destinos.map(({ href, etiqueta, icono: Icono }) => {
           const activo = estaActivo(href, ruta);
           const esRegistrar = href === "/registrar";
@@ -37,7 +37,7 @@ export function BarraInferior() {
                   href={href}
                   data-destino
                   aria-current={activo ? "page" : undefined}
-                  className="transicion-ui flex h-12 w-full flex-col items-center justify-center gap-1 rounded-control bg-naranja text-tinta transition-colors hover:bg-naranja-fuerte"
+                  className="transicion-ui flex h-12 w-full flex-col items-center justify-center gap-1 rounded-control bg-naranja text-tinta transition-transform active:scale-[0.97]"
                 >
                   <Icono className="size-5" aria-hidden />
                   <span className="text-[0.625rem] font-medium leading-none">{etiqueta}</span>
@@ -53,16 +53,18 @@ export function BarraInferior() {
                 data-destino
                 aria-current={activo ? "page" : undefined}
                 className={cn(
-                  "transicion-ui flex min-h-12 flex-col items-center justify-center gap-1 rounded-control px-1 transition-colors",
-                  activo
-                    ? "bg-naranja-suave text-naranja-texto"
-                    : "text-tinta-suave",
+                  "transicion-ui relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-control px-1 transition-colors",
+                  activo ? "text-tinta" : "text-tinta-suave",
                 )}
               >
+                {activo && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 -z-10 rounded-control bg-[oklch(0.78_0.16_55_/_0.16)]"
+                  />
+                )}
                 <Icono className="size-5" aria-hidden />
-                <span className={cn("text-[0.6875rem] leading-none", activo && "font-semibold")}>
-                  {etiqueta}
-                </span>
+                <span className="text-[0.625rem] leading-none">{etiqueta}</span>
               </Link>
             </li>
           );

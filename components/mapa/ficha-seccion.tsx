@@ -111,9 +111,9 @@ export function FichaSeccion({
       aria-label={`Sección ${propiedades.clave}`}
       style={{ transformOrigin: `${origenLocal.x}px ${origenLocal.y}px` }}
       className={cn(
-        "vidrio-flotante transicion-panel fixed z-30 flex flex-col overflow-hidden",
+        "vidrio elevacion-flotante transicion-panel fixed z-30 flex flex-col overflow-hidden",
         "inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] max-h-[62vh] rounded-t-hoja",
-        "md:inset-x-auto md:right-6 md:top-[calc(var(--alto-barra)+2rem)] md:bottom-6 md:max-h-none md:w-[400px] md:rounded-tarjeta",
+        "md:inset-x-auto md:right-6 md:top-24 md:bottom-6 md:max-h-none md:w-[400px] md:rounded-tarjeta",
         enMovimiento && "vidrio-en-movimiento",
         visible ? "scale-100 opacity-100" : "scale-[0.35] opacity-0",
       )}
@@ -193,12 +193,12 @@ export function FichaSeccion({
             </dl>
           </>
         ) : (
-          <p className="pt-4 text-sm text-tinta-suave">
+          <p className="pt-4 text-xs text-tinta-tenue">
             Todavía no hay datos capturados para esta sección.
           </p>
         )}
 
-        {propiedades.nota && <p className="mt-4 text-xs text-tinta-suave">{propiedades.nota}</p>}
+        {propiedades.nota && <p className="mt-4 text-xs text-tinta-tenue">{propiedades.nota}</p>}
       </div>
     </div>
   );

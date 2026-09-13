@@ -22,11 +22,10 @@ type Resultado =
  */
 export function Buscador({
   className,
-  compacto = false,
+  comoCapsula = false,
 }: {
   className?: string;
-  /** Dentro de la barra superior el campo baja a la altura de toque mínima, 44. */
-  compacto?: boolean;
+  comoCapsula?: boolean;
 }) {
   const router = useRouter();
   const { actuante } = useActuante();
@@ -125,7 +124,10 @@ export function Buscador({
   return (
     <div ref={contenedor} className={cn("relative", className)}>
       <Search
-        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tinta-tenue"
+        className={cn(
+          "pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tinta-tenue",
+          comoCapsula && "left-4",
+        )}
         aria-hidden
       />
       <input
@@ -135,19 +137,22 @@ export function Buscador({
         placeholder="Buscar sección, colonia o persona"
         aria-label="Buscador general"
         className={cn(
-          "campo transicion-ui pl-9 transition-colors placeholder:text-tinta-tenue",
-          compacto && "min-h-11 bg-superficie-hundida hover:bg-superficie",
+          "campo",
+          comoCapsula
+            ? "capsula filo rounded-pildora border-transparent pl-11 placeholder:text-tinta-tenue"
+            : "pl-9",
         )}
+        style={{ minHeight: 44 }}
       />
 
       {abierto && resultados.length > 0 && (
-        <ul className="panel absolute left-0 right-0 z-50 mt-2 overflow-hidden py-1 elevacion-flotante">
+        <ul className="vidrio filo absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-tarjeta py-1">
           {resultados.map((r) => (
             <li key={`${r.tipo}-${"id" in r ? r.id : r.clave}`}>
               <button
                 type="button"
                 onClick={() => abrir(r)}
-                className="transicion-ui flex w-full items-baseline gap-3 px-3 py-2 text-left transition-colors hover:bg-naranja-suave"
+                className="transicion-ui flex w-full items-baseline gap-2 px-3 py-2 text-left transition-colors hover:bg-naranja-suave"
               >
                 <span className="truncate text-sm text-tinta">
                   {r.tipo === "seccion" ? (

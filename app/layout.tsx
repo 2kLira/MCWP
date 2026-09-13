@@ -6,6 +6,7 @@ import { BarraInferior } from "@/components/navegacion/barra-inferior";
 import { BarraSuperior } from "@/components/navegacion/barra-superior";
 import { Dock } from "@/components/navegacion/dock";
 import { ProveedorActuante } from "@/components/proveedor-actuante";
+import { LaminaTerritorial } from "@/components/sustrato/lamina-territorial";
 
 /**
  * Una sola familia. Se eligió por linaje institucional, por su tratamiento de acentos y eñes y
@@ -26,8 +27,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f5f2" },
-    { media: "(prefers-color-scheme: dark)", color: "#141210" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f7f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#121110" },
   ],
 };
 
@@ -36,24 +37,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="es" className={`${plex.variable} h-full`}>
       <body className="min-h-full bg-fondo text-tinta">
         <ProveedorActuante>
-          {/* El armazón se construye con flujo normal: el riel ocupa ancho real y la barra
-              superior ocupa alto real. Nada del layout principal vive en posición absoluta. */}
-          <div className="flex min-h-dvh">
-            <Dock />
+          {/* El territorio es el sustrato de toda la aplicación: por eso el vidrio de las
+              tarjetas tiene algo real detrás y cambia con el rol activo. */}
+          <LaminaTerritorial />
 
-            <div className="flex min-w-0 flex-1 flex-col">
-              <BarraSuperior />
+          <Dock />
 
-              <main className="relative flex-1 pb-28 md:pb-12">
-                {/* Lavado estático, tenue y localizado en el encabezado. */}
-                <span className="lavado" aria-hidden />
-
-                <div className="relative mx-auto w-full max-w-tope px-4 pt-4 md:px-8 md:pt-6">
-                  <AvisoConfiguracion />
-                  {children}
-                </div>
-              </main>
-            </div>
+          <div className="relative z-10 flex min-h-dvh flex-col">
+            <BarraSuperior />
+            {/* Espacio a la izquierda para el dock flotante y abajo para la píldora de celular. */}
+            <main className="mx-auto w-full max-w-tope flex-1 px-4 pb-28 pt-4 md:pl-24 md:pr-6 md:pb-10 md:pt-5">
+              <AvisoConfiguracion />
+              {children}
+            </main>
           </div>
 
           <BarraInferior />

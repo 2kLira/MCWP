@@ -10,9 +10,11 @@ import type {
 } from "maplibre-gl";
 import { useActuante } from "@/components/proveedor-actuante";
 import { MUNICIPIO } from "@/lib/demarcaciones";
+import { avanceDeCasilla, type CasillaConRepresentantes } from "@/lib/datos/casillas";
 import { bboxDeRasgo, rasgoPorClave, type ColeccionSecciones, type RasgoSeccion } from "@/lib/territorio";
 import {
   calcularPasosDeVista,
+  esVistaDeCasillas,
   grupoDePrioritarias,
   type DatosMapa,
   type VistaMapa,
@@ -52,6 +54,43 @@ const PROP_SIN_DATO = "sinDato";
 const CAPA_PRIORITARIA_PENDIENTE = "secciones-prioritaria-pendiente";
 const PROP_GRUPO_PRIORIDAD = "grupoPrioridad";
 const PROP_PRIORITARIA_RECORRIDA = "prioritariaRecorrida";
+
+// Fuente y capas de los puntos de casilla de la vista "casillas". Nombre distinto al de la fuente
+// homónima de components/casillas/mapa-casillas.tsx: ese lienzo vive en su propia instancia de
+// MapLibre, sin relación con esta, pero el prefijo deja claro que esta es la variante embebida en
+// el mapa principal.
+const FUENTE_CASILLAS_ID = "casillas-en-mapa-principal";
+const CAPA_CASILLA_TRAZO = "casillas-en-mapa-principal-trazo";
+const CAPA_CASILLA_PUNTO = "casillas-en-mapa-principal-punto";
+
+/** "vacia" -> 0, "parcial" -> 1, "completa" -> 2, igual que en mapa-casillas.tsx: nada más para
+ *  poder usar un match de MapLibre (line-dasharray y compañía no aceptan strings de dato). */
+const NUMERO_DE_AVANCE_CASILLA = { vacia: 0, parcial: 1, completa: 2 } as const;
+
+type RasgoCasillaLienzo = {
+  type: "Feature";
+  geometry: { type: "Point"; coordinates: [number, number] };
+  properties: { id: number; avance: 0 | 1 | 2 };
+};
+
+/**
+ * El mismo GeoJSON de puntos que arma components/casillas/mapa-casillas.tsx, con la misma forma.
+ * No se reutiliza esa función porque no se exporta y ese archivo no se toca; se copia tal cual.
+ */
+function coleccionDeCasillas(
+  casillas: readonly CasillaConRepresentantes[] | null,
+): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: (casillas ?? []).map(
+      (casilla): RasgoCasillaLienzo => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [casilla.lng, casilla.lat] },
+        properties: { id: casilla.id, avance: NUMERO_DE_AVANCE_CASILLA[avanceDeCasilla(casilla)] },
+      }),
+    ),
+  } as unknown as GeoJSON.FeatureCollection;
+}
 
 function idCapaRelleno(grupo: number): string {
   return `secciones-relleno-${grupo}`;
@@ -133,10 +172,11 @@ function filtroPrioritariaPendiente(grupo: "A" | "B" | null): FilterSpecificatio
 /**
  * Expresión de fill-opacity de secciones: hueca si no tiene responsable (vista de estructura) o si
  * es una prioritaria del grupo activo que todavía no se recorre (vistas de prioritarias, feature-
- * state "prioritariaPendiente"); atenuada si no es del grupo de la vista de prioritarias activa
- * (para que se vea el territorio pero no compita con lo que importa); y, aparte de las tres,
- * rebajada otra vez si además está fuera del alcance del actuante. Las secciones sin `dato` (fuera
- * del catálogo) no llegan aquí: las capas de relleno y borde las excluyen por filtro, ver
+ * state "prioritariaPendiente"); atenuada si no es del grupo de la vista de prioritarias activa, o
+ * si la vista activa es la de casillas —ahí todas quedan atenuadas parejo, sin excepción, para que
+ * el territorio siga visible sin competir con los puntos (ver esVistaDeCasillas)—; y, aparte de las
+ * tres, rebajada otra vez si además está fuera del alcance del actuante. Las secciones sin `dato`
+ * (fuera del catálogo) no llegan aquí: las capas de relleno y borde las excluyen por filtro, ver
  * PROP_SIN_DATO.
  */
 function opacidadRellenoSeccion(): DataDrivenPropertyValueSpecification<number> {
@@ -144,16 +184,19 @@ function opacidadRellenoSeccion(): DataDrivenPropertyValueSpecification<number> 
     "case",
     ["boolean", ["feature-state", "hueco"], false],
     0.05,
+    // Prioritaria del grupo activo, sin recorrer: relleno tenue y borde punteado. Tiene que
+    // pesar MÁS que una sección que no es de este grupo, o el mapa de A acaba destacando las de B.
     ["boolean", ["feature-state", "prioritariaPendiente"], false],
-    0.05,
+    0.14,
     [
       "all",
       ["boolean", ["feature-state", "atenuada"], false],
       ["==", ["coalesce", ["feature-state", "enAlcance"], true], false],
     ],
-    0.12,
+    0.03,
+    // No es del grupo de esta vista: se ve el territorio y nada más. Muy por debajo de lo anterior.
     ["boolean", ["feature-state", "atenuada"], false],
-    0.18,
+    0.06,
     ["==", ["coalesce", ["feature-state", "enAlcance"], true], false],
     0.32,
     0.86,
@@ -173,6 +216,11 @@ export type MapaLienzoProps = {
   claveSeleccionada: string | null;
   onClicSeccion: (rasgo: RasgoSeccion, puntoPantalla: { x: number; y: number }) => void;
   onMovimiento: (moviendo: boolean) => void;
+  /** Las casillas del territorio del actuante, o null mientras no se han pedido todavía: la vista
+   *  de casillas las carga perezosa (lib/datos/casillas.ts), no al arrancar el mapa. */
+  casillas: readonly CasillaConRepresentantes[] | null;
+  casillaSeleccionadaId: number | null;
+  onClicCasilla: (id: number, puntoPantalla: { x: number; y: number }) => void;
 };
 
 /**
@@ -187,6 +235,9 @@ export function MapaLienzo({
   claveSeleccionada,
   onClicSeccion,
   onMovimiento,
+  casillas,
+  casillaSeleccionadaId,
+  onClicCasilla,
 }: MapaLienzoProps) {
   const { actuante } = useActuante();
   const contenedorRef = useRef<HTMLDivElement>(null);
@@ -199,6 +250,9 @@ export function MapaLienzo({
   const coleccionRef = useRef(coleccion);
   const onClicSeccionRef = useRef(onClicSeccion);
   const onMovimientoRef = useRef(onMovimiento);
+  const casillasRef = useRef(casillas);
+  const casillaSeleccionadaIdRef = useRef(casillaSeleccionadaId);
+  const onClicCasillaRef = useRef(onClicCasilla);
 
   // Los espejos se actualizan después de pintar, no durante el render.
   useEffect(() => {
@@ -206,8 +260,12 @@ export function MapaLienzo({
     coleccionRef.current = coleccion;
     onClicSeccionRef.current = onClicSeccion;
     onMovimientoRef.current = onMovimiento;
+    casillasRef.current = casillas;
+    casillaSeleccionadaIdRef.current = casillaSeleccionadaId;
+    onClicCasillaRef.current = onClicCasilla;
   });
   const claveResaltadaRef = useRef<string | null>(null);
+  const casillaResaltadaRef = useRef<number | null>(null);
 
   /** Aplica valor de vista, alcance territorial, hueco y selección a todas las secciones. */
   function aplicarEstadoCompleto(mapa: MapaLibreMap) {
@@ -221,6 +279,7 @@ export function MapaLienzo({
     const pasos = calcularPasosDeVista(vistaActual, datosActuales);
     const esEstructura = vistaActual === "estructura";
     const grupoPrioritario = grupoDePrioritarias(vistaActual);
+    const esCasillas = esVistaDeCasillas(vistaActual);
     for (const rasgo of coleccionRef.current.features) {
       const clave = rasgo.properties.clave;
       const dato = datosActuales.porClave.get(clave);
@@ -231,13 +290,25 @@ export function MapaLienzo({
           enAlcance: alcance.get(clave) ?? true,
           seleccionada: clave === claveActual,
           hueco: esEstructura && dato != null && !dato.tieneResponsable,
-          atenuada: grupoPrioritario != null && dato?.prioridad !== grupoPrioritario,
+          atenuada: esCasillas || (grupoPrioritario != null && dato?.prioridad !== grupoPrioritario),
           prioritariaPendiente:
             grupoPrioritario != null && dato != null && dato.prioridad === grupoPrioritario && !dato.recorrida,
         },
       );
     }
     claveResaltadaRef.current = claveActual;
+  }
+
+  /** Resalta el punto de casilla elegido, igual que aplicarSeleccion en mapa-casillas.tsx. */
+  function aplicarSeleccionCasilla(mapa: MapaLibreMap, id: number | null) {
+    const anterior = casillaResaltadaRef.current;
+    if (anterior != null && anterior !== id) {
+      mapa.setFeatureState({ source: FUENTE_CASILLAS_ID, id: anterior }, { seleccionada: false });
+    }
+    if (id != null) {
+      mapa.setFeatureState({ source: FUENTE_CASILLAS_ID, id }, { seleccionada: true });
+    }
+    casillaResaltadaRef.current = id;
   }
 
   /** Agrega la fuente y las capas de secciones sobre un estilo recién cargado. Idempotente. */
@@ -257,6 +328,10 @@ export function MapaLienzo({
     const colorBorde = leerColor("--borde", "#e4e3e1");
     const colorBordeSeleccion = leerColor("--tinta", "#1c1b19");
     const colorHueco = leerColor("--tinta-tenue", "#94918c");
+    // El punteado de una prioritaria por recorrer va en el naranja tipográfico, no en el gris de
+    // "sin responsable": pertenece a la misma historia que lo ya recorrido, y así el mapa cuenta
+    // una sola cosa. El gris se queda para la vista de estructura, que sí habla de otra cosa.
+    const colorPrioritariaPendiente = leerColor("--naranja-tipografico", "#b35700");
     const durPanel = menosMovimiento ? 0 : leerDuracionMs("--dur-panel", 240);
     const durUi = menosMovimiento ? 0 : leerDuracionMs("--dur-ui", 160);
     const ventanaRetrasoMs = menosMovimiento ? 0 : 300;
@@ -357,11 +432,92 @@ export function MapaLienzo({
       filter: filtroPrioritariaPendiente(grupoInicial),
       layout: { visibility: "none" },
       paint: {
-        "line-color": colorHueco,
-        "line-width": 1.5,
+        "line-color": colorPrioritariaPendiente,
+        "line-width": 2,
         "line-dasharray": [2, 2],
       },
     });
+
+    // Fuente y capas de los puntos de casilla. No se reutiliza components/casillas/mapa-casillas.tsx:
+    // ese componente monta su propia instancia de MapLibre en su propio contenedor, y aquí hace
+    // falta un único mapa que alterne entre polígonos de sección y puntos de casilla según la
+    // vista activa. Sincronizar cámara y ciclo de vida entre dos mapas independientes es más
+    // frágil que copiar sus expresiones de capa, así que se copian tal cual (mismos radios, mismos
+    // colores, mismas transiciones). `colorHueco` y `colorBordeSeleccion` son los mismos tokens
+    // ("--tinta-tenue" y "--tinta") que usa ese componente para su trazo y su selección.
+    mapa.addSource(FUENTE_CASILLAS_ID, {
+      type: "geojson",
+      data: coleccionDeCasillas(casillasRef.current),
+      promoteId: "id",
+    });
+
+    // Halo de selección, debajo del punto: igual que CAPA_TRAZO en mapa-casillas.tsx.
+    mapa.addLayer({
+      id: CAPA_CASILLA_TRAZO,
+      type: "circle",
+      source: FUENTE_CASILLAS_ID,
+      layout: { visibility: "none" },
+      paint: {
+        "circle-radius": ["case", ["boolean", ["feature-state", "seleccionada"], false], 11, 0],
+        "circle-color": colorBordeSeleccion,
+        "circle-opacity": 0.18,
+        "circle-radius-transition": { duration: durUi, delay: 0 },
+      },
+    });
+
+    // El punto de casilla: aro hueco si no tiene a nadie, lleno chico si tiene solo titular o
+    // suplente, lleno pleno si tiene los dos. Misma expresión que CAPA_PUNTO en mapa-casillas.tsx.
+    mapa.addLayer({
+      id: CAPA_CASILLA_PUNTO,
+      type: "circle",
+      source: FUENTE_CASILLAS_ID,
+      layout: { visibility: "none" },
+      paint: {
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          11,
+          ["match", ["get", "avance"], 1, 2.5, 4],
+          15,
+          ["match", ["get", "avance"], 1, 4.3, 7],
+          18,
+          ["match", ["get", "avance"], 1, 5.6, 9],
+        ],
+        "circle-color": [
+          "match",
+          ["get", "avance"],
+          0,
+          escala[0],
+          1,
+          escala[2],
+          2,
+          escala[4],
+          escala[0],
+        ],
+        "circle-opacity": ["match", ["get", "avance"], 0, 0, 1],
+        "circle-stroke-width": [
+          "case",
+          ["boolean", ["feature-state", "seleccionada"], false],
+          2.5,
+          ["==", ["get", "avance"], 0],
+          2,
+          1.25,
+        ],
+        "circle-stroke-color": [
+          "case",
+          ["boolean", ["feature-state", "seleccionada"], false],
+          colorBordeSeleccion,
+          colorHueco,
+        ],
+        "circle-radius-transition": { duration: durUi, delay: 0 },
+        "circle-opacity-transition": { duration: durUi, delay: 0 },
+        "circle-color-transition": { duration: durUi, delay: 0 },
+        "circle-stroke-width-transition": { duration: durUi, delay: 0 },
+      },
+    });
+
+    aplicarSeleccionCasilla(mapa, casillaSeleccionadaIdRef.current);
 
     aplicarEstadoCompleto(mapa);
     mapa.setLayoutProperty(
@@ -374,6 +530,9 @@ export function MapaLienzo({
       "visibility",
       grupoInicial ? "visible" : "none",
     );
+    const esCasillasInicial = esVistaDeCasillas(estadoRef.current.vista);
+    mapa.setLayoutProperty(CAPA_CASILLA_TRAZO, "visibility", esCasillasInicial ? "visible" : "none");
+    mapa.setLayoutProperty(CAPA_CASILLA_PUNTO, "visibility", esCasillasInicial ? "visible" : "none");
   }
 
   // ---------------------------------------------------------------------------
@@ -389,7 +548,7 @@ export function MapaLienzo({
 
     (async () => {
       // maplibre-gl se importa por nombre; el paquete no trae `export default`.
-      const { Map: ClaseMapaLibre } = await import("maplibre-gl");
+      const { Map: ClaseMapaLibre, NavigationControl } = await import("maplibre-gl");
       if (!activo) return;
 
       const limite = bboxConMargen(MUNICIPIO.bbox);
@@ -410,18 +569,26 @@ export function MapaLienzo({
       mapaCreado = mapa;
       mapaRef.current = mapa;
 
+      // Botones de zoom, sin brújula: el aspecto de vidrio lo pone globals.css sobre
+      // .maplibregl-ctrl-group. La atribución (compact, ver arriba) se queda en la misma esquina.
+      mapa.addControl(new NavigationControl({ showCompass: false, showZoom: true }), "bottom-right");
+
       mapa.on("style.load", () => {
         construirCapas(mapa);
       });
 
       const capasSeccion = idsCapasRelleno();
+      // En la vista de casillas las secciones quedan de fondo, atenuadas: no responden al clic ni
+      // cambian el cursor, para que lo único "tocable" del mapa sean los puntos de casilla.
       mapa.on("mouseenter", capasSeccion, () => {
+        if (esVistaDeCasillas(estadoRef.current.vista)) return;
         mapa.getCanvas().style.cursor = "pointer";
       });
       mapa.on("mouseleave", capasSeccion, () => {
         mapa.getCanvas().style.cursor = "";
       });
       mapa.on("click", capasSeccion, (evento) => {
+        if (esVistaDeCasillas(estadoRef.current.vista)) return;
         const clave = evento.features?.[0]?.properties?.clave as string | undefined;
         if (!clave) return;
         const rasgo = rasgoPorClave(clave, coleccionRef.current);
@@ -430,6 +597,25 @@ export function MapaLienzo({
         // que la ficha (position: fixed) pueda crecer exactamente desde ahí.
         const caja = mapa.getContainer().getBoundingClientRect();
         onClicSeccionRef.current(rasgo, {
+          x: caja.left + evento.point.x,
+          y: caja.top + evento.point.y,
+        });
+      });
+
+      // Los puntos de casilla: mismo patrón que mapa-casillas.tsx. Como sus capas solo son
+      // visibles en la vista de casillas (ver construirCapas y el efecto de vista más abajo), no
+      // hace falta repetir aquí la comprobación de vista: una capa oculta no dispara eventos.
+      mapa.on("mouseenter", [CAPA_CASILLA_PUNTO], () => {
+        mapa.getCanvas().style.cursor = "pointer";
+      });
+      mapa.on("mouseleave", [CAPA_CASILLA_PUNTO], () => {
+        mapa.getCanvas().style.cursor = "";
+      });
+      mapa.on("click", [CAPA_CASILLA_PUNTO], (evento) => {
+        const id = evento.features?.[0]?.properties?.id as number | undefined;
+        if (id == null) return;
+        const caja = mapa.getContainer().getBoundingClientRect();
+        onClicCasillaRef.current(id, {
           x: caja.left + evento.point.x,
           y: caja.top + evento.point.y,
         });
@@ -490,12 +676,14 @@ export function MapaLienzo({
   // Vista activa: MapLibre interpola el color con la transición nativa de la capa, no salta. Las
   // capas punteadas de "sin responsable" y de prioritaria pendiente solo se muestran en su vista
   // correspondiente; la segunda además cambia de filtro porque el grupo A o B depende de la vista.
+  // La vista de casillas apaga esas dos y prende la suya: sus puntos, no los polígonos de sección.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const mapa = mapaRef.current;
     if (!mapa || !mapa.getSource(FUENTE_ID)) return;
     const esEstructura = vista === "estructura";
     const grupoPrioritario = grupoDePrioritarias(vista);
+    const esCasillas = esVistaDeCasillas(vista);
 
     const pasos = calcularPasosDeVista(vista, datos);
     for (const rasgo of coleccion.features) {
@@ -506,7 +694,7 @@ export function MapaLienzo({
         {
           valor: pasos.get(clave) ?? 0,
           hueco: esEstructura && dato != null && !dato.tieneResponsable,
-          atenuada: grupoPrioritario != null && dato?.prioridad !== grupoPrioritario,
+          atenuada: esCasillas || (grupoPrioritario != null && dato?.prioridad !== grupoPrioritario),
           prioritariaPendiente:
             grupoPrioritario != null && dato != null && dato.prioridad === grupoPrioritario && !dato.recorrida,
         },
@@ -528,6 +716,13 @@ export function MapaLienzo({
         "visibility",
         esEstructura ? "visible" : "none",
       );
+    }
+
+    if (mapa.getLayer(CAPA_CASILLA_PUNTO)) {
+      mapa.setLayoutProperty(CAPA_CASILLA_PUNTO, "visibility", esCasillas ? "visible" : "none");
+    }
+    if (mapa.getLayer(CAPA_CASILLA_TRAZO)) {
+      mapa.setLayoutProperty(CAPA_CASILLA_TRAZO, "visibility", esCasillas ? "visible" : "none");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vista]);
@@ -583,6 +778,31 @@ export function MapaLienzo({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claveSeleccionada]);
 
+  // ---------------------------------------------------------------------------
+  // Casillas: se refresca la fuente completa cuando cambia la lista (primera carga perezosa al
+  // entrar a la vista, cambio de actuante, o avance nuevo tras guardar un representante). Mismo
+  // patrón que el efecto de "Datos reales" de arriba, pero sobre la fuente de puntos.
+  // ---------------------------------------------------------------------------
+  const casillasAnterioresRef = useRef(casillas);
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    const fuente = mapa?.getSource(FUENTE_CASILLAS_ID);
+    if (!mapa || !fuente || casillasAnterioresRef.current === casillas) return;
+    casillasAnterioresRef.current = casillas;
+    (fuente as GeoJSONSource).setData(coleccionDeCasillas(casillas));
+  }, [casillas]);
+
+  // ---------------------------------------------------------------------------
+  // Casilla elegida: resalta su punto. A diferencia de una sección, no mueve la cámara (tampoco lo
+  // hacía mapa-casillas.tsx al seleccionar: ahí la cámara solo se movía con el filtro de sección).
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapa.getSource(FUENTE_CASILLAS_ID)) return;
+    aplicarSeleccionCasilla(mapa, casillaSeleccionadaId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [casillaSeleccionadaId]);
+
   return (
     <div
       ref={contenedorRef}
@@ -590,7 +810,11 @@ export function MapaLienzo({
       // absolute de Tailwind, así que el contenedor toma su tamaño del padre en vez de inset-0.
       className="size-full"
       role="application"
-      aria-label="Mapa de secciones electorales de Oaxaca de Juárez"
+      aria-label={
+        esVistaDeCasillas(vista)
+          ? "Mapa de casillas de Oaxaca de Juárez"
+          : "Mapa de secciones electorales de Oaxaca de Juárez"
+      }
     />
   );
 }

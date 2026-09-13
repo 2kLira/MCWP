@@ -113,7 +113,7 @@ export default function Personas() {
   const virtual = useVirtualizer({
     count: filas.length,
     getScrollElement: () => contenedor.current,
-    estimateSize: () => 76,
+    estimateSize: () => 68,
     overscan: 8,
   });
 
@@ -138,11 +138,11 @@ export default function Personas() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-11.5rem)] max-w-lista flex-col gap-4 md:h-[calc(100dvh-8.5rem)]">
+    <div className="flex h-[calc(100dvh-8rem)] flex-col gap-4 md:h-[calc(100dvh-9rem)]">
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-xl text-tinta">Personas alcanzadas</h1>
-          <p className="cifras mt-1 text-sm text-tinta-suave">
+          <h1 className="text-xl">Personas alcanzadas</h1>
+          <p className="cifras text-sm text-tinta-suave">
             {cargando ? "Contando…" : `${total.toLocaleString("es-MX")} alcanzadas`}
           </p>
         </div>
@@ -150,7 +150,8 @@ export default function Personas() {
           type="button"
           onClick={exportarPromovidos}
           disabled={exportando}
-          className="transicion-ui inline-flex min-h-11 items-center gap-1.5 rounded-control border border-borde bg-superficie px-3 text-sm font-medium text-tinta transition-colors hover:bg-superficie-hundida disabled:opacity-50"
+          className="transicion-ui inline-flex items-center gap-1.5 rounded-control border border-borde px-3 text-sm text-tinta-suave transition-colors hover:text-tinta disabled:opacity-50"
+          style={{ minHeight: 40 }}
         >
           <Download className="size-4" aria-hidden />
           {exportando ? "Exportando…" : "Exportar promovidos"}
@@ -220,12 +221,12 @@ export default function Personas() {
 
       <div
         ref={contenedor}
-        className="panel min-h-0 flex-1 overflow-y-auto"
+        className="min-h-0 flex-1 overflow-y-auto vidrio filo rounded-tarjeta"
       >
         {cargando ? (
-          <ul className="divide-y divide-separador">
+          <ul className="divide-y divide-borde">
             {Array.from({ length: 8 }).map((_, i) => (
-              <li key={i} className="h-[76px] animate-pulse bg-superficie-hundida/50" />
+              <li key={i} className="h-[68px] animate-pulse bg-superficie-hundida/50" />
             ))}
           </ul>
         ) : filas.length === 0 ? (
@@ -243,7 +244,7 @@ export default function Personas() {
                   key={persona.id}
                   type="button"
                   onClick={() => navegar(`/personas/${persona.id}` as never)}
-                  className="transicion-ui absolute left-0 flex w-full items-center justify-between gap-4 border-b border-separador px-4 text-left transition-colors hover:bg-superficie-hundida"
+                  className="transicion-ui absolute left-0 flex w-full items-center justify-between gap-3 border-b border-borde px-4 text-left transition-colors hover:bg-superficie-hundida"
                   style={{
                     top: item.start,
                     height: item.size,
@@ -251,24 +252,24 @@ export default function Personas() {
                 >
                   <span className="min-w-0">
                     <span
-                      className="block truncate text-[0.9375rem] font-medium text-tinta"
+                      className="block truncate text-sm font-medium text-tinta"
                       style={{ viewTransitionName: nombreCompartido(persona.id) }}
                     >
                       {persona.nombre}
                     </span>
-                    <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-tinta-suave">
+                    <span className="flex min-w-0 items-center gap-1 text-xs text-tinta-suave">
                       <span className="truncate">
                         {persona.seccion_clave && (
                           <span className="cifras">Sección {persona.seccion_clave}</span>
                         )}
                         {demarcacion && ` · ${demarcacion}`}
-                        {/* La edad ocupa espacio que a 360px ya no sobra; entra a partir de 640. */}
-                        {edad && <span className="cifras hidden sm:inline"> · {edad}</span>}
+                        {/* La edad ocupa espacio que a 390px ya no sobra; se reserva para 1280+. */}
+                        {edad && <span className="cifras hidden xl:inline"> · {edad}</span>}
                       </span>
                       {persona.quiere_ser_representante && (
                         <span
                           title="Quiere ser representante"
-                          className="shrink-0 text-naranja-texto"
+                          className="shrink-0 text-tinta-tenue"
                         >
                           <Star className="size-3" aria-hidden />
                         </span>
@@ -276,7 +277,7 @@ export default function Personas() {
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
-                    <span className="cifras block text-sm text-tinta-suave">
+                    <span className="cifras block text-xs text-tinta-suave">
                       {formatearTelefono(persona.telefono_norm)}
                     </span>
                     <span className="mt-1 flex justify-end gap-1">
@@ -297,7 +298,7 @@ export default function Personas() {
       </div>
 
       {total > filas.length && (
-        <p className="text-center text-sm text-tinta-suave">
+        <p className="text-center text-xs text-tinta-tenue">
           Mostrando las primeras {filas.length.toLocaleString("es-MX")} de{" "}
           {total.toLocaleString("es-MX")}. Afina la búsqueda para acercarte.
         </p>
@@ -321,10 +322,10 @@ function Filtro({
       aria-pressed={activo}
       onClick={() => alCambiar(!activo)}
       className={cn(
-        "transicion-ui min-h-11 rounded-control border px-3 text-sm transition-colors",
+        "transicion-ui rounded-control border px-3 text-sm transition-colors toque-actividad",
         activo
-          ? "border-transparent bg-naranja-suave font-semibold text-naranja-texto"
-          : "border-borde bg-superficie font-medium text-tinta-suave hover:bg-superficie-hundida hover:text-tinta",
+          ? "border-tinta bg-tinta text-superficie"
+          : "border-borde bg-superficie text-tinta-suave",
       )}
     >
       {etiqueta}

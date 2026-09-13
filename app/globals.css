@@ -16,181 +16,171 @@
 }
 
 /* ===========================================================================
-   Tokens del sistema de diseño — spec/sistema-diseno.md, con el ajuste cálido
-   del rediseño (ver PENDIENTES.md, entradas 43 a 46).
+   Tokens del sistema de diseño — spec/sistema-diseno.md
    =========================================================================== */
 
 :root {
   /* Naranja Pantone 151 C. Contra blanco da 2.49 a 1: como relleno sí, como texto no.
-     De ahí las variantes tipográficas. */
+     De ahí las variantes tipográficas y de estado. */
   --naranja: #ff8200; /* solo relleno, con --tinta encima */
-  --naranja-fuerte: #e87400; /* relleno al pasar el cursor */
-  --naranja-texto: #a84400; /* naranja tipográfico en claro, 5.5 sobre el marfil */
-  --naranja-claro: #ff9b33; /* naranja tipográfico en oscuro */
+  --naranja-texto: #a84400; /* naranja tipográfico en claro, 5.5 a 1 sobre el marfil cálido */
+  --naranja-claro: #ff9b33; /* naranja tipográfico en oscuro, 8.91 sobre el fondo */
   --naranja-tipografico: var(--naranja-texto);
+  --naranja-fuerte: #e87400; /* relleno naranja al pasar el cursor */
   --naranja-suave: #fff0e1; /* fondo de selección */
-  --naranja-suave-fuerte: #ffe4cb; /* el mismo, al pasar el cursor */
+  --naranja-suave-fuerte: #ffe4cb;
 
-  /* Neutros cálidos: marfil casi blanco y carbón cálido. */
+  /* Neutros, apenas más cálidos: el vidrio necesita un sustrato tibio para no leerse gris. */
   --fondo: #f7f5f2;
   --superficie: #fffdfa;
   --superficie-hundida: #f0ece7;
   --borde: rgba(65, 45, 25, 0.12);
   --separador: rgba(65, 45, 25, 0.09);
   --tinta: #24211e;
-  --tinta-suave: #69615a; /* 5.6 sobre el fondo */
-  --tinta-tenue: #746b63; /* 4.8 sobre el fondo: ya no es gris tenue */
+  --tinta-suave: #69615a;
+  --tinta-tenue: #746b63; /* el anterior (#94918c) daba 3.0 a 1 contra el fondo, por debajo de AA */
 
   /* Una sola señal de alerta. */
-  --alerta: #b3322a;
+  --alerta: #c0362c;
 
   /* Escala del mapa: cinco pasos del neutro al naranja pleno. */
-  --mapa-0: #ece7e1;
+  --mapa-0: #efedea;
   --mapa-1: #ffe0bf;
   --mapa-2: #ffc48a;
   --mapa-3: #ffa34d;
   --mapa-4: #ff8200;
 
-  /* Vidrio. Primero una superficie casi opaca que funciona sin backdrop-filter; el desenfoque
-     se enciende aparte, como mejora progresiva, y solo en las dos superficies que lo merecen. */
-  --vidrio-solido: oklch(0.99 0.004 75 / 0.96);
-  --vidrio-fondo: oklch(0.99 0.004 75 / 0.82);
-  --vidrio-fondo-denso: oklch(0.99 0.004 75 / 0.93);
-  --vidrio-fondo-movimiento: oklch(0.99 0.004 75 / 0.97);
-  --vidrio-borde: rgba(255, 255, 255, 0.75);
-  --vidrio-borde-bajo: var(--borde);
-  --vidrio-luz: rgba(255, 255, 255, 0.85);
-  --vidrio-desenfoque: 8px;
-  --reflejo: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  /* Vidrio. El sustrato de toda la aplicación es la lámina territorial, así que el vidrio
+     siempre tiene algo real detrás: no es decoración, es una capa de calco sobre el atlas. */
+  --vidrio-fondo: oklch(0.995 0.004 70 / 0.62);
+  --vidrio-fondo-denso: oklch(0.995 0.004 70 / 0.86);
+  --vidrio-fondo-movimiento: oklch(0.995 0.004 70 / 0.93);
+  --vidrio-borde: oklch(1 0 0 / 0.7);
+  --vidrio-borde-bajo: oklch(0.62 0.02 60 / 0.16);
+  --vidrio-luz: oklch(1 0 0 / 0.85);
+  --vidrio-desenfoque: 10px; /* antes 24px: el desenfoque caro ahora es un lujo de escritorio */
 
-  /* Lavado del encabezado: estático, muy tenue y localizado. No envuelve la pantalla. */
-  --lavado-encabezado: radial-gradient(
-    68rem 22rem at 12% -6rem,
-    oklch(0.86 0.09 58 / 0.14),
-    transparent 70%
-  );
+  /* Lámina territorial: el atlas que vive detrás de todo. */
+  --lamina-papel: oklch(0.975 0.006 75);
+  --lamina-trazo: oklch(0.62 0.045 55 / 0.55);
+  --lamina-relleno: oklch(0.85 0.115 58 / 0.22);
+  --lamina-propio: oklch(0.76 0.175 55 / 0.3);
+  --lamina-bruma: oklch(0.985 0.005 75 / 0.78);
+  --bloom-naranja: oklch(0.85 0.1 58 / 0.16);
+  --bloom-lejano: oklch(0.9 0.05 40 / 0.1);
 
-  /* Elevación contenida. Nada de sombras profundas y difusas. */
+  /* Sombra: poco, y nunca la gris genérica. Una sola capa contenida en vez de tres difusas: se
+     lee igual de flotante y cuesta mucho menos pintar en un celular. */
   --sombra-apoyo: 0 1px 2px rgba(50, 35, 20, 0.05);
   --sombra-flotante: 0 6px 20px rgba(50, 35, 20, 0.07);
   --sombra-dock: 0 6px 20px rgba(50, 35, 20, 0.07);
+  --reflejo: inset 0 1px 0 rgba(255, 255, 255, 0.65); /* filo de luz superior del vidrio */
 
   /* Tipografía. */
   --texto-xs: 0.75rem; /* 12, etiquetas de tabla */
-  --texto-sm: 0.875rem; /* 14, apoyo */
-  --texto-base: clamp(0.9375rem, 0.9rem + 0.2vw, 1rem); /* 15 a 16, controles y filas */
+  --texto-sm: 0.8125rem; /* 13, apoyo */
+  --texto-base: clamp(0.9375rem, 0.9rem + 0.2vw, 1rem);
   --texto-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.1875rem);
-  --texto-xl: clamp(1.5rem, 1.35rem + 0.6vw, 1.75rem); /* 24 a 28, título de página */
-  --texto-cifra: clamp(1.5rem, 1.3rem + 0.9vw, 2rem); /* 24 a 32, métricas secundarias */
-  --texto-cifra-mayor: clamp(2.5rem, 1.85rem + 2.6vw, 3.5rem); /* 40 a 56, métrica principal */
+  --texto-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --texto-cifra: clamp(1.75rem, 1.4rem + 1.6vw, 2.5rem); /* indicadores */
+  --texto-titulo: clamp(2rem, 1.3rem + 2.6vw, 3.25rem); /* encabezado de página */
+  --texto-cifra-mayor: clamp(2.5rem, 1.6rem + 3.2vw, 4rem); /* la cifra más grande del tablero */
 
   /* Forma: los radios cambian según jerarquía. */
-  --radio-control: 10px;
+  --radio-control: 6px;
   --radio-tarjeta: 16px;
-  --radio-hoja: 18px;
+  --radio-hoja: 20px;
   --radio-pildora: 999px;
+  --radio-lienzo: 24px; /* la tarjeta grande del mapa */
 
   /* Movimiento: una sola familia de curvas, sin rebote. */
   --curva: cubic-bezier(0.2, 0, 0, 1);
-  --dur-ui: 140ms; /* cambios de estado, apertura de menús */
-  --dur-panel: 200ms; /* fichas y hojas */
+  --dur-ui: 160ms; /* cambios de estado, apertura de menús */
+  --dur-panel: 240ms; /* fichas y hojas */
   --dur-camara: 600ms; /* movimientos de mapa */
 
   /* Área táctil. */
   --toque-minimo: 44px;
   --toque-actividad: 48px;
-
-  /* Armazón: el riel y la barra superior ocupan espacio real, y su medida se comparte con las
-     pantallas que se montan a pantalla completa, como el mapa. */
-  --ancho-riel: 76px;
-  --alto-barra: 56px;
-}
-
-@media (min-width: 768px) {
-  :root {
-    --alto-barra: 64px;
-  }
 }
 
 /* Tokens de modo oscuro. Se aplican con la clase .dark o por preferencia del sistema. */
 .dark {
   --naranja-tipografico: var(--naranja-claro);
-  --naranja-fuerte: #ff9426;
   --naranja-suave: oklch(0.32 0.07 55);
   --naranja-suave-fuerte: oklch(0.37 0.085 55);
 
-  --fondo: #141210;
-  --superficie: #1d1b18;
-  --superficie-hundida: #141210;
+  --fondo: #121110;
+  --superficie: #1b1a18;
+  --superficie-hundida: #121110;
   --borde: rgba(255, 235, 215, 0.14);
   --separador: rgba(255, 235, 215, 0.1);
-  --tinta: #f5f3f0;
-  --tinta-suave: #b0aaa3;
-  --tinta-tenue: #938c85;
+  --tinta: #f5f4f2;
+  --tinta-suave: #a3a09b;
+  --tinta-tenue: #6e6b66;
 
   --alerta: #ff6b5e;
 
-  --mapa-0: #2a2724;
+  --vidrio-fondo: oklch(0.24 0.012 60 / 0.62);
+  --vidrio-fondo-denso: oklch(0.24 0.012 60 / 0.88);
+  --vidrio-fondo-movimiento: oklch(0.24 0.012 60 / 0.94);
+  --vidrio-borde: oklch(1 0 0 / 0.1);
+  --vidrio-borde-bajo: oklch(1 0 0 / 0.06);
+  --vidrio-luz: oklch(1 0 0 / 0.14);
 
-  --vidrio-solido: oklch(0.24 0.008 60 / 0.96);
-  --vidrio-fondo: oklch(0.24 0.008 60 / 0.82);
-  --vidrio-fondo-denso: oklch(0.24 0.008 60 / 0.93);
-  --vidrio-fondo-movimiento: oklch(0.24 0.008 60 / 0.97);
-  --vidrio-borde: rgba(255, 255, 255, 0.1);
-  --vidrio-borde-bajo: var(--borde);
-  --vidrio-luz: rgba(255, 255, 255, 0.14);
-  --reflejo: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --lamina-papel: oklch(0.19 0.01 60);
+  --lamina-trazo: oklch(0.55 0.03 60 / 0.42);
+  --lamina-relleno: oklch(0.42 0.07 55 / 0.55);
+  --lamina-propio: oklch(0.66 0.15 55 / 0.8);
+  --lamina-bruma: oklch(0.16 0.008 60 / 0.55);
+  --bloom-naranja: oklch(0.55 0.12 55 / 0.2);
+  --bloom-lejano: oklch(0.45 0.07 40 / 0.15);
 
-  --lavado-encabezado: radial-gradient(
-    68rem 22rem at 12% -6rem,
-    oklch(0.55 0.1 55 / 0.12),
-    transparent 70%
-  );
-
-  /* En oscuro la elevación se lee con luz en el borde, no con sombra. */
+  /* En oscuro la elevación se lee con luz en el borde, no con sombra: --reflejo hace ese trabajo. */
   --sombra-apoyo: none;
-  --sombra-flotante: 0 6px 20px rgba(0, 0, 0, 0.4);
-  --sombra-dock: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --sombra-flotante: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --sombra-dock: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --reflejo: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --borde-elevado: #3d3a36;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.claro) {
     --naranja-tipografico: var(--naranja-claro);
-    --naranja-fuerte: #ff9426;
     --naranja-suave: oklch(0.32 0.07 55);
     --naranja-suave-fuerte: oklch(0.37 0.085 55);
 
-    --fondo: #141210;
-    --superficie: #1d1b18;
-    --superficie-hundida: #141210;
+    --fondo: #121110;
+    --superficie: #1b1a18;
+    --superficie-hundida: #121110;
     --borde: rgba(255, 235, 215, 0.14);
     --separador: rgba(255, 235, 215, 0.1);
-    --tinta: #f5f3f0;
-    --tinta-suave: #b0aaa3;
-    --tinta-tenue: #938c85;
+    --tinta: #f5f4f2;
+    --tinta-suave: #a3a09b;
+    --tinta-tenue: #6e6b66;
 
     --alerta: #ff6b5e;
 
-    --mapa-0: #2a2724;
+    --vidrio-fondo: oklch(0.24 0.012 60 / 0.62);
+    --vidrio-fondo-denso: oklch(0.24 0.012 60 / 0.88);
+    --vidrio-fondo-movimiento: oklch(0.24 0.012 60 / 0.94);
+    --vidrio-borde: oklch(1 0 0 / 0.1);
+    --vidrio-borde-bajo: oklch(1 0 0 / 0.06);
+    --vidrio-luz: oklch(1 0 0 / 0.14);
 
-    --vidrio-solido: oklch(0.24 0.008 60 / 0.96);
-    --vidrio-fondo: oklch(0.24 0.008 60 / 0.82);
-    --vidrio-fondo-denso: oklch(0.24 0.008 60 / 0.93);
-    --vidrio-fondo-movimiento: oklch(0.24 0.008 60 / 0.97);
-    --vidrio-borde: rgba(255, 255, 255, 0.1);
-    --vidrio-borde-bajo: var(--borde);
-    --vidrio-luz: rgba(255, 255, 255, 0.14);
-    --reflejo: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-
-    --lavado-encabezado: radial-gradient(
-      68rem 22rem at 12% -6rem,
-      oklch(0.55 0.1 55 / 0.12),
-      transparent 70%
-    );
+    --lamina-papel: oklch(0.19 0.01 60);
+    --lamina-trazo: oklch(0.55 0.03 60 / 0.42);
+    --lamina-relleno: oklch(0.42 0.07 55 / 0.55);
+    --lamina-propio: oklch(0.66 0.15 55 / 0.8);
+    --lamina-bruma: oklch(0.16 0.008 60 / 0.55);
+    --bloom-naranja: oklch(0.55 0.12 55 / 0.2);
+    --bloom-lejano: oklch(0.45 0.07 40 / 0.15);
 
     --sombra-apoyo: none;
-    --sombra-flotante: 0 6px 20px rgba(0, 0, 0, 0.4);
-    --sombra-dock: 0 6px 20px rgba(0, 0, 0, 0.4);
+    --sombra-flotante: 0 6px 20px rgba(0, 0, 0, 0.45);
+    --sombra-dock: 0 6px 20px rgba(0, 0, 0, 0.45);
+    --reflejo: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --borde-elevado: #3d3a36;
   }
 }
 
@@ -218,15 +208,15 @@
   --destructive-foreground: var(--superficie);
   --border: var(--borde);
   --input: var(--borde);
-  --ring: var(--naranja-tipografico);
+  --ring: var(--naranja);
   --radius: var(--radio-tarjeta);
 
   /* Gráficas: una sola serie naranja, el resto en neutros. */
   --chart-1: var(--naranja);
   --chart-2: var(--tinta-suave);
   --chart-3: var(--tinta-tenue);
-  --chart-4: #c9c4be;
-  --chart-5: #a8a29b;
+  --chart-4: #c9c6c2;
+  --chart-5: #a8a5a0;
 
   --sidebar: var(--superficie);
   --sidebar-foreground: var(--tinta);
@@ -235,7 +225,7 @@
   --sidebar-accent: var(--superficie-hundida);
   --sidebar-accent-foreground: var(--tinta);
   --sidebar-border: var(--borde);
-  --sidebar-ring: var(--naranja-tipografico);
+  --sidebar-ring: var(--naranja);
 }
 
 /* ===========================================================================
@@ -285,8 +275,8 @@
   --color-tinta-suave: var(--tinta-suave);
   --color-tinta-tenue: var(--tinta-tenue);
   --color-naranja: var(--naranja);
-  --color-naranja-fuerte: var(--naranja-fuerte);
   --color-naranja-texto: var(--naranja-tipografico);
+  --color-naranja-fuerte: var(--naranja-fuerte);
   --color-naranja-suave: var(--naranja-suave);
   --color-naranja-suave-fuerte: var(--naranja-suave-fuerte);
   --color-alerta: var(--alerta);
@@ -301,17 +291,21 @@
   --font-mono: ui-monospace, SFMono-Regular, monospace;
 
   --text-xs: var(--texto-xs);
-  --text-xs--line-height: 1.45;
+  --text-xs--line-height: 1.5;
   --text-sm: var(--texto-sm);
-  --text-sm--line-height: 1.45;
+  --text-sm--line-height: 1.5;
   --text-base: var(--texto-base);
   --text-base--line-height: 1.5;
   --text-lg: var(--texto-lg);
-  --text-lg--line-height: 1.3;
+  --text-lg--line-height: 1.2;
   --text-xl: var(--texto-xl);
   --text-xl--line-height: 1.2;
   --text-cifra: var(--texto-cifra);
-  --text-cifra--line-height: 1.15;
+  --text-cifra--line-height: 1.2;
+  --text-titulo: var(--texto-titulo);
+  --text-titulo--line-height: 1.05;
+  --text-cifra-mayor: var(--texto-cifra-mayor);
+  --text-cifra-mayor--line-height: 1;
 
   --radius-sm: var(--radio-control);
   --radius-md: var(--radio-control);
@@ -321,6 +315,7 @@
   --radius-control: var(--radio-control);
   --radius-tarjeta: var(--radio-tarjeta);
   --radius-hoja: var(--radio-hoja);
+  --radius-lienzo: var(--radio-lienzo);
   --radius-pildora: var(--radio-pildora);
 
   --shadow-apoyo: var(--sombra-apoyo);
@@ -328,11 +323,7 @@
 
   --ease-curva: var(--curva);
 
-  --container-tope: 1520px;
-  --container-lista: 1180px;
-
-  --spacing-riel: var(--ancho-riel);
-  --spacing-barra: var(--alto-barra);
+  --container-tope: 1280px;
 }
 
 /* ===========================================================================
@@ -396,9 +387,10 @@
   }
 }
 
-/* Foco visible: anillo de 2 con desplazamiento de 2. Va en el naranja tipográfico y no en el
-   naranja de relleno, que contra el marfil se queda en 2.3 a 1 y no se distingue. Fuera de
-   @layer base a propósito: dentro de la capa, las reglas de shadcn le ganaban el color. */
+/* Foco visible: anillo de 2 en naranja tipográfico y desplazamiento de 2. Se aparta del spec, que
+   pide --naranja: ese naranja de relleno da 2.3 a 1 contra el marfil cálido y no alcanza el mínimo
+   de 3 a 1 que exige un indicador de foco. --naranja-tipografico sí cumple. Va fuera de @layer base
+   a propósito: dentro de la capa, las reglas de shadcn le ganaban el color del anillo. */
 :focus-visible {
   outline: 2px solid var(--naranja-tipografico) !important;
   outline-offset: 2px !important;
@@ -419,18 +411,27 @@
 @utility cifra-indicador {
   font-variant-numeric: tabular-nums;
   font-size: var(--texto-cifra);
-  line-height: 1.15;
+  line-height: 1.2;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
-/* Métrica principal del resumen: 40 en celular, 56 en escritorio. */
+/* Título de página: la cifra tipográfica más alta de la jerarquía. */
+@utility titulo-pagina {
+  font-size: var(--texto-titulo);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+/* La cifra más grande del tablero: un peldaño arriba de cifra-indicador. */
 @utility cifra-mayor {
   font-variant-numeric: tabular-nums;
   font-size: var(--texto-cifra-mayor);
-  line-height: 1.05;
-  font-weight: 620;
-  letter-spacing: -0.025em;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.035em;
 }
 
 /* Longitud de línea máxima en texto corrido. */
@@ -438,50 +439,49 @@
   max-width: 68ch;
 }
 
-/* Superficie de contenido: casi opaca, borde fino, sombra mínima. Es la base de los paneles
-   que no flotan sobre nada. */
-@utility panel {
-  background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-tarjeta);
-  box-shadow: var(--sombra-apoyo);
-}
-
-/* Vidrio. Nace de tinte, transparencia moderada, borde y reflejo; el desenfoque se enciende
-   aparte en .vidrio-flotante y solo como mejora progresiva. */
+/* Vidrio. El fondo por sí solo ya es casi opaco, así que la pieza funciona sin desenfoque en
+   celular o donde el navegador no soporte backdrop-filter; el desenfoque se enciende aparte, fuera
+   de toda capa, para no pagar su costo por defecto. El reflejo superior —luz atrapada en el borde—
+   es lo que la separa de un rectángulo gris con opacidad. */
 @utility vidrio {
   position: relative;
-  background: var(--vidrio-solido);
-  border: 1px solid var(--borde);
+  background: var(--vidrio-fondo-denso);
+  border: 1px solid var(--vidrio-borde-bajo);
+  border-top-color: var(--vidrio-borde);
   color: var(--tinta);
-  box-shadow: var(--sombra-apoyo), var(--reflejo);
+  box-shadow: var(--sombra-flotante), var(--reflejo);
 }
 
-/* La misma pieza, pero legible sobre zonas densas del mapa. */
+/* La misma pieza, con un fondo un paso más opaco para leerse sobre zonas densas del atlas. */
 @utility vidrio-denso {
   position: relative;
-  background: var(--vidrio-fondo-denso);
-  border: 1px solid var(--borde);
+  background: var(--vidrio-fondo-movimiento);
+  border: 1px solid var(--vidrio-borde-bajo);
+  border-top-color: var(--vidrio-borde);
   color: var(--tinta);
   box-shadow: var(--sombra-flotante), var(--reflejo);
 }
 
-/* Barra superior: superficie casi opaca, filete abajo y reflejo interior. Sin sombra: no
-   flota, es una fila del armazón que además se queda pegada. */
-@utility barra-superior {
-  background: var(--vidrio-solido);
-  border-bottom: 1px solid var(--borde);
-  box-shadow: var(--reflejo);
-}
-
-/* Las únicas superficies que llevan desenfoque: la barra superior y lo que se monta encima del
-   mapa. El fondo translúcido y el desenfoque se activan abajo, con @supports. */
+/* Alias semántico de vidrio: el panel que se monta encima del mapa (ficha de sección, capas). */
 @utility vidrio-flotante {
   position: relative;
-  background: var(--vidrio-solido);
-  border: 1px solid var(--borde);
+  background: var(--vidrio-fondo-denso);
+  border: 1px solid var(--vidrio-borde-bajo);
+  border-top-color: var(--vidrio-borde);
   color: var(--tinta);
   box-shadow: var(--sombra-flotante), var(--reflejo);
+}
+
+/* Cápsula: la píldora de vidrio para acciones flotantes, no para estatus (esa es .pildora). */
+@utility capsula {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radio-pildora);
+  min-height: 44px;
+  background: var(--vidrio-fondo-denso);
+  border: 1px solid var(--vidrio-borde-bajo);
+  box-shadow: var(--sombra-flotante), var(--reflejo);
+  color: var(--tinta);
 }
 
 /* Filo de luz en el borde superior. Va como pseudoelemento para no gastar un div. */
@@ -498,7 +498,7 @@
 }
 
 /* Mientras el mapa se mueve se apaga el desenfoque y sube la opacidad: nadie lo nota y se
-   recuperan cuadros por segundo en celular. */
+   recuperan veinte cuadros por segundo en celular. */
 @utility vidrio-en-movimiento {
   background: var(--vidrio-fondo-movimiento);
   backdrop-filter: none;
@@ -562,12 +562,11 @@
   font-size: var(--texto-base);
 }
 
-/* Coreografía de entrada, una sola vez al montar. Sin escalonado: la entrada en cascada es de
-   las cosas que delatan una maqueta. */
+/* Coreografía de entrada, una sola vez al montar. El escalonado se pasa con --retraso. */
 @keyframes entrada-sube {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -577,6 +576,7 @@
 
 @utility entrada {
   animation: entrada-sube var(--dur-panel) var(--curva) both;
+  animation-delay: var(--retraso, 0ms);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -585,12 +585,46 @@
   }
 }
 
+/* ===========================================================================
+   Sustrato y navegación flotante
+   =========================================================================== */
+
+/* La lámina territorial vive detrás de todo y no recibe eventos. */
+@utility lamina {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--lamina-papel);
+}
+
+/* Bruma que separa la lámina del contenido para que el texto no pelee con la cartografía. */
+@utility bruma {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 12% 0%, var(--bloom-naranja) 0%, transparent 58%),
+    radial-gradient(90% 70% at 100% 100%, var(--bloom-lejano) 0%, transparent 60%),
+    var(--lamina-bruma);
+}
+
+/* Dock: la navegación flota, no se pega al borde. El desenfoque se enciende aparte (ver más abajo,
+   junto con el resto del vidrio del sistema) para que en celular no cueste nada por defecto. */
+@utility dock {
+  background: var(--vidrio-fondo-denso);
+  border: 1px solid var(--vidrio-borde-bajo);
+  border-top-color: var(--vidrio-borde);
+  box-shadow: var(--sombra-dock);
+}
+
 /* Cifra grande del atlas: peso, apretado, cifras tabulares. */
 @utility cifra-atlas {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 /* Clave de sección: se lee como un sello, no como texto corrido. */
@@ -601,50 +635,43 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   border-radius: var(--radio-control);
-  border: 1px solid var(--borde);
-  background: var(--naranja-suave);
+  border: 1px solid var(--vidrio-borde-bajo);
+  background: oklch(0.78 0.16 55 / 0.14);
   color: var(--naranja-tipografico);
   padding: 2px 7px;
   font-size: var(--texto-xs);
   min-height: 0;
 }
 
-/* Lavado estático del encabezado. Muy tenue, localizado y sin animación: no envuelve la
-   pantalla en neblina ni compite con el texto. */
-@utility lavado {
-  position: absolute;
-  inset-inline: 0;
-  top: 0;
-  height: 22rem;
-  z-index: 0;
-  pointer-events: none;
-  background: var(--lavado-encabezado);
-}
-
 /* ===========================================================================
-   Desenfoque: mejora progresiva, nunca requisito
-   ---------------------------------------------------------------------------
-   Estas reglas van sin capa a propósito, para que le ganen a las utilidades de
-   Tailwind sin recurrir a !important.
+   Desenfoque del vidrio: opcional y fuera de capa a propósito.
+   El background, border y box-shadow de cada pieza de vidrio ya funcionan solos (ver arriba);
+   aquí solo se añade el backdrop-filter, y solo donde el dispositivo puede pagarlo. Al no vivir en
+   una @layer, estas reglas le ganan a las utilidades de Tailwind sin necesitar !important (el mismo
+   truco que usa :focus-visible). Se excluye siempre .vidrio-en-movimiento: mientras el mapa se
+   mueve, el desenfoque se apaga sin importar el tamaño de pantalla.
    =========================================================================== */
 
-@supports (backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px)) {
+@supports (backdrop-filter: blur(10px)) or (-webkit-backdrop-filter: blur(10px)) {
   @media (min-width: 768px) {
-    .barra-superior,
-    .vidrio-flotante:not(.vidrio-en-movimiento) {
-      background: var(--vidrio-fondo);
-      backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.3);
-      -webkit-backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.3);
+    .vidrio:not(.vidrio-en-movimiento),
+    .vidrio-denso:not(.vidrio-en-movimiento),
+    .vidrio-flotante:not(.vidrio-en-movimiento),
+    .capsula:not(.vidrio-en-movimiento),
+    .dock:not(.vidrio-en-movimiento) {
+      backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.35);
+      -webkit-backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.35);
     }
   }
 }
 
-/* Quien pide menos transparencia se queda con superficies sólidas. */
+/* Quien pide menos transparencia no quiere ver el mapa a través del panel: fondo sólido y sin
+   desenfoque, sin perder ninguna otra propiedad del vidrio (radio, borde, sombra). */
 @media (prefers-reduced-transparency: reduce) {
   .vidrio,
   .vidrio-denso,
   .vidrio-flotante,
-  .barra-superior,
+  .capsula,
   .dock {
     background: var(--superficie);
     backdrop-filter: none;
@@ -653,12 +680,42 @@
 }
 
 /* ===========================================================================
-   Navegación
+   Controles de MapLibre: se visten con el vidrio del sistema. Sin capa, al final del archivo,
+   para ganarle a la hoja de estilo que trae MapLibre por defecto sin recurrir a !important.
    =========================================================================== */
 
-/* Riel y barra inferior: superficie casi opaca, borde fino, sombra contenida. */
-@utility dock {
-  background: var(--vidrio-solido);
-  border: 1px solid var(--borde);
-  box-shadow: var(--sombra-dock), var(--reflejo);
+.maplibregl-ctrl-group {
+  background: var(--vidrio-fondo-denso);
+  border: 1px solid var(--vidrio-borde-bajo);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-flotante), var(--reflejo);
+  overflow: hidden;
+}
+
+/* El piso táctil del sistema son 44 píxeles y aquí también aplica: MapLibre trae 29 por
+   defecto, que en la calle no se atina. */
+.maplibregl-ctrl-group button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  background-color: transparent;
+  color: var(--tinta);
+}
+
+.maplibregl-ctrl-group button:hover {
+  background-color: var(--superficie-hundida);
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--separador);
+}
+
+.maplibregl-ctrl-attrib {
+  background: var(--vidrio-fondo-denso);
+  color: var(--tinta-suave);
+  border-radius: var(--radio-control);
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--tinta-suave);
 }

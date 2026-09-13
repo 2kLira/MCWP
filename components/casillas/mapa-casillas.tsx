@@ -346,7 +346,7 @@ export function LeyendaCasillas({
   return (
     <div
       className={cn(
-        "vidrio-flotante transicion-ui absolute bottom-3 left-3 z-10 flex flex-col overflow-hidden md:bottom-4 md:left-4",
+        "vidrio elevacion-flotante transicion-ui absolute bottom-3 left-3 z-10 flex flex-col overflow-hidden md:bottom-4 md:left-4",
         abierta ? "rounded-tarjeta" : "rounded-pildora",
         "md:rounded-tarjeta",
         enMovimiento && "vidrio-en-movimiento",

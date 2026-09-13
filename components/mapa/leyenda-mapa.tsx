@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { grupoDePrioritarias, VISTAS_MAPA, type VistaMapa } from "./datos-mapa";
+import { esVistaDeCasillas, grupoDePrioritarias, VISTAS_MAPA, type VistaMapa } from "./datos-mapa";
 
 /** Las cuatro vistas que se pintan con la escala de cinco pasos, por cuantiles. */
 const VISTAS_DE_ESCALA = new Set<VistaMapa>(["personas", "promovidos", "actividad", "recorridos"]);
@@ -37,21 +37,48 @@ function Muestra({
 }
 
 /**
- * Leyenda de la vista activa, en la esquina inferior izquierda del mapa. Es de las dos únicas
- * superficies con desenfoque de la aplicación, porque aquí sí hay territorio detrás. No choca con
- * el selector de capas (que ya vive en el borde del panel, fuera del mapa), ni con la atribución
- * de CARTO (abajo a la derecha), ni con la ficha de sección.
- *
- * En celular arranca colapsada en una pastilla corta para no taparle mapa a nadie; en escritorio
- * el botón de la pastilla se oculta y el contenido siempre se ve abierto.
+ * Muestra de un estado de casilla, calcada de la forma real del punto en el mapa (mapa-lienzo.tsx,
+ * capa CAPA_CASILLA_PUNTO): aro hueco para "vacía", punto lleno chico para "parcial", punto lleno
+ * pleno para "completa". Es la misma idea que MuestraCasilla de components/casillas/mapa-casillas.tsx
+ * —esa función no se exporta y ese archivo no se toca, así que se copia el marcado en vez de
+ * importarlo— pero vive aquí porque esta es la leyenda del mapa principal, no una aparte.
+ */
+function MuestraCasilla({
+  tipo,
+  etiqueta,
+}: {
+  tipo: "vacia" | "parcial" | "completa";
+  etiqueta: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 text-xs text-tinta">
+      <span aria-hidden className="grid size-4 shrink-0 place-items-center">
+        {tipo === "vacia" && <span className="hueco-punteado size-4 rounded-full" />}
+        {tipo === "parcial" && <span className="size-2.5 rounded-full bg-mapa-2" />}
+        {tipo === "completa" && <span className="size-4 rounded-full bg-mapa-4" />}
+      </span>
+      {etiqueta}
+    </div>
+  );
+}
+
+/**
+ * Leyenda de la vista activa. Flota en vidrio sobre el mapa, esquina inferior izquierda: ahí no
+ * choca con la barra superior, el resumen de prioritarias ni el selector de capas (los tres viven
+ * arriba), ni con la ficha de sección (a la derecha en escritorio, hoja de abajo en celular) ni con
+ * el riel de navegación (a la izquierda, ya despejado por `sangradoIzquierdo` igual que el resto
+ * del cromo del mapa). En celular arranca colapsada en una pastilla corta para no taparle mapa a
+ * nadie; en escritorio el botón de la pastilla se oculta y el contenido siempre se ve abierto.
  */
 export function LeyendaMapa({
   vista,
   enMovimiento,
+  sangradoIzquierdo = false,
   className,
 }: {
   vista: VistaMapa;
   enMovimiento: boolean;
+  sangradoIzquierdo?: boolean;
   className?: string;
 }) {
   const [abierta, setAbierta] = useState(false);
@@ -62,7 +89,9 @@ export function LeyendaMapa({
   return (
     <div
       className={cn(
-        "vidrio-flotante transicion-ui absolute bottom-3 left-3 z-10 flex flex-col overflow-hidden md:bottom-4 md:left-4",
+        "vidrio-flotante filo transicion-ui absolute z-10 flex flex-col overflow-hidden",
+        "bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-3 md:bottom-4 md:left-4",
+        sangradoIzquierdo && "md:left-24",
         abierta ? "rounded-tarjeta" : "rounded-pildora",
         "md:rounded-tarjeta",
         enMovimiento && "vidrio-en-movimiento",
@@ -76,7 +105,7 @@ export function LeyendaMapa({
         onClick={() => setAbierta((valor) => !valor)}
         aria-expanded={abierta}
         aria-controls={idContenido}
-        className="transicion-ui flex min-h-11 items-center gap-1.5 whitespace-nowrap px-3.5 text-sm font-medium text-tinta md:hidden"
+        className="transicion-ui flex min-h-11 items-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-medium text-tinta-suave md:hidden"
       >
         Leyenda
         <ChevronDown
@@ -109,6 +138,14 @@ export function LeyendaMapa({
           </div>
         )}
 
+        {esVistaDeCasillas(vista) && (
+          <div className="flex flex-col gap-1.5">
+            <MuestraCasilla tipo="completa" etiqueta="Titular y suplente" />
+            <MuestraCasilla tipo="parcial" etiqueta="Solo uno de los dos" />
+            <MuestraCasilla tipo="vacia" etiqueta="Ninguno todavía" />
+          </div>
+        )}
+
         {VISTAS_DE_ESCALA.has(vista) && (
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
@@ -122,7 +159,7 @@ export function LeyendaMapa({
               </div>
               <span className="text-xs text-tinta-suave">Más</span>
             </div>
-            <p className="text-xs text-tinta-suave">Por cuantiles, no cifras fijas.</p>
+            <p className="text-[11px] text-tinta-suave">Por cuantiles, no cifras fijas.</p>
           </div>
         )}
       </div>

@@ -62,7 +62,7 @@ export function BarrasAvance({
   return (
     <div
       className={cn(
-        "vidrio-flotante transicion-ui flex w-full flex-col gap-3 rounded-tarjeta px-3.5 py-3",
+        "vidrio elevacion-flotante transicion-ui flex w-full flex-col gap-3 rounded-tarjeta px-3.5 py-3",
         enMovimiento && "vidrio-en-movimiento",
         className,
       )}

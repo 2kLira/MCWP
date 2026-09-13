@@ -3,10 +3,10 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { MessageCircle } from "lucide-react";
-import { useId, useMemo } from "react";
+import { useMemo } from "react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId } from "@/lib/demarcaciones";
-import { estatusVisibles, etiquetaAlcance } from "@/lib/permisos";
+import { etiquetaAlcance } from "@/lib/permisos";
 import { ETIQUETA_TIPO_ACTIVIDAD } from "@/lib/tipos";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
@@ -15,19 +15,15 @@ import {
   type ResumenTablero,
   type CumpleanosHoy,
 } from "@/lib/datos/tablero";
-import { reporteSemanal, type SemanaReporte } from "@/lib/datos/reportes";
 import { actividadesDeAgenda, type Actividad } from "@/lib/datos/actividades";
+import { estatusVisibles } from "@/lib/permisos";
 
 const MapaPagina = dynamic(
   () => import("@/components/mapa/mapa-pagina").then((m) => m.MapaPagina),
-  {
-    ssr: false,
-    loading: () => <div className="size-full animate-pulse bg-superficie-hundida" />,
-  },
+  { ssr: false, loading: () => <div className="size-full animate-pulse bg-superficie-hundida" /> },
 );
 
 const RESUMEN_VACIO = {} as ResumenTablero;
-const formatoCifra = new Intl.NumberFormat("es-MX");
 
 function enDias(dias: number): string {
   const f = new Date();
@@ -50,9 +46,6 @@ export default function Tablero() {
   );
 
   const resumen = useConsulta(() => resumenTablero(actuante), RESUMEN_VACIO, [actuante.id]);
-  const semanal = useConsulta<SemanaReporte[]>(() => reporteSemanal(actuante, 10), [], [
-    actuante.id,
-  ]);
   const agenda = useConsulta<Actividad[]>(
     // Con el recorte de estatus: un responsable o un brigadista no deben ver aquí actividades
     // realizadas que la agenda ya no les muestra, o los dos bloques dirían cosas distintas.
@@ -77,31 +70,140 @@ export default function Tablero() {
 
   const r = resumen.datos;
   const cargando = resumen.cargando;
+  const secciones = (r.seccionesConResponsable ?? 0) + (r.seccionesSinResponsable ?? 0);
+  const hayTotalSecciones = secciones > 0;
+  const cobertura = hayTotalSecciones ? (r.seccionesConResponsable ?? 0) / secciones : 0;
+  const porcentajeCobertura = Math.round(cobertura * 100);
 
   return (
-    <div className="flex flex-col gap-6 md:gap-8">
-      <header className="pt-1">
-        <h1 className="text-xl text-tinta">Resumen territorial</h1>
-        <p className="mt-1 text-sm text-tinta-suave">Oaxaca de Juárez · {territorio}</p>
+    <div className="flex flex-col">
+      {/* Encabezado: el título manda, la barra superior (otra capa) pinta buscador y
+          conmutador de rol a la derecha, por eso el hueco reservado en escritorio. */}
+      <header className="pb-6 pt-2 md:pr-[34rem]">
+        <h1 className="titulo-pagina text-tinta">Oaxaca de Juárez</h1>
+        <p className="mt-1 text-base text-tinta-suave">Resumen territorial · {territorio}</p>
       </header>
 
-      <Resumen resumen={r} cargando={cargando} semanal={semanal.datos} />
+      {/* Una sola superficie: banda de métricas arriba, cobertura al pie, separadas por
+          un filete horizontal. Nada de tarjetas individuales. */}
+      <section
+        aria-label="Indicadores del tablero"
+        className="rounded-lienzo border border-borde bg-superficie"
+      >
+        <dl className="grid grid-cols-1 gap-y-6 p-4 sm:grid-cols-2 sm:gap-x-4 md:grid-cols-[minmax(0,1.15fr)_1px_minmax(0,1fr)_1px_minmax(0,1fr)] md:items-center md:gap-0 md:p-8">
+          {/* Bloque principal: la cifra que manda. */}
+          <div className="sm:col-span-2 md:col-span-1 md:pr-8">
+            <dt className="text-sm text-tinta-suave">Personas alcanzadas</dt>
+            <dd className="cifra-mayor mt-1 text-tinta">
+              {cargando ? "—" : (r.personas ?? 0).toLocaleString("es-MX")}
+            </dd>
+            <p className="mt-1 text-sm text-tinta-suave">
+              {cargando ? "—" : `en ${secciones.toLocaleString("es-MX")} secciones`}
+            </p>
+            <p className="mt-0.5 text-sm text-naranja-texto">
+              {cargando ? "—" : `${(r.nuevasSemana ?? 0).toLocaleString("es-MX")} nuevas esta semana`}
+            </p>
+          </div>
 
-      {/* El mapa es el protagonista, pero alineado al mismo eje que todo lo demás. */}
-      <section aria-label="Mapa de secciones" className="panel overflow-hidden">
-        <div className="h-[25rem] sm:h-[30rem] lg:h-[36rem]">
+          <div className="hidden md:block md:h-full md:w-px md:justify-self-center md:bg-separador" />
+
+          {/* Quieren participar / información. */}
+          <div className="flex justify-around gap-4 border-t border-separador pt-6 md:justify-center md:gap-10 md:border-t-0 md:px-8 md:pt-0">
+            <MetricaSecundaria
+              valor={r.quierenParticipar}
+              etiqueta="Quieren participar"
+              cargando={cargando}
+            />
+            <MetricaSecundaria
+              valor={r.quierenInfo}
+              etiqueta="Quieren información"
+              cargando={cargando}
+            />
+          </div>
+
+          <div className="hidden md:block md:h-full md:w-px md:justify-self-center md:bg-separador" />
+
+          {/* Promovidos / aspirantes a representante: antes tarjetas de vidrio aparte. */}
+          <div className="flex justify-around gap-4 border-t border-separador pt-6 md:justify-center md:gap-10 md:border-t-0 md:pl-8 md:pt-0">
+            <MetricaSecundaria
+              valor={r.promovidos}
+              etiqueta="Promovidos"
+              cargando={cargando}
+            />
+            <MetricaSecundaria
+              valor={r.aspirantesRepresentante}
+              etiqueta="Quieren ser representantes"
+              cargando={cargando}
+            />
+          </div>
+        </dl>
+
+        {/* Cobertura territorial: la barra es información, no adorno. Es la historia que el
+            socio va a preguntar en la junta. */}
+        <div className="border-t border-separador px-6 py-5 md:px-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p id="texto-cobertura" className="text-sm text-tinta-suave">
+              {cargando ? (
+                "—"
+              ) : hayTotalSecciones ? (
+                <>
+                  <span className="cifras font-semibold text-tinta">
+                    {(r.seccionesConResponsable ?? 0).toLocaleString("es-MX")}
+                  </span>{" "}
+                  de{" "}
+                  <span className="cifras font-semibold text-tinta">
+                    {secciones.toLocaleString("es-MX")}
+                  </span>{" "}
+                  secciones con responsable
+                </>
+              ) : (
+                "Todavía no hay secciones registradas"
+              )}
+            </p>
+            <Link
+              href="/territorio"
+              className="text-sm font-semibold text-naranja-texto underline-offset-4 hover:underline"
+            >
+              {cargando
+                ? "—"
+                : `${(r.seccionesSinResponsable ?? 0).toLocaleString("es-MX")} sin responsable`}
+            </Link>
+          </div>
+          <div
+            role="progressbar"
+            aria-labelledby="texto-cobertura"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={hayTotalSecciones ? porcentajeCobertura : 0}
+            aria-valuetext={
+              hayTotalSecciones
+                ? `${porcentajeCobertura} por ciento de cobertura`
+                : "Sin secciones registradas todavía"
+            }
+            className="mt-3 h-1.5 w-full overflow-hidden rounded-pildora bg-superficie-hundida"
+          >
+            <div
+              className="transicion-panel h-full w-full origin-left rounded-pildora bg-naranja"
+              style={{ transform: `scaleX(${hayTotalSecciones ? cobertura : 0})` }}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* El mapa como tarjeta grande, alineada al mismo eje que todo lo demás. */}
+      <section
+        aria-label="Mapa de secciones"
+        className="mt-8 overflow-hidden rounded-lienzo border border-borde elevacion-apoyo"
+      >
+        <div className="h-[26rem] sm:h-[32rem] lg:h-[38rem]">
           <MapaPagina conBarra={false} />
         </div>
       </section>
 
       {/* Tres columnas separadas por filetes, no tres tarjetas. */}
-      <section className="panel grid gap-y-6 p-4 md:grid-cols-3 md:divide-x md:divide-separador md:p-6">
+      <section className="grid gap-y-8 pt-8 md:grid-cols-3 md:divide-x md:divide-separador">
         <Columna titulo="Hoy" cola>
-          <ListaActividades
-            actividades={hoy}
-            vacio="Sin actividades hoy."
-            cargando={agenda.cargando}
-          />
+          <ListaActividades actividades={hoy} vacio="Sin actividades hoy." cargando={agenda.cargando} />
         </Columna>
         <Columna titulo="Esta semana" sangria cola>
           <ListaActividades
@@ -135,198 +237,67 @@ export default function Tablero() {
       </section>
 
       {/* Zona de apoyo, no protagonista: por eso va al final y desaparece por completo si hoy
-          no cumple nadie, en vez de dejar un panel vacío ocupando lugar. */}
+          no cumple nadie, en vez de dejar una tarjeta vacía ocupando lugar. */}
       {!cumpleanos.cargando && cumpleanos.datos.length > 0 && (
-        <ListaCumpleanos personas={cumpleanos.datos} />
+        <section className="mt-8 border-t border-separador pt-6">
+          <h2 className="mb-3 text-sm font-medium text-tinta-suave">
+            Cumplen años hoy · <span className="cifras text-tinta">{cumpleanos.datos.length}</span>
+          </h2>
+          <ul className="flex max-w-[46rem] flex-col divide-y divide-separador">
+            {cumpleanos.datos.map((c) => (
+              <li
+                key={c.persona_id}
+                className="grid min-h-[4.5rem] items-center gap-x-4 gap-y-2 py-3 md:grid-cols-[minmax(0,18rem)_minmax(0,12rem)_auto]"
+              >
+                <p className="truncate text-[15px] font-medium text-tinta">{c.nombre}</p>
+                <p className="text-sm text-tinta-suave">
+                  <span className="cifras">{c.edad} años</span>
+                  {c.seccion_clave && (
+                    <>
+                      {" · "}
+                      Sección <span className="cifras">{c.seccion_clave}</span>
+                    </>
+                  )}
+                </p>
+                {c.telefono_norm && (
+                  <a
+                    href={`https://wa.me/52${c.telefono_norm}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Escribir por WhatsApp a ${c.nombre}`}
+                    className="transicion-ui inline-flex h-11 shrink-0 items-center gap-2 justify-self-start rounded-control border border-borde bg-superficie px-3 text-sm text-tinta toque-actividad md:justify-self-end"
+                  >
+                    <MessageCircle className="size-4" aria-hidden />
+                    WhatsApp
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );
 }
 
-/* ---------------------------------------------------------------------------
- * Resumen: una sola superficie tranquila, no seis tarjetas
- * ------------------------------------------------------------------------- */
-
-function Resumen({
-  resumen: r,
-  cargando,
-  semanal,
-}: {
-  resumen: ResumenTablero;
-  cargando: boolean;
-  semanal: SemanaReporte[];
-}) {
-  const conResponsable = r.seccionesConResponsable ?? 0;
-  const sinResponsable = r.seccionesSinResponsable ?? 0;
-  const secciones = conResponsable + sinResponsable;
-  // Sin secciones no hay porcentaje que valga: antes que un NaN, no se muestra nada.
-  const porcentaje = secciones > 0 ? Math.round((conResponsable / secciones) * 100) : null;
-  const idCobertura = useId();
-
-  return (
-    <section aria-labelledby={`${idCobertura}-titulo`} className="panel overflow-hidden">
-      <h2 id={`${idCobertura}-titulo`} className="sr-only">
-        Resumen de personas alcanzadas y cobertura
-      </h2>
-
-      <div className="flex flex-col gap-6 p-4 md:p-6 lg:flex-row lg:gap-10">
-        {/* Métrica principal. Manda, pero ya no aplasta al resto. */}
-        <div className="lg:w-60 lg:shrink-0 lg:border-r lg:border-separador lg:pr-10">
-          <p className="text-sm text-tinta-suave">Personas alcanzadas</p>
-          <p className="cifra-mayor mt-1 text-tinta">
-            {cargando ? "—" : formatoCifra.format(r.personas ?? 0)}
-          </p>
-          <p className="mt-1 text-sm text-tinta-suave">
-            {cargando || secciones === 0 ? (
-              " "
-            ) : (
-              <>
-                en <span className="cifras">{formatoCifra.format(secciones)}</span> secciones
-              </>
-            )}
-          </p>
-        </div>
-
-        {/* Secundarias: una cuadrícula integrada, sin tarjeta alrededor de cada cifra. */}
-        <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3 lg:gap-x-10 xl:grid-cols-5">
-          <Dato valor={r.quierenParticipar} etiqueta="Quieren participar" cargando={cargando} />
-          <Dato valor={r.quierenInfo} etiqueta="Quieren información" cargando={cargando} />
-          <Dato valor={r.nuevasSemana} etiqueta="Nuevas esta semana" cargando={cargando}>
-            <Franja datos={semanal} />
-          </Dato>
-          <Dato valor={r.promovidos} etiqueta="Promovidos" cargando={cargando} />
-          <Dato
-            valor={r.aspirantesRepresentante}
-            etiqueta="Quieren ser representantes"
-            cargando={cargando}
-          />
-        </dl>
-      </div>
-
-      {/* Cobertura territorial: la barra es información, no adorno. Es la historia que el socio
-          va a preguntar en la junta, así que el texto solo se basta sin mirar el color. */}
-      <div className="border-t border-separador p-4 md:px-6 md:py-5">
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <h3 id={idCobertura} className="text-sm font-medium text-tinta">
-            Cobertura de responsables
-          </h3>
-          <p className="text-sm text-tinta-suave">
-            {cargando ? (
-              "Contando…"
-            ) : secciones === 0 ? (
-              "Todavía no hay secciones cargadas."
-            ) : (
-              <>
-                <span className="cifras font-semibold text-tinta">
-                  {formatoCifra.format(conResponsable)}
-                </span>{" "}
-                de <span className="cifras">{formatoCifra.format(secciones)}</span> secciones
-                {porcentaje !== null && (
-                  <>
-                    {" · "}
-                    <span className="cifras">{porcentaje}%</span>
-                  </>
-                )}
-              </>
-            )}
-          </p>
-        </div>
-
-        <div
-          role="progressbar"
-          aria-labelledby={idCobertura}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={porcentaje ?? 0}
-          aria-valuetext={
-            porcentaje === null
-              ? "Sin datos de cobertura"
-              : `${porcentaje} por ciento de las secciones tienen responsable`
-          }
-          className="mt-3 h-1.5 w-full max-w-[44rem] overflow-hidden rounded-pildora bg-superficie-hundida"
-        >
-          <div
-            className="transicion-panel h-full w-full origin-left rounded-pildora bg-naranja transition-transform"
-            style={{ transform: `scaleX(${(porcentaje ?? 0) / 100})` }}
-          />
-        </div>
-
-        {!cargando && sinResponsable > 0 && (
-          <p className="mt-2.5 text-sm">
-            <Link
-              href="/territorio"
-              className="text-naranja-texto underline-offset-4 hover:underline"
-            >
-              <span className="cifras">{formatoCifra.format(sinResponsable)}</span> sin responsable
-            </Link>
-          </p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function Dato({
+function MetricaSecundaria({
   valor,
   etiqueta,
   cargando,
-  children,
 }: {
   valor: number | undefined;
   etiqueta: string;
   cargando: boolean;
-  children?: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0">
+    <div className="text-center">
       <dd className="cifra-indicador text-tinta">
-        {cargando ? "—" : formatoCifra.format(valor ?? 0)}
+        {cargando ? "—" : (valor ?? 0).toLocaleString("es-MX")}
       </dd>
       <dt className="mt-0.5 text-sm text-tinta-suave">{etiqueta}</dt>
-      {!cargando && children}
     </div>
   );
 }
-
-/**
- * Diez semanas de altas reales, tomadas de reporteSemanal. Sin ejes, sin leyenda, sin caja: lo
- * que aporta es la forma. Lleva periodo escrito y descripción accesible porque una serie sin
- * periodo no dice nada, y si algún día no hay serie, simplemente no se pinta.
- */
-function Franja({ datos }: { datos: SemanaReporte[] }) {
-  if (datos.length === 0) return null;
-
-  const tope = Math.max(...datos.map((d) => d.personas), 1);
-  const total = datos.reduce((suma, d) => suma + d.personas, 0);
-
-  return (
-    <div className="mt-2.5">
-      <div
-        role="img"
-        aria-label={`Altas por semana en las últimas ${datos.length} semanas: ${formatoCifra.format(total)} personas en total, con un máximo de ${formatoCifra.format(tope)} en una semana.`}
-        className="flex h-6 items-end gap-[3px]"
-      >
-        {datos.map((d, i) => (
-          <span
-            key={d.inicio}
-            title={`${d.etiqueta}: ${d.personas}`}
-            className="w-1.5 rounded-[1px]"
-            style={{
-              height: `${Math.max(8, (d.personas / tope) * 100)}%`,
-              background: i === datos.length - 1 ? "var(--naranja)" : "var(--tinta-tenue)",
-              opacity: i === datos.length - 1 ? 1 : 0.4,
-            }}
-          />
-        ))}
-      </div>
-      <p className="mt-1.5 text-xs text-tinta-suave">Últimas {datos.length} semanas</p>
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------------------------
- * Contenido inferior
- * ------------------------------------------------------------------------- */
 
 function Columna({
   titulo,
@@ -341,8 +312,8 @@ function Columna({
   children: React.ReactNode;
 }) {
   return (
-    <div className={[sangria ? "md:pl-8" : "", cola ? "md:pr-8" : ""].join(" ").trim()}>
-      <h2 className="mb-3 text-sm font-semibold text-tinta">{titulo}</h2>
+    <div className={[sangria ? "md:pl-10" : "", cola ? "md:pr-10" : ""].join(" ").trim()}>
+      <h2 className="mb-3 text-sm font-medium text-tinta-suave">{titulo}</h2>
       {children}
     </div>
   );
@@ -361,7 +332,7 @@ function ListaActividades({
     return (
       <div className="flex flex-col gap-3">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-8 animate-pulse rounded-control bg-superficie-hundida" />
+          <div key={i} className="h-8 animate-pulse rounded bg-superficie-hundida" />
         ))}
       </div>
     );
@@ -375,19 +346,19 @@ function ListaActividades({
         <li key={a.id} className="py-2.5 first:pt-0">
           <Link href={`/actividades/${a.id}` as never} className="group block">
             <span className="flex items-baseline justify-between gap-3">
-              <span className="truncate text-sm font-medium text-tinta group-hover:text-naranja-texto">
+              <span className="truncate text-sm text-tinta group-hover:text-naranja-texto">
                 {a.nombre}
               </span>
               <span className="cifras shrink-0 text-xs text-tinta-suave">
                 {fechaCorta(a.fecha)}
               </span>
             </span>
-            <span className="mt-0.5 block text-sm text-tinta-suave">
+            <span className="mt-0.5 block text-xs text-tinta-suave">
               {ETIQUETA_TIPO_ACTIVIDAD[a.tipo]}
               {a.seccion_clave && (
                 <>
                   {" · "}
-                  <span className="cifras">Sección {a.seccion_clave}</span>
+                  <span className="cifras">{a.seccion_clave}</span>
                 </>
               )}
             </span>
@@ -415,64 +386,15 @@ function Pendiente({
         href={href as never}
         className="group flex items-baseline justify-between gap-3 py-2.5"
       >
-        <span className="text-sm text-tinta-suave group-hover:text-naranja-texto">{etiqueta}</span>
+        <span className="text-sm text-tinta-suave group-hover:text-tinta">{etiqueta}</span>
         {cargando ? (
           <span className="h-4 w-8 animate-pulse rounded bg-superficie-hundida" />
         ) : (
           <span className="cifra-atlas text-lg text-tinta">
-            {formatoCifra.format(valor ?? 0)}
+            {(valor ?? 0).toLocaleString("es-MX")}
           </span>
         )}
       </Link>
     </li>
-  );
-}
-
-/* ---------------------------------------------------------------------------
- * Listado de personas: nombre, datos secundarios y contacto, en ese orden y
- * sin un vacío entre el nombre y el botón.
- * ------------------------------------------------------------------------- */
-
-function ListaCumpleanos({ personas }: { personas: CumpleanosHoy[] }) {
-  return (
-    <section className="panel p-4 md:p-6">
-      <h2 className="text-sm font-semibold text-tinta">
-        Cumplen años hoy · <span className="cifras">{formatoCifra.format(personas.length)}</span>
-      </h2>
-
-      <ul className="mt-1 flex max-w-[46rem] flex-col divide-y divide-separador">
-        {personas.map((c) => (
-          <li
-            key={c.persona_id}
-            className="grid min-h-[4.5rem] grid-cols-[minmax(0,1fr)_auto] items-center justify-start gap-x-4 gap-y-1 py-3 md:grid-cols-[minmax(0,17rem)_minmax(0,12rem)_auto]"
-          >
-            <p className="min-w-0 text-[0.9375rem] font-medium text-tinta">{c.nombre}</p>
-
-            <p className="col-start-1 text-sm text-tinta-suave md:col-start-2">
-              <span className="cifras">{c.edad} años</span>
-              {c.seccion_clave && (
-                <>
-                  {" · "}
-                  <span className="cifras">Sección {c.seccion_clave}</span>
-                </>
-              )}
-            </p>
-
-            {c.telefono_norm && (
-              <a
-                href={`https://wa.me/52${c.telefono_norm}`}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`Escribir por WhatsApp a ${c.nombre}`}
-                className="transicion-ui col-start-2 row-span-2 row-start-1 md:row-span-1 inline-flex shrink-0 items-center gap-2 self-center rounded-control border border-borde bg-superficie px-3 text-sm font-medium text-tinta transition-colors hover:bg-naranja-suave hover:text-naranja-texto toque-actividad md:col-start-3"
-              >
-                <MessageCircle className="size-4" aria-hidden />
-                WhatsApp
-              </a>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, User } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId } from "@/lib/demarcaciones";
 import { etiquetaAlcance } from "@/lib/permisos";
@@ -19,11 +19,10 @@ function territorioDe(usuario: UsuarioActuante) {
  */
 export function ConmutadorRol({
   className,
-  compacto = false,
+  comoCapsula = false,
 }: {
   className?: string;
-  /** Dentro de la barra superior: altura de toque, ancho al contenido y sin sombra. */
-  compacto?: boolean;
+  comoCapsula?: boolean;
 }) {
   const { actuante, disponibles, cambiarActuante } = useActuante();
   const [abierto, setAbierto] = useState(false);
@@ -53,30 +52,39 @@ export function ConmutadorRol({
         aria-expanded={abierto}
         onClick={() => setAbierto((v) => !v)}
         className={cn(
-          "transicion-ui flex items-center gap-2.5 rounded-control border border-borde px-3 text-left transition-colors",
-          compacto
-            ? "min-h-11 max-w-[11.5rem] bg-superficie-hundida hover:bg-superficie sm:max-w-[15rem] md:max-w-[19rem]"
-            : "w-full bg-superficie py-2 hover:bg-superficie-hundida",
+          "transicion-ui flex items-center gap-3 text-left transition-colors",
+          comoCapsula
+            ? "capsula filo w-fit max-w-[17rem] rounded-pildora px-2 pr-3"
+            : "w-full rounded-control border border-borde bg-superficie px-3 py-2 hover:bg-superficie-hundida",
         )}
+        style={comoCapsula ? { minHeight: 44 } : undefined}
       >
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-tinta">
-            {ETIQUETA_ROL[actuante.rol]}
+        {comoCapsula ? (
+          <>
+            <span
+              className="flex size-7 shrink-0 items-center justify-center rounded-full bg-superficie-hundida"
+              aria-hidden
+            >
+              <User className="size-4 text-tinta-suave" />
+            </span>
+            <span className="truncate text-sm font-medium text-tinta">
+              {ETIQUETA_ROL[actuante.rol]}
+            </span>
+          </>
+        ) : (
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-tinta">
+              {ETIQUETA_ROL[actuante.rol]}
+            </span>
+            <span className="block truncate text-xs text-tinta-suave">
+              {territorioDe(actuante)}
+            </span>
           </span>
-          <span
-            className={cn(
-              "block truncate text-xs text-tinta-suave",
-              // En celular la barra mide 56: cabe el rol, no el territorio. Este ya se lee
-              // completo en el encabezado de la pantalla y dentro del menú.
-              compacto && "hidden md:block",
-            )}
-          >
-            {territorioDe(actuante)}
-          </span>
-        </span>
+        )}
         <ChevronDown
           className={cn(
             "transicion-ui size-4 shrink-0 text-tinta-tenue transition-transform",
+            comoCapsula && "ml-auto",
             abierto && "rotate-180",
           )}
           aria-hidden
@@ -87,7 +95,7 @@ export function ConmutadorRol({
         <ul
           role="listbox"
           aria-label="Cambiar de rol"
-          className="panel elevacion-flotante absolute right-0 z-50 mt-2 w-max min-w-full max-w-[min(22rem,calc(100vw-2rem))] overflow-hidden py-1"
+          className="vidrio filo absolute right-0 z-50 mt-2 w-full min-w-72 overflow-hidden rounded-tarjeta py-1"
         >
           {disponibles.map((usuario) => {
             const elegido = usuario.id === actuante.id;

@@ -1,22 +1,35 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Buscador } from "@/components/buscador";
 import { ConmutadorRol } from "@/components/conmutador-rol";
+import { cn } from "@/lib/utils";
 
 /**
- * Barra superior. Ocupa alto real en el armazón: es una fila hermana del contenido, no una capa
- * que flota encima de él. Se queda pegada al desplazarse, y por eso su superficie es casi opaca
- * y lleva un filete abajo, para que nada se lea a través de ella.
+ * Barra superior de escritorio: buscador y conmutador de rol en cápsula, alineados a la derecha.
  *
- * Es una de las dos únicas superficies con desenfoque de toda la aplicación; la otra es lo que
- * se monta sobre el mapa.
+ * En el tablero no ocupa alto en el flujo: es una capa `h-0` con `overflow-visible`, así que su
+ * contenido desborda hacia abajo sin empujar la página y el título grande de la pantalla —que
+ * reserva hueco a la derecha con `md:pr-[34rem]`— queda en el mismo renglón que las cápsulas.
+ *
+ * En las demás pantallas sí ocupa su alto. Esas tienen encabezado de ancho completo y una capa de
+ * alto cero se les montaba encima: el título de Personas alcanzadas y su botón de exportar
+ * quedaban debajo del buscador, tapados.
  */
 export function BarraSuperior() {
+  const ruta = usePathname();
+  const flotante = ruta === "/";
+
   return (
-    <div className="barra-superior sticky top-0 z-30">
-      <div className="mx-auto flex h-[var(--alto-barra)] w-full max-w-tope items-center gap-2 px-4 md:gap-4 md:px-8">
-        <Buscador className="min-w-0 flex-1 md:max-w-[35rem]" compacto />
-        <ConmutadorRol className="ml-auto shrink-0" compacto />
+    <div
+      className={cn(
+        "pointer-events-none sticky top-0 z-30 hidden px-6 pt-5 md:block",
+        flotante ? "h-0 overflow-visible" : "pb-3",
+      )}
+    >
+      <div className="mx-auto flex max-w-tope items-center justify-end gap-3">
+        <Buscador className="pointer-events-auto w-full max-w-[35rem]" comoCapsula />
+        <ConmutadorRol className="pointer-events-auto shrink-0" comoCapsula />
       </div>
     </div>
   );

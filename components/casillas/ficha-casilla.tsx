@@ -325,7 +325,7 @@ function BloqueRepresentante({
             className="campo"
           />
           {editable && mostrarResultados && !personaId && (buscando || resultados.length > 0) && (
-            <ul className="vidrio-denso absolute inset-x-0 top-full z-10 mt-1 flex max-h-48 flex-col gap-1 overflow-y-auto rounded-control p-1.5">
+            <ul className="vidrio-denso elevacion-flotante absolute inset-x-0 top-full z-10 mt-1 flex max-h-48 flex-col gap-1 overflow-y-auto rounded-control p-1.5">
               {buscando && <li className="px-2 py-1.5 text-xs text-tinta-tenue">Buscando…</li>}
               {!buscando &&
                 resultados.map((p) => (
@@ -486,7 +486,7 @@ export function FichaCasilla({
       aria-label={`Casilla ${casilla.numero}`}
       style={{ transformOrigin: `${origenLocal.x}px ${origenLocal.y}px` }}
       className={cn(
-        "vidrio-flotante transicion-panel fixed z-30 flex flex-col overflow-hidden",
+        "vidrio elevacion-flotante transicion-panel fixed z-30 flex flex-col overflow-hidden",
         "inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] max-h-[72vh] rounded-t-hoja",
         "md:inset-x-auto md:right-6 md:top-24 md:bottom-6 md:max-h-none md:w-[440px] md:rounded-tarjeta",
         enMovimiento && "vidrio-en-movimiento",
