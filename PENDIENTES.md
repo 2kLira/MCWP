@@ -412,3 +412,19 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     lo incluye, igual que ya pasaba con `/casillas` y `/importar`. En celular sí se llega, desde
     Más. **Falta decidir** si esos cuatro destinos entran al riel o si el riel se queda corto a
     propósito.
+
+## Fase F de la etapa electoral v2
+
+43. **Las tablas nuevas nacen con Row Level Security activo y hay que apagarlo.** `casillas`,
+    `representantes_casilla` y `resultados_historicos` quedaron con RLS encendido y sin políticas,
+    así que el navegador, que entra con la llave anónima, veía cero renglones: en el mapa se leía
+    "0 de 0 casillas" con 185 cargadas. Ninguna otra tabla del proyecto tiene RLS, porque no hay
+    login y el filtrado por territorio vive en `lib/permisos.ts`. Lo corrige
+    `supabase/migraciones/2026-09-14-rls-casillas.sql`.
+
+    **Esto va a volver a pasar con cada tabla nueva**, así que quien cree una tiene que revisarlo, y
+    la forma rápida de detectarlo es consultar la tabla con la llave anónima y con la secreta y
+    comparar los conteos: si la anónima devuelve cero y la secreta no, es esto.
+
+    Cuando entre el bloque de cuentas, RLS se enciende en todas las tablas con políticas que
+    repliquen la regla de `lib/permisos.ts`, y esta migración se revierte.

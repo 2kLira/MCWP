@@ -268,6 +268,9 @@ type FilaSeccion = {
 type FilaColonia = { id: number; nombre: string };
 type FilaColoniaSeccion = { colonia_id: number; seccion_clave: string; traslape_pct: number };
 type FilaProblematica = { id: number; nombre: string };
+// Catálogo de scripts/importar.ts, igual que secciones/colonias: este script solo lo lee, nunca
+// lo borra ni lo modifica.
+type FilaCasilla = { id: number; seccion_clave: string };
 
 async function seleccionarTodo<T>(tabla: string, columnas: string, orden: string): Promise<T[]> {
   const filas: T[] = [];
@@ -378,9 +381,20 @@ async function main() {
     process.exit(1);
   }
 
+  // Catálogo de casillas: lo carga scripts/importar.ts y este script solo lo lee, nunca lo toca.
+  const filasCasillas = await seleccionarTodo<FilaCasilla>("casillas", "id,seccion_clave", "id");
+  if (filasCasillas.length === 0) {
+    console.error(
+      "La tabla casillas está vacía. Corre primero la importación de casillas\n" +
+        "(scripts/importar.ts) y vuelve a correr este script.",
+    );
+    process.exit(1);
+  }
+
   // Re-ordenamos en memoria por clave/id: no dependemos del orden en que Postgres devuelva filas.
   filasSecciones.sort((a, b) => a.clave.localeCompare(b.clave));
   filasDemarcaciones.sort((a, b) => a.id - b.id);
+  filasCasillas.sort((a, b) => a.id - b.id);
 
   const nombrePorDemarcacion = new Map(filasDemarcaciones.map((d) => [d.id, d.nombre]));
   const idsDemarcaciones = filasDemarcaciones.map((d) => d.id);
@@ -410,7 +424,8 @@ async function main() {
 
   console.log(
     `Territorio leído: ${filasDemarcaciones.length} demarcaciones, ${filasSecciones.length} secciones, ` +
-      `${filasColonias.length} colonias, ${filasColoniaSeccion.length} traslapes colonia-sección.\n`,
+      `${filasColonias.length} colonias, ${filasColoniaSeccion.length} traslapes colonia-sección, ` +
+      `${filasCasillas.length} casillas.\n`,
   );
 
   /* ------------------------------------------------------------------------------------------
@@ -1452,6 +1467,139 @@ async function main() {
     }
   }
 
+  /* ------------------------------------------------------------------------------------------
+   * 15. Representantes de casilla: titular y suplente por casilla, con sus tres estados y con
+   *     quién los capturó. Es lo que llena el mapa de casillas y sus barras de avance.
+   * ------------------------------------------------------------------------------------------ */
+
+  type CargoRepresentante = "titular" | "suplente";
+  type EstadoCapacitacion = "capacitado" | "por_capacitar";
+  type EstadoManual = "entregado" | "pendiente";
+  type EstadoAcreditacion = "acreditado" | "pendiente";
+
+  type FilaRepresentante = {
+    id: string;
+    casilla_id: number;
+    cargo: CargoRepresentante;
+    persona_id: string | null;
+    nombre: string;
+    telefono_norm: string;
+    capacitacion: EstadoCapacitacion;
+    manual: EstadoManual;
+    acreditacion: EstadoAcreditacion;
+    registrado_por: string;
+    created_at: string;
+  };
+
+  // Cobertura por prioridad de sección (spec de esta tarea): A alta, B media, sin prioridad baja.
+  // "suplente" es la tasa MARGINAL sobre el total de casillas, no condicionada al titular; como
+  // nunca hay suplente sin titular, la probabilidad condicionada se deriva dividiendo entre la
+  // tasa de titular (p. ej. A: 0.70 / 0.85 ≈ 82 % de los titulares también tienen suplente).
+  const COBERTURA_POR_PRIORIDAD: Record<"A" | "B" | "sin_prioridad", { titular: number; suplenteMarginal: number }> = {
+    A: { titular: 0.85, suplenteMarginal: 0.7 },
+    B: { titular: 0.6, suplenteMarginal: 0.4 },
+    sin_prioridad: { titular: 0.3, suplenteMarginal: 0.15 },
+  };
+
+  function claveCobertura(prioridad: "A" | "B" | null): "A" | "B" | "sin_prioridad" {
+    return prioridad ?? "sin_prioridad";
+  }
+
+  // Los tres estados, correlacionados a propósito: capacitación primero, manual entregado
+  // condicionado a la capacitación (algo más probable si ya se capacitó, pero el manual se
+  // reparte casi aparte porque es el trámite más fácil de los tres), y acreditación al final,
+  // que solo despega de verdad cuando ya se está capacitado y con manual entregado — así casi
+  // nunca sale un acreditado sin capacitar. El residuo pequeño fuera de ese grupo es ruido de
+  // captura, no la regla.
+  function estadosAlAzar(): { capacitacion: EstadoCapacitacion; manual: EstadoManual; acreditacion: EstadoAcreditacion } {
+    const capacitado = conProbabilidad(0.6);
+    const manualEntregado = conProbabilidad(capacitado ? 0.85 : 0.475);
+    const puedeAcreditar = capacitado && manualEntregado;
+    const acreditado = conProbabilidad(puedeAcreditar ? 0.65 : 0.03);
+    return {
+      capacitacion: capacitado ? "capacitado" : "por_capacitar",
+      manual: manualEntregado ? "entregado" : "pendiente",
+      acreditacion: acreditado ? "acreditado" : "pendiente",
+    };
+  }
+
+  // Quién es el representante: ~45 % ya están en el padrón sembrado. Se prioriza, en este orden,
+  // a quien levantó la mano (quiere_ser_representante) de la propia sección, luego de la misma
+  // demarcación, y solo si no hay nadie con la mano levantada se cae a cualquier persona local
+  // (primero de la sección, luego de la demarcación) antes de generar un nombre nuevo. Cada
+  // persona del padrón se usa como máximo una vez: nadie cuida dos casillas a la vez.
+  const personaUsadaComoRepresentante = new Set<string>();
+
+  function candidatoPadronPara(seccionClave: string, demarcacionId: number): FilaPersona | null {
+    const disponible = (p: FilaPersona) => !personaUsadaComoRepresentante.has(p.id);
+    const enSeccion = (personasPorSeccionClave.get(seccionClave) ?? []).filter(disponible);
+    const enDemarcacion = (personasPorDemarcacionId.get(demarcacionId) ?? []).filter(disponible);
+
+    const enSeccionConMano = enSeccion.filter((p) => p.quiere_ser_representante);
+    if (enSeccionConMano.length > 0) return elegirUno(enSeccionConMano);
+    const enDemarcacionConMano = enDemarcacion.filter((p) => p.quiere_ser_representante);
+    if (enDemarcacionConMano.length > 0) return elegirUno(enDemarcacionConMano);
+    if (enSeccion.length > 0) return elegirUno(enSeccion);
+    if (enDemarcacion.length > 0) return elegirUno(enDemarcacion);
+    return null;
+  }
+
+  const PROB_DESDE_PADRON = 0.45;
+
+  function construirRepresentante(
+    casilla: FilaCasilla,
+    seccion: FilaSeccion,
+    cargo: CargoRepresentante,
+  ): FilaRepresentante {
+    const usarPadron = conProbabilidad(PROB_DESDE_PADRON);
+    const persona = usarPadron ? candidatoPadronPara(seccion.clave, seccion.demarcacion_id) : null;
+    if (persona) personaUsadaComoRepresentante.add(persona.id);
+
+    const telefono = persona ? null : siguienteTelefono();
+    const estados = estadosAlAzar();
+
+    return {
+      id: uuidDeterminista(),
+      casilla_id: casilla.id,
+      cargo,
+      persona_id: persona?.id ?? null,
+      nombre: persona?.nombre ?? nombreVerosimil(),
+      telefono_norm: persona?.telefono_norm ?? telefono!.norm,
+      ...estados,
+      registrado_por: usuarioLocal(seccion.demarcacion_id, seccion.clave),
+      // Levantamiento reciente y en curso: la estructura arma casillas en las últimas semanas,
+      // no de una sola vez.
+      created_at: fechaConHoraAlAzar(sumarDias(HOY, -entero(0, 45))).toISOString(),
+    };
+  }
+
+  const representantes: FilaRepresentante[] = [];
+  // casilla_id -> qué cargos quedaron cubiertos, para el informe de cobertura por casilla.
+  const coberturaPorCasilla = new Map<number, { titular: boolean; suplente: boolean }>();
+
+  for (const casilla of filasCasillas) {
+    const seccion = seccionPorClave.get(casilla.seccion_clave);
+    if (!seccion) {
+      // No debería pasar: las 169 secciones de casillas.csv están todas en el catálogo. Si
+      // llegara a faltar una, se salta la casilla en vez de reventar el sembrado completo.
+      console.error(
+        `Aviso: la casilla ${casilla.id} apunta a la sección ${casilla.seccion_clave}, que no está ` +
+          "en el catálogo leído. Se deja sin representantes.",
+      );
+      continue;
+    }
+    const { titular: probTitular, suplenteMarginal } = COBERTURA_POR_PRIORIDAD[claveCobertura(seccion.prioridad)];
+
+    const hayTitular = conProbabilidad(probTitular);
+    // Nunca suplente sin titular: la probabilidad condicionada sale de dividir la tasa marginal
+    // entre la de titular.
+    const haySuplente = hayTitular && conProbabilidad(suplenteMarginal / probTitular);
+
+    if (hayTitular) representantes.push(construirRepresentante(casilla, seccion, "titular"));
+    if (haySuplente) representantes.push(construirRepresentante(casilla, seccion, "suplente"));
+    coberturaPorCasilla.set(casilla.id, { titular: hayTitular, suplente: haySuplente });
+  }
+
   /* ============================================================================================
    * Informe de verificación
    * ============================================================================================ */
@@ -1547,11 +1695,53 @@ async function main() {
     },
   ]);
 
+  console.log("\nRepresentantes de casilla:");
+  const titulares = representantes.filter((r) => r.cargo === "titular");
+  const suplentes = representantes.filter((r) => r.cargo === "suplente");
+  const casillasCompletas = [...coberturaPorCasilla.values()].filter((c) => c.titular && c.suplente).length;
+  console.table([
+    {
+      casillas: filasCasillas.length,
+      "con titular": titulares.length,
+      "con suplente": suplentes.length,
+      completas: casillasCompletas,
+      "desde padrón": representantes.filter((r) => r.persona_id !== null).length,
+      "nombre nuevo": representantes.filter((r) => r.persona_id === null).length,
+    },
+  ]);
+
+  console.log("Representantes por estado:");
+  console.table([
+    {
+      capacitados: representantes.filter((r) => r.capacitacion === "capacitado").length,
+      "manual entregado": representantes.filter((r) => r.manual === "entregado").length,
+      acreditados: representantes.filter((r) => r.acreditacion === "acreditado").length,
+      total: representantes.length,
+    },
+  ]);
+
+  console.log("Cobertura de casillas por prioridad de su sección:");
+  const filasCoberturaPrioridad = (["A", "B", "sin_prioridad"] as const).map((clave) => {
+    const casillasDeEstaPrioridad = filasCasillas.filter(
+      (c) => claveCobertura(seccionPorClave.get(c.seccion_clave)?.prioridad ?? null) === clave,
+    );
+    const conTitular = casillasDeEstaPrioridad.filter((c) => coberturaPorCasilla.get(c.id)?.titular).length;
+    const conSuplente = casillasDeEstaPrioridad.filter((c) => coberturaPorCasilla.get(c.id)?.suplente).length;
+    const total = casillasDeEstaPrioridad.length;
+    return {
+      prioridad: clave,
+      casillas: total,
+      "% con titular": total > 0 ? ((conTitular / total) * 100).toFixed(1) : "—",
+      "% con suplente": total > 0 ? ((conSuplente / total) * 100).toFixed(1) : "—",
+    };
+  });
+  console.table(filasCoberturaPrioridad);
+
   console.log(
     `\nResumen: ${usuarios.length} usuarios, ${asignaciones.length} asignaciones, ${personas.length} personas, ` +
       `${actividades.length} actividades, ${actividadBrigadistas.length} actividad_brigadistas, ` +
       `${participaciones.length} participaciones, ${menciones.length} menciones, ${solicitudes.length} solicitudes, ` +
-      `${seguimientos.length} seguimientos.`,
+      `${seguimientos.length} seguimientos, ${representantes.length} representantes_casilla.`,
   );
 
   if (SIMULAR) {
@@ -1570,6 +1760,10 @@ async function main() {
   await vaciarUuid("participaciones");
   await vaciarUuid("actividad_brigadistas", "usuario_id");
   await vaciarUuid("fotos");
+  // representantes_casilla apunta a personas (persona_id) y a usuarios (registrado_por): se borra
+  // antes de llegar a esas dos tablas, más abajo. No se toca casillas —no es de este script y
+  // además, por el cascade de casilla_id, borrarla se llevaría estos renglones de todos modos.
+  await vaciarUuid("representantes_casilla");
   {
     // Antes de borrar actividades hay que limpiar personas.actividad_origen: si quedara alguna
     // fila apuntando a una actividad que estamos por borrar, la llave foránea lo rechazaría.
@@ -1597,6 +1791,9 @@ async function main() {
   await insertarPorLotes("menciones_problematica", menciones, TAMANO_LOTE);
   await insertarPorLotes("solicitudes", solicitudes, TAMANO_LOTE);
   await insertarPorLotes("seguimientos", seguimientos, TAMANO_LOTE);
+  // Va al final: depende de personas y de usuarios, ya insertados arriba, y de casillas, que ya
+  // estaba cargada desde antes de correr este script.
+  await insertarPorLotes("representantes_casilla", representantes, TAMANO_LOTE);
 
   console.log("\nSembrado terminado.");
 }
