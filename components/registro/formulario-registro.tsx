@@ -75,6 +75,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const [quiereInfo, setQuiereInfo] = useState(true);
   const [esPromovido, setEsPromovido] = useState(false);
   const [quiereSerRepresentante, setQuiereSerRepresentante] = useState(false);
+  const [recibioApoyo, setRecibioApoyo] = useState(false);
   const [elegidas, setElegidas] = useState<number[]>([]);
   const [comentario, setComentario] = useState("");
   const [consiente, setConsiente] = useState(false);
@@ -291,6 +292,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         quiere_info: quiereInfo,
         es_promovido: esPromovido,
         quiere_ser_representante: quiereSerRepresentante,
+        recibio_apoyo: recibioApoyo,
         aviso_version: AVISO_VERSION,
         consentimiento_en: new Date().toISOString(),
         registrada_por: actuante.id,
@@ -358,6 +360,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     setQuiereInfo(true);
     setEsPromovido(false);
     setQuiereSerRepresentante(false);
+    setRecibioApoyo(false);
     setElegidas([]);
     setComentario("");
     setConsiente(false);
@@ -387,7 +390,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         <button
           type="button"
           onClick={otraCaptura}
-          className="transicion-ui w-full max-w-xs rounded-control bg-naranja text-sm font-medium text-tinta toque-actividad"
+          className="transicion-ui w-full max-w-xs rounded-control bg-naranja text-sm font-medium text-sobre-naranja toque-actividad"
         >
           Registrar a alguien más
         </button>
@@ -702,6 +705,11 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
             valor={quiereSerRepresentante}
             alCambiar={setQuiereSerRepresentante}
           />
+          <Interruptor
+            etiqueta="Recibió apoyo"
+            valor={recibioApoyo}
+            alCambiar={setRecibioApoyo}
+          />
         </div>
 
         <div className="flex flex-col gap-2">
@@ -796,7 +804,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         <button
           type="submit"
           disabled={!listo || estado === "guardando"}
-          className="transicion-ui sticky bottom-20 rounded-control bg-naranja text-base font-medium text-tinta toque-actividad disabled:opacity-50 md:bottom-4"
+          className="transicion-ui sticky bottom-20 rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50 md:bottom-4"
         >
           {estado === "guardando" ? "Guardando…" : "Guardar"}
         </button>

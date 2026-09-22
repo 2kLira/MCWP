@@ -148,7 +148,7 @@ export function FichaSeccion({
             "no prioritaria", la ausencia ya dice eso. */}
         {dato?.prioridad && (
           <div className="mb-4 flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-tinta">
+            <span className="inline-flex items-center gap-1.5 rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-sobre-naranja">
               {`Prioridad ${dato.prioridad}`}
             </span>
           </div>
@@ -178,6 +178,7 @@ export function FichaSeccion({
             <dl className="grid grid-cols-2 gap-3 border-b border-borde py-4">
               <Renglon etiqueta="Personas alcanzadas" valor={formatoCifra.format(dato.personas)} />
               <Renglon etiqueta="Promovidos" valor={formatoCifra.format(dato.promovidos)} />
+              <Renglon etiqueta="Recibieron apoyo" valor={formatoCifra.format(dato.apoyos)} />
               <Renglon
                 etiqueta="Quieren participar"
                 valor={formatoCifra.format(dato.quierenParticipar)}

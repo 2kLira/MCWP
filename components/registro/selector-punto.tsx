@@ -86,7 +86,7 @@ export function SelectorPunto({
             type="button"
             disabled={!clave}
             onClick={() => alConfirmar(centro, clave)}
-            className="transicion-ui flex-1 rounded-control bg-naranja text-sm font-medium text-tinta toque-actividad disabled:opacity-50"
+            className="transicion-ui flex-1 rounded-control bg-naranja text-sm font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
           >
             Usar este punto
           </button>

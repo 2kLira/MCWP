@@ -5,8 +5,8 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { esVistaDeCasillas, grupoDePrioritarias, VISTAS_MAPA, type VistaMapa } from "./datos-mapa";
 
-/** Las cuatro vistas que se pintan con la escala de cinco pasos, por cuantiles. */
-const VISTAS_DE_ESCALA = new Set<VistaMapa>(["personas", "promovidos", "actividad", "recorridos"]);
+/** Las cinco vistas que se pintan con la escala de cinco pasos, por cuantiles. */
+const VISTAS_DE_ESCALA = new Set<VistaMapa>(["personas", "promovidos", "apoyos", "actividad", "recorridos"]);
 
 /**
  * Una muestra de color junto a su etiqueta, fiel a como esa sección se pinta en el mapa: relleno

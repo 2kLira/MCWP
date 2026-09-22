@@ -107,7 +107,7 @@ export function CalendarioMensual({
               <span
                 className={cn(
                   "cifras grid size-6 place-items-center rounded-full text-sm",
-                  esHoy ? "bg-naranja text-tinta" : "text-tinta",
+                  esHoy ? "bg-naranja text-sobre-naranja" : "text-tinta",
                 )}
               >
                 {format(dia, "d")}

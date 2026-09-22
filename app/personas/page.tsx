@@ -61,6 +61,7 @@ export default function Personas() {
   const [promovido, setPromovido] = useState(false);
   const [representante, setRepresentante] = useState(false);
   const [genero, setGenero] = useState<Genero | null>(null);
+  const [apoyo, setApoyo] = useState<boolean | null>(null);
 
   const [filas, setFilas] = useState<PersonaEnLista[]>([]);
   const [total, setTotal] = useState(0);
@@ -93,8 +94,9 @@ export default function Personas() {
       promovido: promovido || undefined,
       representante: representante || undefined,
       genero,
+      apoyo,
     }),
-    [textoDiferido, demarcacionId, seccionClave, participar, info, promovido, representante, genero],
+    [textoDiferido, demarcacionId, seccionClave, participar, info, promovido, representante, genero, apoyo],
   );
 
   useEffect(() => {
@@ -208,6 +210,16 @@ export default function Personas() {
               </option>
             ))}
           </select>
+          <select
+            value={apoyo == null ? "" : apoyo ? "si" : "no"}
+            onChange={(e) => setApoyo(e.target.value === "" ? null : e.target.value === "si")}
+            aria-label="Filtrar por apoyo recibido"
+            className="campo w-auto"
+          >
+            <option value="">Con y sin apoyo</option>
+            <option value="si">Recibió apoyo</option>
+            <option value="no">Sin apoyo</option>
+          </select>
           <Filtro etiqueta="Quiere participar" activo={participar} alCambiar={setParticipar} />
           <Filtro etiqueta="Quiere información" activo={info} alCambiar={setInfo} />
           <Filtro etiqueta="Promovido" activo={promovido} alCambiar={setPromovido} />
@@ -282,10 +294,11 @@ export default function Personas() {
                     </span>
                     <span className="mt-1 flex justify-end gap-1">
                       {persona.es_promovido && (
-                        <span className="rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-tinta">
+                        <span className="rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-sobre-naranja">
                           Promovido
                         </span>
                       )}
+                      {persona.recibio_apoyo && <span className="pildora">Apoyo</span>}
                       {persona.quiere_participar && <span className="pildora">Participa</span>}
                       {persona.quiere_info && <span className="pildora">Info</span>}
                     </span>

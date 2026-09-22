@@ -37,7 +37,7 @@ export function BarraInferior() {
                   href={href}
                   data-destino
                   aria-current={activo ? "page" : undefined}
-                  className="transicion-ui flex h-12 w-full flex-col items-center justify-center gap-1 rounded-control bg-naranja text-tinta transition-transform active:scale-[0.97]"
+                  className="transicion-ui flex h-12 w-full flex-col items-center justify-center gap-1 rounded-control bg-naranja text-sobre-naranja transition-transform active:scale-[0.97]"
                 >
                   <Icono className="size-5" aria-hidden />
                   <span className="text-[0.625rem] font-medium leading-none">{etiqueta}</span>

@@ -103,8 +103,8 @@ export function MapaCasillas({
     // El trazo por defecto no puede ser --superficie: una casilla "vacía" ya pinta con el paso
     // más claro de la escala (casi blanco) y un aro igual de claro la volvería invisible sobre
     // el mapa base claro. --tinta-tenue sí contrasta contra cualquier paso de la escala.
-    const colorTrazo = leerColor("--tinta-tenue", "#94918c");
-    const colorSeleccion = leerColor("--tinta", "#1c1b19");
+    const colorTrazo = leerColor("--tinta-tenue", "#686e77");
+    const colorSeleccion = leerColor("--tinta", "#1a1d22");
     const durUi = prefiereMenosMovimiento() ? 0 : leerDuracionMs("--dur-ui", 160);
 
     // Halo de selección, debajo del punto: un círculo más grande que solo se nota cuando la

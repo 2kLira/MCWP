@@ -12,11 +12,12 @@ import { seccionesResumen, type SeccionResumen } from "@/lib/datos/catalogos";
 import type { ColeccionSecciones } from "@/lib/territorio";
 import type { UsuarioActuante } from "@/lib/tipos";
 
-/** Las ocho vistas del mapa, en el orden en que aparecen en el selector. */
+/** Las nueve vistas del mapa, en el orden en que aparecen en el selector. */
 export type VistaMapa =
   | "estructura"
   | "personas"
   | "promovidos"
+  | "apoyos"
   | "actividad"
   | "recorridos"
   | "prioritarias_a"
@@ -27,6 +28,7 @@ export const VISTAS_MAPA: ReadonlyArray<{ id: VistaMapa; etiqueta: string }> = [
   { id: "estructura", etiqueta: "Estructura" },
   { id: "personas", etiqueta: "Personas alcanzadas" },
   { id: "promovidos", etiqueta: "Promovidos" },
+  { id: "apoyos", etiqueta: "Apoyo entregado" },
   { id: "actividad", etiqueta: "Actividad" },
   { id: "recorridos", etiqueta: "Recorridos" },
   { id: "prioritarias_a", etiqueta: "Prioritarias A" },
@@ -78,6 +80,8 @@ export type DatoSeccion = {
   recorridos: number;
   actividadTotal: number;
   promovidos: number;
+  /** Personas registradas en la sección que ya recibieron apoyo. */
+  apoyos: number;
   aspirantes: number;
   ultimaActividad: string | null;
   proximaActividad: string | null;
@@ -119,6 +123,8 @@ export async function cargarDatosMapa(
       recorridos: fila.recorridos,
       actividadTotal: fila.reuniones + fila.activismo + fila.recorridos,
       promovidos: fila.promovidos,
+      // La columna llega con la migración de la rama soet; sin ella se lee como cero.
+      apoyos: fila.apoyos ?? 0,
       aspirantes: fila.aspirantes_representante,
       ultimaActividad: fila.ultima_actividad,
       proximaActividad: fila.proxima_actividad,
@@ -180,6 +186,8 @@ function metricaDeVista(vista: VistaMapa, dato: DatoSeccion | undefined): number
       return dato.personas;
     case "promovidos":
       return dato.promovidos;
+    case "apoyos":
+      return dato.apoyos;
     case "actividad":
       return dato.actividadTotal;
     case "recorridos":

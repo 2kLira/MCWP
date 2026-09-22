@@ -210,7 +210,7 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
       <button
         type="submit"
         disabled={!listo || guardando}
-        className="transicion-ui rounded-control bg-naranja text-base font-medium text-tinta toque-actividad disabled:opacity-50"
+        className="transicion-ui rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
       >
         {guardando ? "Guardando…" : "Crear actividad"}
       </button>

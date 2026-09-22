@@ -75,7 +75,7 @@ export default function Actividades() {
           <button
             type="button"
             onClick={() => setAbierta(true)}
-            className="transicion-ui inline-flex items-center gap-2 rounded-control bg-naranja px-4 text-sm font-medium text-tinta toque-actividad"
+            className="transicion-ui inline-flex items-center gap-2 rounded-control bg-naranja px-4 text-sm font-medium text-sobre-naranja toque-actividad"
           >
             <Plus className="size-4" aria-hidden />
             Nueva actividad

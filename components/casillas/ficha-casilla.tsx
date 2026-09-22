@@ -398,7 +398,7 @@ function BloqueRepresentante({
               type="button"
               disabled={!puedeGuardar}
               onClick={alGuardar}
-              className="transicion-ui rounded-control bg-naranja px-4 text-sm font-medium text-tinta toque-actividad disabled:opacity-50"
+              className="transicion-ui rounded-control bg-naranja px-4 text-sm font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
             >
               {guardando ? "Guardando…" : "Guardar"}
             </button>

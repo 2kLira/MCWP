@@ -40,6 +40,8 @@ export type SeccionResumen = {
   proxima_actividad: string | null;
   promovidos: number;
   aspirantes_representante: number;
+  /** Personas de la sección que recibieron apoyo (migración de la rama soet). */
+  apoyos: number;
   /* Fase B/C · la sección como unidad de meta. Nulos legítimos: la lista nominal y la meta de
    * votos llegan por Excel del cliente y todavía no están cargadas para todas las secciones. */
   lista_nominal: number | null;

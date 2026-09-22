@@ -208,7 +208,7 @@ function MomentoElegir({
           accept=".csv,text/csv"
           onChange={onElegir}
           disabled={revisando}
-          className="text-sm text-tinta-suave file:mr-3 file:rounded-control file:border-0 file:bg-naranja file:px-3 file:py-2 file:text-sm file:font-medium file:text-tinta disabled:opacity-50"
+          className="text-sm text-tinta-suave file:mr-3 file:rounded-control file:border-0 file:bg-naranja file:px-3 file:py-2 file:text-sm file:font-medium file:text-sobre-naranja disabled:opacity-50"
         />
       </label>
 
@@ -282,7 +282,7 @@ function MomentoPrevisualizar({
             type="button"
             onClick={onImportar}
             disabled={importando}
-            className="transicion-ui flex-1 rounded-control bg-naranja text-sm font-medium text-tinta toque-actividad disabled:opacity-50"
+            className="transicion-ui flex-1 rounded-control bg-naranja text-sm font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
           >
             {importando ? "Importando…" : `Importar ${totalImportar} promovidos`}
           </button>

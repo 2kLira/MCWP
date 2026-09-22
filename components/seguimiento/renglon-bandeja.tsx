@@ -31,7 +31,7 @@ export function RenglonBandeja({
               esperando una respuesta concreta, no solo información. Mismo tratamiento que
               "Promovido" en la lista de personas: relleno naranja, texto casi negro. */}
           {fila.tiene_solicitud && (
-            <span className="rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-tinta">
+            <span className="rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-sobre-naranja">
               Petición
             </span>
           )}

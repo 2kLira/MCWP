@@ -266,7 +266,7 @@ export function FormularioRepresentante() {
           <button
             type="button"
             onClick={otraCaptura}
-            className="transicion-ui w-full rounded-control bg-naranja text-sm font-medium text-tinta toque-actividad"
+            className="transicion-ui w-full rounded-control bg-naranja text-sm font-medium text-sobre-naranja toque-actividad"
           >
             Registrar otro en esta sección
           </button>
@@ -490,7 +490,7 @@ export function FormularioRepresentante() {
       <button
         type="submit"
         disabled={!listo || estado === "guardando"}
-        className="transicion-ui sticky bottom-20 rounded-control bg-naranja text-base font-medium text-tinta toque-actividad disabled:opacity-50 md:bottom-4"
+        className="transicion-ui sticky bottom-20 rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50 md:bottom-4"
       >
         {estado === "guardando" ? "Guardando…" : "Guardar"}
       </button>

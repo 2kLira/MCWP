@@ -371,7 +371,7 @@ function BloqueCierre({
           type="button"
           disabled={!conclusion.trim() || !fotoCierre || cerrando}
           onClick={confirmar}
-          className="transicion-ui rounded-control bg-naranja text-base font-medium text-tinta toque-actividad disabled:opacity-50"
+          className="transicion-ui rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
         >
           {cerrando ? "Cerrando…" : "Confirmar cierre"}
         </button>

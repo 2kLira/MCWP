@@ -10,6 +10,7 @@ import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido } from "@/lib/transicion";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
+  actualizarPersona,
   historialPersona,
   marcarPromovido,
   obtenerPersona,
@@ -91,6 +92,17 @@ export function FichaPersona({ id }: { id: string }) {
     if (r.datos) setRecargar((v) => v + 1);
   }
 
+  const recibioApoyo = p.recibio_apoyo;
+
+  async function alternarApoyo() {
+    setMarcando(true);
+    setAvisoPromovido(null);
+    const r = await actualizarPersona(actuante, id, { recibio_apoyo: !recibioApoyo });
+    setMarcando(false);
+    if (r.aviso) setAvisoPromovido(r.aviso);
+    if (r.datos) setRecargar((v) => v + 1);
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <Volver />
@@ -151,11 +163,12 @@ export function FichaPersona({ id }: { id: string }) {
         <div className="flex flex-wrap items-center gap-2">
           {p.quiere_participar && <span className="pildora">Quiere participar</span>}
           {p.quiere_info && <span className="pildora">Quiere información</span>}
+          {p.recibio_apoyo && <span className="pildora">Recibió apoyo</span>}
           {p.aviso_version && (
             <span className="pildora">Consentimiento {p.aviso_version}</span>
           )}
           {p.es_promovido && (
-            <span className="inline-flex items-center gap-1.5 rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-tinta">
+            <span className="inline-flex items-center gap-1.5 rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-sobre-naranja">
               Promovido
             </span>
           )}
@@ -179,6 +192,14 @@ export function FichaPersona({ id }: { id: string }) {
                 : p.es_promovido
                   ? "Quitar promovido"
                   : "Marcar como promovido"}
+            </button>
+            <button
+              type="button"
+              onClick={alternarApoyo}
+              disabled={marcando}
+              className="transicion-ui w-fit rounded-control border border-borde bg-superficie px-4 text-sm font-medium text-tinta toque-actividad disabled:opacity-50"
+            >
+              {marcando ? "Guardando…" : recibioApoyo ? "Quitar apoyo" : "Marcar apoyo recibido"}
             </button>
             {avisoPromovido && <p className="text-sm text-alerta">{avisoPromovido}</p>}
           </div>

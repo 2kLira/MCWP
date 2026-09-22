@@ -428,3 +428,20 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
 
     Cuando entre el bloque de cuentas, RLS se enciende en todas las tablas con políticas que
     repliquen la regla de `lib/permisos.ts`, y esta migración se revierte.
+
+## Rama soet
+
+56. **Acento azul en vez de naranja.** En esta rama los tokens `--naranja*` y `--mapa-*` de
+    `app/globals.css` valen azul, y los neutros perdieron la calidez que el spec les daba para
+    acompañar al naranja. Los nombres se dejaron igual para no divergir de main. La regla del spec
+    "nunca blanco sobre naranja" se invierte: el azul de relleno es oscuro, así que el texto encima va
+    en blanco con el token nuevo `--sobre-naranja` (`text-sobre-naranja`). En oscuro el relleno sube a
+    `#2b6fd0` para seguir despegándose del fondo.
+
+57. **Recibió apoyo.** `spec/modelo-datos.md` no tiene este campo. Se agregó `personas.recibio_apoyo`
+    como sí o no, sin decir qué apoyo fue ni cuándo se entregó; si el cliente lo quiere, eso es una
+    tabla aparte de entregas, no más columnas. El "mapa de calor" se resolvió como una vista más del
+    mapa por sección (cuantiles, igual que Promovidos) y no como mapa de puntos: la sección es la
+    unidad exacta del sistema. La migración es `supabase/migraciones/2026-09-21-soet-apoyo.sql` y
+    marca a tres de cada diez personas sembradas para que la demo no salga vacía. Falta confirmar si
+    la demo de esta rama usa la misma base que main o una propia.

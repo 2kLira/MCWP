@@ -109,7 +109,7 @@ function Boton({
         className={cn(
           "transicion-ui grid size-11 place-items-center rounded-control transition-colors",
           primaria
-            ? "bg-naranja text-tinta"
+            ? "bg-naranja text-sobre-naranja"
             : activo
               ? "text-naranja-texto"
               : "text-tinta-suave hover:text-tinta",
