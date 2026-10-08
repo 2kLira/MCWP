@@ -13,7 +13,7 @@ function leerVariable(nombre: string): string {
 
 /** Un paso de la escala del mapa, `--mapa-0` a `--mapa-4`. */
 export function leerColorMapa(paso: 0 | 1 | 2 | 3 | 4): string {
-  return leerVariable(`--mapa-${paso}`) || "#eceff3";
+  return leerVariable(`--mapa-${paso}`) || "#efedea";
 }
 
 /** Los cinco pasos de la escala, en orden, tal como están hoy en app/globals.css. */

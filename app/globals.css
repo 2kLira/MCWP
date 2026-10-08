@@ -20,62 +20,64 @@
    =========================================================================== */
 
 :root {
-  /* Rama soet: el acento es azul. Los tokens conservan el nombre "naranja" para no divergir de
-     main, pero aquí valen azul. A diferencia del naranja, este azul es oscuro: el texto encima de
-     un relleno va en blanco (--sobre-naranja), nunca en --tinta. */
-  --naranja: #0057b8; /* relleno, con blanco encima: 6.87 a 1 */
-  --naranja-texto: #0052ad; /* azul tipográfico en claro, 6.96 a 1 sobre el fondo */
-  --naranja-claro: #6aa9f5; /* azul tipográfico en oscuro, 7.75 a 1 sobre el fondo */
+  /* Naranja Pantone 151 C. Contra blanco da 2.49 a 1: como relleno sí, como texto no.
+     De ahí las variantes tipográficas y de estado. */
+  --naranja: #ff8200; /* solo relleno, con --tinta encima */
+  --naranja-texto: #a84400; /* naranja tipográfico en claro, 5.5 a 1 sobre el marfil cálido */
+  --naranja-claro: #ff9b33; /* naranja tipográfico en oscuro, 8.91 sobre el fondo */
   --naranja-tipografico: var(--naranja-texto);
-  --naranja-fuerte: #004a9e; /* relleno azul al pasar el cursor */
-  --sobre-naranja: #ffffff; /* texto encima del relleno azul */
-  --naranja-suave: #e8f0fb; /* fondo de selección */
-  --naranja-suave-fuerte: #d4e3f7;
+  --naranja-fuerte: #e87400; /* relleno naranja al pasar el cursor */
+  /* Texto encima del relleno naranja. Es la tinta oscura, FIJA en claro y en oscuro: no puede ser
+     var(--tinta) porque en oscuro esa se vuelve casi blanca y daría blanco sobre naranja (2.1 a 1),
+     que es exactamente lo que el sistema de diseño prohíbe. Contra #ff8200 da 6.8 a 1. */
+  --sobre-naranja: #24211e;
+  --naranja-suave: #fff0e1; /* fondo de selección */
+  --naranja-suave-fuerte: #ffe4cb;
 
   /* Neutros, apenas más cálidos: el vidrio necesita un sustrato tibio para no leerse gris. */
-  --fondo: #f5f7fa;
-  --superficie: #ffffff;
-  --superficie-hundida: #edf0f4;
-  --borde: rgba(20, 40, 70, 0.12);
-  --separador: rgba(20, 40, 70, 0.09);
-  --tinta: #1a1d22;
-  --tinta-suave: #5a6069;
-  --tinta-tenue: #686e77; /* 4.79 a 1 contra el fondo */
+  --fondo: #f7f5f2;
+  --superficie: #fffdfa;
+  --superficie-hundida: #f0ece7;
+  --borde: rgba(65, 45, 25, 0.12);
+  --separador: rgba(65, 45, 25, 0.09);
+  --tinta: #24211e;
+  --tinta-suave: #69615a;
+  --tinta-tenue: #746b63; /* el anterior (#94918c) daba 3.0 a 1 contra el fondo, por debajo de AA */
 
   /* Una sola señal de alerta. */
   --alerta: #c0362c;
 
   /* Escala del mapa: cinco pasos del neutro al naranja pleno. */
-  --mapa-0: #eceff3;
-  --mapa-1: #d3e2f5;
-  --mapa-2: #a6c6ee;
-  --mapa-3: #5f98e0;
-  --mapa-4: #0057b8;
+  --mapa-0: #efedea;
+  --mapa-1: #ffe0bf;
+  --mapa-2: #ffc48a;
+  --mapa-3: #ffa34d;
+  --mapa-4: #ff8200;
 
   /* Vidrio. El sustrato de toda la aplicación es la lámina territorial, así que el vidrio
      siempre tiene algo real detrás: no es decoración, es una capa de calco sobre el atlas. */
-  --vidrio-fondo: oklch(0.995 0.003 250 / 0.62);
-  --vidrio-fondo-denso: oklch(0.995 0.003 250 / 0.86);
-  --vidrio-fondo-movimiento: oklch(0.995 0.003 250 / 0.93);
+  --vidrio-fondo: oklch(0.995 0.004 70 / 0.62);
+  --vidrio-fondo-denso: oklch(0.995 0.004 70 / 0.86);
+  --vidrio-fondo-movimiento: oklch(0.995 0.004 70 / 0.93);
   --vidrio-borde: oklch(1 0 0 / 0.7);
-  --vidrio-borde-bajo: oklch(0.6 0.02 250 / 0.16);
+  --vidrio-borde-bajo: oklch(0.62 0.02 60 / 0.16);
   --vidrio-luz: oklch(1 0 0 / 0.85);
   --vidrio-desenfoque: 10px; /* antes 24px: el desenfoque caro ahora es un lujo de escritorio */
 
   /* Lámina territorial: el atlas que vive detrás de todo. */
-  --lamina-papel: oklch(0.977 0.005 250);
-  --lamina-trazo: oklch(0.6 0.04 250 / 0.5);
-  --lamina-relleno: oklch(0.82 0.08 250 / 0.22);
-  --lamina-propio: oklch(0.6 0.16 255 / 0.28);
-  --lamina-bruma: oklch(0.985 0.004 250 / 0.78);
-  --bloom-naranja: oklch(0.8 0.09 255 / 0.16);
-  --bloom-lejano: oklch(0.9 0.04 230 / 0.1);
+  --lamina-papel: oklch(0.975 0.006 75);
+  --lamina-trazo: oklch(0.62 0.045 55 / 0.55);
+  --lamina-relleno: oklch(0.85 0.115 58 / 0.22);
+  --lamina-propio: oklch(0.76 0.175 55 / 0.3);
+  --lamina-bruma: oklch(0.985 0.005 75 / 0.78);
+  --bloom-naranja: oklch(0.85 0.1 58 / 0.16);
+  --bloom-lejano: oklch(0.9 0.05 40 / 0.1);
 
   /* Sombra: poco, y nunca la gris genérica. Una sola capa contenida en vez de tres difusas: se
      lee igual de flotante y cuesta mucho menos pintar en un celular. */
-  --sombra-apoyo: 0 1px 2px rgba(15, 30, 55, 0.05);
-  --sombra-flotante: 0 6px 20px rgba(15, 30, 55, 0.07);
-  --sombra-dock: 0 6px 20px rgba(15, 30, 55, 0.07);
+  --sombra-apoyo: 0 1px 2px rgba(50, 35, 20, 0.05);
+  --sombra-flotante: 0 6px 20px rgba(50, 35, 20, 0.07);
+  --sombra-dock: 0 6px 20px rgba(50, 35, 20, 0.07);
   --reflejo: inset 0 1px 0 rgba(255, 255, 255, 0.65); /* filo de luz superior del vidrio */
 
   /* Tipografía. */
@@ -109,90 +111,87 @@
 /* Tokens de modo oscuro. Se aplican con la clase .dark o por preferencia del sistema. */
 .dark {
   --naranja-tipografico: var(--naranja-claro);
-  --naranja: #2b6fd0; /* relleno en oscuro: 4.90 a 1 con blanco encima */
-  --naranja-fuerte: #2560b8;
-  --naranja-suave: oklch(0.3 0.07 255);
-  --naranja-suave-fuerte: oklch(0.36 0.09 255);
+  --naranja-suave: oklch(0.32 0.07 55);
+  --naranja-suave-fuerte: oklch(0.37 0.085 55);
 
-  --fondo: #0f1114;
-  --superficie: #181b20;
-  --superficie-hundida: #0f1114;
-  --borde: rgba(215, 230, 255, 0.14);
-  --separador: rgba(215, 230, 255, 0.1);
-  --tinta: #f3f5f8;
-  --tinta-suave: #a0a6af;
-  --tinta-tenue: #737983;
+  --fondo: #121110;
+  --superficie: #1b1a18;
+  --superficie-hundida: #121110;
+  --borde: rgba(255, 235, 215, 0.14);
+  --separador: rgba(255, 235, 215, 0.1);
+  --tinta: #f5f4f2;
+  --tinta-suave: #a3a09b;
+  --tinta-tenue: #6e6b66;
 
   --alerta: #ff6b5e;
 
-  --vidrio-fondo: oklch(0.23 0.012 255 / 0.62);
-  --vidrio-fondo-denso: oklch(0.23 0.012 255 / 0.88);
-  --vidrio-fondo-movimiento: oklch(0.23 0.012 255 / 0.94);
+  --vidrio-fondo: oklch(0.24 0.012 60 / 0.62);
+  --vidrio-fondo-denso: oklch(0.24 0.012 60 / 0.88);
+  --vidrio-fondo-movimiento: oklch(0.24 0.012 60 / 0.94);
   --vidrio-borde: oklch(1 0 0 / 0.1);
   --vidrio-borde-bajo: oklch(1 0 0 / 0.06);
   --vidrio-luz: oklch(1 0 0 / 0.14);
 
-  --lamina-papel: oklch(0.18 0.01 255);
-  --lamina-trazo: oklch(0.55 0.03 250 / 0.42);
-  --lamina-relleno: oklch(0.4 0.07 255 / 0.5);
-  --lamina-propio: oklch(0.6 0.15 255 / 0.75);
-  --lamina-bruma: oklch(0.15 0.008 255 / 0.55);
-  --bloom-naranja: oklch(0.5 0.12 255 / 0.2);
-  --bloom-lejano: oklch(0.45 0.06 230 / 0.15);
+  --lamina-papel: oklch(0.19 0.01 60);
+  --lamina-trazo: oklch(0.55 0.03 60 / 0.42);
+  --lamina-relleno: oklch(0.42 0.07 55 / 0.55);
+  --lamina-propio: oklch(0.66 0.15 55 / 0.8);
+  --lamina-bruma: oklch(0.16 0.008 60 / 0.55);
+  --bloom-naranja: oklch(0.55 0.12 55 / 0.2);
+  --bloom-lejano: oklch(0.45 0.07 40 / 0.15);
 
   /* En oscuro la elevación se lee con luz en el borde, no con sombra: --reflejo hace ese trabajo. */
   --sombra-apoyo: none;
   --sombra-flotante: 0 6px 20px rgba(0, 0, 0, 0.45);
   --sombra-dock: 0 6px 20px rgba(0, 0, 0, 0.45);
   --reflejo: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --borde-elevado: #363b43;
+  --borde-elevado: #3d3a36;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.claro) {
     --naranja-tipografico: var(--naranja-claro);
-    --naranja: #2b6fd0; /* relleno en oscuro: 4.90 a 1 con blanco encima */
-    --naranja-fuerte: #2560b8;
-    --naranja-suave: oklch(0.3 0.07 255);
-    --naranja-suave-fuerte: oklch(0.36 0.09 255);
+    --naranja-suave: oklch(0.32 0.07 55);
+    --naranja-suave-fuerte: oklch(0.37 0.085 55);
 
-    --fondo: #0f1114;
-    --superficie: #181b20;
-    --superficie-hundida: #0f1114;
-    --borde: rgba(215, 230, 255, 0.14);
-    --separador: rgba(215, 230, 255, 0.1);
-    --tinta: #f3f5f8;
-    --tinta-suave: #a0a6af;
-    --tinta-tenue: #737983;
+    --fondo: #121110;
+    --superficie: #1b1a18;
+    --superficie-hundida: #121110;
+    --borde: rgba(255, 235, 215, 0.14);
+    --separador: rgba(255, 235, 215, 0.1);
+    --tinta: #f5f4f2;
+    --tinta-suave: #a3a09b;
+    --tinta-tenue: #6e6b66;
 
     --alerta: #ff6b5e;
 
-    --vidrio-fondo: oklch(0.23 0.012 255 / 0.62);
-    --vidrio-fondo-denso: oklch(0.23 0.012 255 / 0.88);
-    --vidrio-fondo-movimiento: oklch(0.23 0.012 255 / 0.94);
+    --vidrio-fondo: oklch(0.24 0.012 60 / 0.62);
+    --vidrio-fondo-denso: oklch(0.24 0.012 60 / 0.88);
+    --vidrio-fondo-movimiento: oklch(0.24 0.012 60 / 0.94);
     --vidrio-borde: oklch(1 0 0 / 0.1);
     --vidrio-borde-bajo: oklch(1 0 0 / 0.06);
     --vidrio-luz: oklch(1 0 0 / 0.14);
 
-    --lamina-papel: oklch(0.18 0.01 255);
-    --lamina-trazo: oklch(0.55 0.03 250 / 0.42);
-    --lamina-relleno: oklch(0.4 0.07 255 / 0.5);
-    --lamina-propio: oklch(0.6 0.15 255 / 0.75);
-    --lamina-bruma: oklch(0.15 0.008 255 / 0.55);
-    --bloom-naranja: oklch(0.5 0.12 255 / 0.2);
-    --bloom-lejano: oklch(0.45 0.06 230 / 0.15);
+    --lamina-papel: oklch(0.19 0.01 60);
+    --lamina-trazo: oklch(0.55 0.03 60 / 0.42);
+    --lamina-relleno: oklch(0.42 0.07 55 / 0.55);
+    --lamina-propio: oklch(0.66 0.15 55 / 0.8);
+    --lamina-bruma: oklch(0.16 0.008 60 / 0.55);
+    --bloom-naranja: oklch(0.55 0.12 55 / 0.2);
+    --bloom-lejano: oklch(0.45 0.07 40 / 0.15);
 
     --sombra-apoyo: none;
     --sombra-flotante: 0 6px 20px rgba(0, 0, 0, 0.45);
     --sombra-dock: 0 6px 20px rgba(0, 0, 0, 0.45);
     --reflejo: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    --borde-elevado: #363b43;
+    --borde-elevado: #3d3a36;
   }
 }
 
 /* ===========================================================================
    Puente con shadcn/ui: sus variables apuntan a los tokens de arriba.
-   En esta rama el acento es azul oscuro: --primary-foreground es blanco.
+   Nunca blanco sobre naranja: --primary-foreground es --sobre-naranja, la tinta oscura
+   fija, que no se invierte en modo oscuro como sí lo hace --tinta.
    =========================================================================== */
 
 :root {
@@ -643,7 +642,7 @@
   letter-spacing: 0.02em;
   border-radius: var(--radio-control);
   border: 1px solid var(--vidrio-borde-bajo);
-  background: oklch(0.6 0.15 255 / 0.12);
+  background: oklch(0.78 0.16 55 / 0.14);
   color: var(--naranja-tipografico);
   padding: 2px 7px;
   font-size: var(--texto-xs);

@@ -324,13 +324,13 @@ export function MapaLienzo({
 
     const menosMovimiento = prefiereMenosMovimiento();
     const escala = leerEscalaMapa();
-    const colorBorde = leerColor("--borde", "#dde2e9");
-    const colorBordeSeleccion = leerColor("--tinta", "#1a1d22");
-    const colorHueco = leerColor("--tinta-tenue", "#686e77");
+    const colorBorde = leerColor("--borde", "#e4e3e1");
+    const colorBordeSeleccion = leerColor("--tinta", "#1c1b19");
+    const colorHueco = leerColor("--tinta-tenue", "#94918c");
     // El punteado de una prioritaria por recorrer va en el naranja tipográfico, no en el gris de
     // "sin responsable": pertenece a la misma historia que lo ya recorrido, y así el mapa cuenta
     // una sola cosa. El gris se queda para la vista de estructura, que sí habla de otra cosa.
-    const colorPrioritariaPendiente = leerColor("--naranja-tipografico", "#0052ad");
+    const colorPrioritariaPendiente = leerColor("--naranja-tipografico", "#b35700");
     const durPanel = menosMovimiento ? 0 : leerDuracionMs("--dur-panel", 240);
     const durUi = menosMovimiento ? 0 : leerDuracionMs("--dur-ui", 160);
     const ventanaRetrasoMs = menosMovimiento ? 0 : 300;

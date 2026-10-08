@@ -518,3 +518,28 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
       para entrar, pero **no hay recuperación de contraseña posible**: si uno la olvida, el admin se
       la tiene que reponer. Falta decidir si se les dan correos reales o si el método de acceso
       cambia a teléfono con código, que era la opción con costo de SMS.
+
+64. **El acento vuelve a ser naranja.** Se revirtió la decisión de la entrada 56. La paleta se tomó
+    textualmente de la rama `main` —no se reconstruyó del spec— con `git checkout main --
+    app/globals.css`, así que `spec/sistema-diseno.md` **vuelve a ser la verdad** y la nota que la
+    entrada 56 derogaba queda sin efecto: la regla "nunca blanco sobre naranja" rige otra vez.
+
+    También regresaron a sus valores naranjas los colores de respaldo que estaban codificados a
+    mano fuera de la hoja de estilos, que es donde se escondían: cuatro en
+    `components/mapa/mapa-lienzo.tsx`, dos en `components/casillas/mapa-casillas.tsx`, uno en
+    `components/mapa/tokens.ts` y los dos `themeColor` de `app/layout.tsx`. El CSS compilado no
+    contiene un solo hexadecimal azul.
+
+    **Lo único que NO se revirtió, y por qué.** El token `--sobre-naranja` nació con el azul y hoy
+    lo usan 21 archivos. Borrarlo habría obligado a editar los 21, así que se conservó y se le dio
+    el valor correcto para naranja: `#24211e`, la tinta oscura, **fija en claro y en oscuro**.
+
+    No es `var(--tinta)` a propósito. En modo oscuro `--tinta` se vuelve casi blanca, y `main`
+    nunca redefine `--naranja` en oscuro, así que apuntar ahí daría blanco sobre naranja: 2.49 a 1,
+    exactamente lo que el sistema de diseño prohíbe. Con la tinta fija da 6.44 a 1 en los dos
+    modos. De paso eso corrige un hueco que `main` arrastra: su `--primary-foreground: var(--tinta)`
+    produce ese blanco sobre naranja en oscuro, y aquí apunta a `--sobre-naranja`.
+
+    Contrastes verificados de la paleta restaurada: tinta sobre relleno 6.44; naranja tipográfico
+    sobre fondo claro 5.53; naranja claro sobre fondo oscuro 8.97; tinta sobre fondo 14.72;
+    tinta tenue sobre fondo 4.79. Todos por encima del mínimo de 4.5.
