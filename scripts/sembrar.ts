@@ -30,9 +30,57 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 
-import { ACTUANTES } from "../lib/actuantes";
+/**
+ * ⛔ ESTE SCRIPT YA NO SE PUEDE CORRER. Ver la comprobación de abajo.
+ *
+ * Los cuatro actuantes vivían en lib/actuantes.ts, que se borró al entrar el login real. Se
+ * dejan aquí inertes para que el archivo siga compilando como referencia histórica.
+ */
+const ACTUANTES = [
+  { id: "00000000-0000-4000-8000-000000000001", nombre: "Dirección general",
+    rol: "admin", demarcacionId: null, seccionClave: null, activo: true },
+  { id: "00000000-0000-4000-8000-000000000002", nombre: "Responsable de Santa Rosa Panzacola",
+    rol: "resp_demarcacion", demarcacionId: 13, seccionClave: null, activo: true },
+  { id: "00000000-0000-4000-8000-000000000003", nombre: "Responsable de la secci\u00f3n 0473",
+    rol: "resp_seccion", demarcacionId: 13, seccionClave: "0473", activo: true },
+  { id: "00000000-0000-4000-8000-000000000004", nombre: "Brigadista de San Mart\u00edn Mexicapam",
+    rol: "brigadista", demarcacionId: 12, seccionClave: null, activo: true },
+] as const;
 import { MUNICIPIO } from "../lib/demarcaciones";
 import type { RolUsuario } from "../lib/tipos";
+
+// ---------------------------------------------------------------------------------------------
+// ⛔ Negativa deliberada.
+//
+// Este script sembraba 2000 personas inventadas. Desde el 8 de octubre de 2026 la base recibe
+// datos personales reales, así que correrlo mezclaría gente falsa con gente real y nadie podría
+// distinguirlas después.
+//
+// Y de todos modos ya no funciona: siembra `usuarios` con los uuid fijos 00000000-…-00000000000N,
+// y `usuarios.id` ahora referencia `auth.users(id)`, así que reventaría por llave foránea. Las
+// cuentas se crean con Supabase Auth, no sembrando filas.
+//
+// Se conserva como referencia de cómo se construyó la maqueta. Si alguna vez hace falta un
+// entorno de demostración con datos inventados, va en un proyecto de Supabase aparte y hay que
+// reescribir la parte de usuarios para que pase por Auth.
+// ---------------------------------------------------------------------------------------------
+//
+// La negativa va tras una condición y no como un process.exit() suelto: un exit incondicional en
+// el nivel del módulo marca todo lo que sigue como código inalcanzable, y ahí TypeScript deja de
+// estrechar tipos. La variable de entorno además obliga a que saltárselo sea una decisión
+// deliberada y no un descuido.
+if (!process.env.PERMITIR_SEMBRADO_INVENTADO) {
+  console.error(
+    "scripts/sembrar.ts está deshabilitado a propósito.\n\n" +
+      "La base ya recibe datos personales reales y este script siembra 2000 personas\n" +
+      "inventadas: correrlo mezclaría gente falsa con gente real sin forma de distinguirlas.\n\n" +
+      "Y de todos modos fallaría: siembra usuarios con uuid fijos, y usuarios.id ahora\n" +
+      "referencia auth.users(id). Las cuentas se crean con Supabase Auth.\n\n" +
+      "Si de verdad hace falta un entorno de demostración, va en otro proyecto de Supabase.",
+  );
+  process.exit(1);
+}
+
 
 config({ path: ".env.local" });
 config({ path: ".env" });

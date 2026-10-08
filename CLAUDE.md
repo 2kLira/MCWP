@@ -6,14 +6,35 @@ mensajes al usuario.
 
 ## Reglas que no se negocian
 
-**Ningún dato personal real entra a este proyecto.** La base solo contiene datos sembrados. Los
-teléfonos sembrados usan el rango 951 100 0000 a 951 100 9999, que no corresponde a personas reales.
-Nunca generes teléfonos con otro patrón.
+**Este proyecto ya recibe datos personales reales.** Dejó de ser maqueta el 8 de octubre de 2026,
+cuando se aprobó y se montó la base nueva con login y RLS. Los teléfonos sembrados que queden del
+rango 951 100 0000 a 951 100 9999 son de prueba y se pueden distinguir por ahí, pero la base ya no
+es un patio de juegos: cualquier renglón nuevo puede ser una persona real. Lo que se borra, se
+borró de verdad.
 
-**No hay login.** Se entra con un conmutador de rol. Por lo mismo no hay Row Level Security y el
-filtrado por territorio vive en la capa de aplicación, en un único módulo `lib/permisos.ts`. Todo
-acceso a datos pasa por ahí. Cuando el proyecto se apruebe, ese módulo se reemplaza por políticas de
-base de datos, así que no dupliques la lógica de permisos en componentes.
+Hay dos pendientes bloqueantes anotados en `PENDIENTES.md` que deben resolverse antes de capturar
+en campo con gente real: el aviso de privacidad sigue marcado como provisional pendiente de
+revisión legal, y no está definida la política de retención ni quién responde por los datos.
+
+**Hay login, y por lo tanto hay Row Level Security.** Se entra con correo y contraseña contra
+Supabase Auth. Ya no existe el conmutador de rol: el rol sale de la sesión, no de un selector.
+
+El filtrado **no** vive en la capa de aplicación. Vive en políticas de base de datos, en
+`supabase/seguridad.sql`, que es el único punto de verdad de permisos. No dupliques esa lógica en
+componentes ni en consultas: si una pantalla necesita menos datos, pídele menos a la base, no
+filtres después. Si una política bloquea algo que debería pasar, se arregla la política.
+
+`usuarios.id` **es** el id de `auth.users`, así que `auth.uid()` sirve directo en las políticas.
+Las bajas se hacen con `activo = false`, nunca borrando.
+
+Dos trampas que ya costaron caro y no hay que repetir:
+
+- **Toda vista lleva `with (security_invoker = true)`.** Sin eso la vista corre con los permisos de
+  quien la creó, se salta RLS, y un brigadista lee toda la base por ahí aunque las tablas estén
+  bien protegidas.
+- **La envoltura `(select ...)` alrededor de una llamada en una política solo vale si la expresión
+  no referencia columnas.** Con una columna dentro se vuelve un subplan correlacionado y la
+  política falla en los `INSERT ... SELECT` que arma PostgREST.
 
 **La sección electoral es la única unidad territorial exacta.** La colonia es referencia y
 autocompletado, nunca fuente de verdad. Si hay conflicto entre colonia y sección, gana la sección.
@@ -24,6 +45,10 @@ ni quién capturó, ni sección cuando hay coordenada.
 **Antes de escribir código de una fase, lee los tres documentos de `spec/`.** Si algo del spec choca
 con lo que ibas a hacer, gana el spec. Si el spec no cubre un caso, anótalo en `PENDIENTES.md` en
 lugar de inventar y seguir.
+
+Con una excepción ya registrada: `spec/alcance.md` describe un conmutador de rol y dice
+"Row Level Security. Fuera, por la decisión de no tener login". Eso quedó superado el 8 de octubre
+de 2026. En todo lo demás el spec sigue mandando.
 
 ## Pila
 
@@ -41,12 +66,13 @@ calendario se arma con una rejilla propia.
 app/                 rutas del App Router
 components/          componentes de interfaz
 components/mapa/     todo lo de MapLibre, aislado
-lib/permisos.ts      único punto de verdad de permisos
 lib/territorio.ts    punto en polígono, normalización de teléfono, resolución de dirección
 lib/supabase.ts      cliente
 data/                secciones.geojson, colonias.geojson, demarcaciones.json
-supabase/schema.sql  esquema
-supabase/seed.sql    o scripts/sembrar.ts
+supabase/schema.sql    estructura, consolidada
+supabase/seguridad.sql permisos, RLS y políticas. Único punto de verdad de permisos
+supabase/migraciones-maqueta-v1/  historia de la maqueta. No aplicar, ver LEER.md
+scripts/sembrar.ts   sembrado
 spec/                los tres documentos de especificación
 PENDIENTES.md        decisiones que no estaban en el spec
 ```

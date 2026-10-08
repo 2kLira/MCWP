@@ -3,7 +3,7 @@
 import { Map as IconoMapa } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId, MUNICIPIO } from "@/lib/demarcaciones";
-import { etiquetaAlcance } from "@/lib/permisos";
+import { etiquetaAlcance } from "@/lib/puertas-ui";
 import { cn } from "@/lib/utils";
 
 /** Barra superior flotante del mapa: municipio y territorio del actuante. Va en vidrio. */

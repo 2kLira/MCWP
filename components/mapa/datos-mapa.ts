@@ -1,8 +1,8 @@
 /**
  * Datos reales de las ocho vistas del mapa.
  *
- * Las cifras salen de `seccionesResumen` (lib/datos/catalogos.ts), ya recortadas al territorio del
- * usuario actuante por `aplicarAlcance` (lib/permisos.ts). Este módulo no decide quién ve qué, solo
+ * Las cifras salen de `seccionesResumen` (lib/datos/catalogos.ts), ya recortadas por RLS sobre la
+ * vista. Este módulo no decide quién ve qué, solo
  * convierte lo que la base ya recortó en un paso de 0 a 4 por sección. Cinco vistas usan cortes por
  * cuantiles sobre los valores presentes; las dos de prioritarias no, ver `calcularPasosPrioritarias`.
  * La octava, casillas, no pinta polígono por dato: pinta puntos, ver `esVistaDeCasillas`.

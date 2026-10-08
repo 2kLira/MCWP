@@ -36,8 +36,8 @@ type SeleccionCasilla = { id: number; origen: { x: number; y: number } };
 
 /**
  * Orquesta el mapa: carga el GeoJSON de secciones una vez (nunca desde la base) y el resumen real
- * por sección cada vez que cambia el actuante (el recorte por territorio vive en lib/permisos.ts,
- * vía seccionesResumen). Alrededor del lienzo arma la barra superior, el selector de capas y la
+ * por sección cada vez que cambia el actuante (el recorte lo hace RLS sobre la vista, vía
+ * seccionesResumen). Alrededor del lienzo arma la barra superior, el selector de capas y la
  * ficha lateral, las tres únicas superficies de vidrio de esta pantalla.
  */
 /**

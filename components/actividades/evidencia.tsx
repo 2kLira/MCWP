@@ -5,8 +5,8 @@ import { Camera, LoaderCircle, MapPin } from "lucide-react";
 import { clienteSupabase } from "@/lib/supabase";
 import { agregarFoto, type Foto, type MomentoFoto } from "@/lib/datos/actividades";
 import { comprimirFoto } from "@/components/actividades/comprimir";
+import { CUBETA_FOTOS, rutaDeFoto } from "@/lib/datos/almacenamiento";
 
-const CUBETA = "fotos";
 
 const ETIQUETA_MOMENTO: Record<MomentoFoto, string> = {
   inicio: "foto de inicio",
@@ -77,9 +77,11 @@ export function BotonEvidencia({
       return;
     }
 
-    const ruta = `${actividadId}/${momento}-${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
+    // El prefijo "actividades/" lo exigen las políticas de storage.objects: leen el segundo
+    // segmento de la ruta como el id de la actividad.
+    const ruta = rutaDeFoto(actividadId, momento);
     const { error: errorSubida } = await supabase
-      .storage.from(CUBETA)
+      .storage.from(CUBETA_FOTOS)
       .upload(ruta, comprimida.archivo, { contentType: "image/webp" });
 
     if (errorSubida) {
@@ -88,11 +90,11 @@ export function BotonEvidencia({
       return;
     }
 
-    const { data: publica } = supabase.storage.from(CUBETA).getPublicUrl(ruta);
-
+    // Se guarda la RUTA, no una URL. El bucket es privado y una URL firmada caduca: persistirla
+    // haría que la columna se pudriera sola.
     const r = await agregarFoto({
       actividadId,
-      url: publica.publicUrl,
+      url: ruta,
       subidaPor: usuarioId,
       momento,
       lat: coordenada?.lat ?? null,

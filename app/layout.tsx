@@ -1,12 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
-import { AvisoConfiguracion } from "@/components/aviso-configuracion";
-import { BarraInferior } from "@/components/navegacion/barra-inferior";
-import { BarraSuperior } from "@/components/navegacion/barra-superior";
-import { Dock } from "@/components/navegacion/dock";
-import { ProveedorActuante } from "@/components/proveedor-actuante";
-import { LaminaTerritorial } from "@/components/sustrato/lamina-territorial";
+
+/**
+ * Layout raíz, a propósito desnudo: html, body, la fuente y los metadatos. Nada más.
+ *
+ * La cáscara de la aplicación —proveedor de identidad, lámina territorial, dock y barras— vive en
+ * app/(aplicacion)/layout.tsx. Está separada porque la pantalla de entrada no debe llevarla: un
+ * layout anidado se renderiza *dentro* del raíz, así que si el cromo viviera aquí, /entrar saldría
+ * con el dock encima y envuelta por el proveedor de identidad, que es justo lo que produce bucles
+ * de redirección. Los grupos de ruta no cambian ninguna URL.
+ */
 
 /**
  * Una sola familia. Se eligió por linaje institucional, por su tratamiento de acentos y eñes y
@@ -32,29 +36,10 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${plex.variable} h-full`}>
-      <body className="min-h-full bg-fondo text-tinta">
-        <ProveedorActuante>
-          {/* El territorio es el sustrato de toda la aplicación: por eso el vidrio de las
-              tarjetas tiene algo real detrás y cambia con el rol activo. */}
-          <LaminaTerritorial />
-
-          <Dock />
-
-          <div className="relative z-10 flex min-h-dvh flex-col">
-            <BarraSuperior />
-            {/* Espacio a la izquierda para el dock flotante y abajo para la píldora de celular. */}
-            <main className="mx-auto w-full max-w-tope flex-1 px-4 pb-28 pt-4 md:pl-24 md:pr-6 md:pb-10 md:pt-5">
-              <AvisoConfiguracion />
-              {children}
-            </main>
-          </div>
-
-          <BarraInferior />
-        </ProveedorActuante>
-      </body>
+      <body className="min-h-full bg-fondo text-tinta">{children}</body>
     </html>
   );
 }

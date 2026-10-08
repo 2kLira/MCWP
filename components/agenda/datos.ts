@@ -2,11 +2,12 @@
  * Consultas de la agenda.
  *
  * Viven aquí y no en lib/datos/actividades.ts porque el recorte por estatus y la agenda propia
- * del brigadista son preguntas de esta pantalla. Lo que no vive aquí es ninguna regla: quién ve
- * qué estatus y quién ve solo lo suyo se le pregunta a lib/permisos.ts y nada más a él.
+ * del brigadista son preguntas de esta pantalla. Quién alcanza qué actividad lo decide RLS; qué
+ * estatus se listan se le pregunta a lib/puertas-ui.ts, que es cosmética y coincide con la
+ * política a propósito.
  */
 
-import { estatusVisibles, puedeVerListadosGenerales } from "@/lib/permisos";
+import { estatusVisibles, puedeVerListadosGenerales } from "@/lib/puertas-ui";
 import type { UsuarioActuante } from "@/lib/tipos";
 import {
   actividadesDeAgenda,

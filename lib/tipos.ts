@@ -6,7 +6,20 @@ export type RolUsuario =
   | "resp_seccion"
   | "brigadista";
 
-/** El usuario que está actuando en la sesión. Sin login, lo elige el conmutador de rol. */
+/**
+ * Los cuatro roles, para validar lo que llega de un formulario o de una petición.
+ *
+ * Ojo: `resp_demarcacion` y `resp_seccion` todavía no tienen políticas de Row Level Security, así
+ * que una cuenta con esos roles entra y no ve nada. Está anotado en PENDIENTES.md.
+ */
+export const ROLES: readonly RolUsuario[] = [
+  "admin",
+  "resp_demarcacion",
+  "resp_seccion",
+  "brigadista",
+];
+
+/** El usuario que está actuando. Sale de la sesión de Supabase Auth. */
 export type UsuarioActuante = {
   id: string;
   nombre: string;

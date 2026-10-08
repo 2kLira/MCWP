@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId, MUNICIPIO } from "@/lib/demarcaciones";
-import { alcanceDe } from "@/lib/permisos";
+import { alcanceDe } from "@/lib/puertas-ui";
 import { cargarSecciones, type ColeccionSecciones } from "@/lib/territorio";
 
 /**

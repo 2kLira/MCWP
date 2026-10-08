@@ -4,7 +4,6 @@
  * seguimiento, y su último seguimiento está pendiente o no existe).
  */
 
-import { aplicarAlcance } from "@/lib/permisos";
 import { normalizarTelefono } from "@/lib/territorio";
 import type { UsuarioActuante } from "@/lib/tipos";
 import { db, esFaltaDeEsquema, lista, uno, type Resultado } from "@/lib/datos/cliente";
@@ -102,7 +101,7 @@ export function bandeja(
   usuario: UsuarioActuante | null,
   filtros: FiltrosBandeja = {},
 ): Promise<Resultado<FilaBandeja[]>> {
-  let consulta = aplicarAlcance(db().from("v_bandeja_seguimiento").select("*"), usuario);
+  let consulta = db().from("v_bandeja_seguimiento").select("*");
   consulta = aplicarFiltrosBandeja(consulta, filtros);
   // Lo más viejo sin atender sale primero.
   return lista<FilaBandeja>(consulta.order("created_at", { ascending: true }));
@@ -117,10 +116,9 @@ export async function totalBandeja(
   usuario: UsuarioActuante | null,
   filtros: FiltrosBandeja = {},
 ): Promise<Resultado<number>> {
-  let consulta = aplicarAlcance(
-    db().from("v_bandeja_seguimiento").select("*", { count: "exact", head: true }),
-    usuario,
-  );
+  let consulta = db()
+    .from("v_bandeja_seguimiento")
+    .select("*", { count: "exact", head: true });
   consulta = aplicarFiltrosBandeja(consulta, filtros);
   const { count, error } = await consulta;
   if (error) {
@@ -158,6 +156,7 @@ export function crearSeguimiento(entrada: {
       })
       .select()
       .single(),
+    "El seguimiento lo lleva el administrador general.",
   );
 }
 
@@ -167,5 +166,6 @@ export function cambiarEstadoSeguimiento(
 ): Promise<Resultado<Seguimiento | null>> {
   return uno<Seguimiento>(
     db().from("seguimientos").update({ estado }).eq("id", id).select().single(),
+    "El seguimiento lo lleva el administrador general.",
   );
 }

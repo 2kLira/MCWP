@@ -1,8 +1,11 @@
 /**
- * Acceso a personas. Todo recorte territorial sale de lib/permisos.ts.
+ * Acceso a personas.
+ *
+ * El recorte no se hace aquí: lo hace Row Level Security en cada consulta. El admin ve todo; el
+ * brigadista solo a la gente de la actividad a la que lo invitaron, mientras siga abierta.
  */
 
-import { aplicarAlcance, puedeEditar, puedeVerRegistro } from "@/lib/permisos";
+import { puedeEditarPersona } from "@/lib/puertas-ui";
 import { normalizarTelefono } from "@/lib/territorio";
 import type { Genero, UsuarioActuante } from "@/lib/tipos";
 import { db, lista, resultado, uno, type Resultado } from "@/lib/datos/cliente";
@@ -89,9 +92,7 @@ export async function listarPersonas(
     .from("personas")
     .select(COLUMNAS_LISTA, { count: "exact" });
 
-  consulta = aplicarAlcance(consulta, usuario);
-
-  // Los filtros de la pantalla se aplican encima del recorte, nunca en su lugar.
+  // Los filtros de la pantalla se aplican encima de lo que RLS ya dejó ver.
   if (filtros.demarcacionId) consulta = consulta.eq("demarcacion_id", filtros.demarcacionId);
   if (filtros.seccionClave) consulta = consulta.eq("seccion_clave", filtros.seccionClave);
   if (filtros.quiereParticipar) consulta = consulta.eq("quiere_participar", true);
@@ -128,9 +129,8 @@ export async function obtenerPersona(
   const r = await uno<Persona>(
     db().from("personas").select("*").eq("id", id).maybeSingle(),
   );
-  if (r.datos && !puedeVerRegistro(usuario, r.datos)) {
-    return { datos: null, sinEsquema: false, aviso: "Esta persona está fuera de tu territorio." };
-  }
+  // Sin comprobación posterior: si RLS no la dejó ver, r.datos ya viene en null. Comprobar aquí
+  // por territorio le escondía al brigadista la persona que acababa de capturar.
   return r;
 }
 
@@ -202,7 +202,7 @@ export type EntradaPersona = {
   es_promovido?: boolean;
   quiere_ser_representante?: boolean;
   recibio_apoyo?: boolean;
-  /** Igual que en Persona: columna sin migración todavía. Ver el aviso de crearPersona. */
+  /** Quién trajo a esta persona. Apunta a personas, no a usuarios. */
   promotor_id?: string | null;
 };
 
@@ -218,7 +218,12 @@ export function crearPersona(entrada: EntradaPersona): Promise<Resultado<Persona
   }
   // crearPersona no recibe el actuante en su firma actual, así que promovido_por se queda sin
   // llenar aquí; lo pone marcarPromovido, que sí conoce quién marca.
-  return uno<Persona>(db().from("personas").insert(fila).select().single());
+  return uno<Persona>(
+    db().from("personas").insert(fila).select().single(),
+    // El rechazo que un brigadista va a encontrar de verdad. Por eso dice qué hacer.
+    "Para registrar a alguien necesitas estar invitado a una actividad programada o en curso, y " +
+      "capturar desde ella.",
+  );
 }
 
 export async function actualizarPersona(
@@ -227,7 +232,7 @@ export async function actualizarPersona(
   cambios: Partial<EntradaPersona>,
 ): Promise<Resultado<Persona | null>> {
   const actual = await obtenerPersona(usuario, id);
-  if (!actual.datos || !puedeEditar(usuario, "persona", actual.datos)) {
+  if (!actual.datos || !puedeEditarPersona(usuario, actual.datos)) {
     return { datos: null, sinEsquema: false, aviso: "No puedes editar esta persona." };
   }
   const fila: Record<string, unknown> = { ...cambios };
@@ -248,7 +253,7 @@ export async function marcarPromovido(
   valor: boolean,
 ): Promise<Resultado<Persona | null>> {
   const actual = await obtenerPersona(usuario, id);
-  if (!actual.datos || !puedeEditar(usuario, "persona", actual.datos)) {
+  if (!actual.datos || !puedeEditarPersona(usuario, actual.datos)) {
     return { datos: null, sinEsquema: false, aviso: "No puedes editar esta persona." };
   }
   const fila = valor
@@ -289,6 +294,7 @@ export function crearSolicitud(entrada: {
       })
       .select("id")
       .single(),
+    "Solo puedes dejar una petición de alguien capturado en tu actividad.",
   );
 }
 
@@ -324,7 +330,6 @@ export async function listarPromovidosExportar(
       "nombre, telefono_norm, seccion_clave, demarcacion_id, genero, fecha_nacimiento, promovido_en, colonias(nombre)",
     );
 
-  consulta = aplicarAlcance(consulta, usuario);
   consulta = consulta.eq("es_promovido", true);
 
   if (filtros.demarcacionId) consulta = consulta.eq("demarcacion_id", filtros.demarcacionId);
@@ -346,4 +351,20 @@ export async function listarPromovidosExportar(
 
   const { data, error } = await consulta.order("promovido_en", { ascending: false }).limit(5000);
   return resultado((data ?? []) as unknown as PromovidoExportable[], error, []);
+}
+
+/**
+ * ¿Ese teléfono ya está registrado? Sí o no, nada más.
+ *
+ * Existe porque `buscarPorTelefono` devuelve la ficha completa, y con RLS un brigadista no alcanza
+ * a leer personas de otras capturas: le devolvería null y **perdería el aviso de duplicado en
+ * silencio**, que es justo el error que la deduplicación por teléfono existe para evitar.
+ *
+ * La función de la base (`public.telefono_ya_registrado`) es SECURITY DEFINER y comprueba por
+ * dentro que haya sesión y usuario activo. Nunca devuelve el registro, ni el nombre, ni la
+ * sección: solo el sí o el no.
+ */
+export async function telefonoYaRegistrado(telefono: string): Promise<Resultado<boolean>> {
+  const { data, error } = await db().rpc("telefono_ya_registrado", { tel: telefono });
+  return resultado(data === true, error, false);
 }

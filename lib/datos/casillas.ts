@@ -1,20 +1,16 @@
 /**
- * Acceso a casillas y a sus representantes. Todo recorte territorial sale de lib/permisos.ts,
- * sobre `seccion_clave`: la casilla no tiene demarcación propia, hereda la de su sección.
+ * Acceso a casillas y a sus representantes.
+ *
+ * El recorte lo hace Row Level Security: `casillas` es catálogo de referencia, así que lo lee
+ * cualquier usuario activo; `representantes_casilla` lleva datos personales y es solo del admin.
  *
  * La sección electoral es la única unidad territorial exacta (spec/alcance.md): esta tabla ya
  * trae `seccion_clave` resuelta desde el archivo de coordenadas, no se vuelve a calcular aquí.
  */
 
-import {
-  alcanceDe,
-  aplicarAlcance,
-  puedeEncabezarActividad,
-  puedeVerRegistro,
-  type ConTerritorio,
-} from "@/lib/permisos";
+import { puedeEncabezarActividad } from "@/lib/puertas-ui";
 import { DEMARCACIONES } from "@/lib/demarcaciones";
-import { cargarSecciones, normalizarTelefono, rasgoPorClave } from "@/lib/territorio";
+import { normalizarTelefono, rasgoPorClave } from "@/lib/territorio";
 import type { UsuarioActuante } from "@/lib/tipos";
 import { db, lista, uno, type Resultado } from "@/lib/datos/cliente";
 
@@ -82,24 +78,6 @@ function armarCasilla(fila: FilaCasilla): CasillaConRepresentantes {
   };
 }
 
-/**
- * `casillas` no trae `demarcacion_id` propio: a diferencia de personas y actividades, aquí no
- * viene denormalizado (spec/modelo-datos.md sí lo pide para esas tablas, precisamente para que
- * `aplicarAlcance` filtre con una sola columna). La casilla solo hereda su sección, así que un
- * responsable de demarcación se resuelve aparte: se toman las claves de sección que caen en su
- * demarcación según la cartografía cacheada (la misma que usa el resto de la aplicación) y se
- * filtra con `.in(...)`. Para "todo", "sección" y "ninguno" sí basta la columna `seccion_clave`
- * y ahí aplicarAlcance funciona igual que en cualquier otra tabla.
- */
-async function clavesDeSeccionPorDemarcacion(demarcacionId: number): Promise<string[]> {
-  const nombre = DEMARCACIONES.find((d) => d.id === demarcacionId)?.nombre;
-  if (!nombre) return [];
-  const coleccion = await cargarSecciones();
-  return coleccion.features
-    .filter((rasgo) => rasgo.properties.demarcacion === nombre)
-    .map((rasgo) => rasgo.properties.clave);
-}
-
 /** Demarcación de una sección, resuelta contra la cartografía cacheada. Null si no se conoce. */
 export function demarcacionIdDeSeccion(seccionClave: string): number | null {
   const rasgo = rasgoPorClave(seccionClave);
@@ -108,25 +86,17 @@ export function demarcacionIdDeSeccion(seccionClave: string): number | null {
 }
 
 /**
- * Todas las casillas del territorio del actuante, con su sección y sus dos representantes (o
+ * Todas las casillas que el actuante alcanza a ver, con su sección y sus dos representantes (o
  * null cuando todavía no se han capturado). Orden por sección y número, que es como se buscan
  * en campo.
  */
 export async function listarCasillas(
   usuario: UsuarioActuante | null,
 ): Promise<Resultado<CasillaConRepresentantes[]>> {
-  let consulta = db().from("casillas").select(COLUMNAS_CASILLA);
-
-  const alcance = alcanceDe(usuario);
-  if (alcance.tipo === "demarcacion") {
-    const claves = await clavesDeSeccionPorDemarcacion(alcance.demarcacionId);
-    consulta =
-      claves.length > 0
-        ? consulta.in("seccion_clave", claves)
-        : consulta.eq("seccion_clave", "__sin_territorio__");
-  } else {
-    consulta = aplicarAlcance(consulta, usuario);
-  }
+  // `usuario` ya no recorta —eso lo hace RLS— pero se conserva en la firma porque es la
+  // dependencia de useConsulta que redispara al cambiar de identidad. No lo quites.
+  void usuario;
+  const consulta = db().from("casillas").select(COLUMNAS_CASILLA);
 
   const r = await lista<FilaCasilla>(
     consulta.order("seccion_clave", { ascending: true }).order("numero", { ascending: true }),
@@ -188,18 +158,10 @@ export async function buscarCasillasPorSeccion(
   usuario: UsuarioActuante | null,
   seccionClave: string,
 ): Promise<Resultado<CasillaConRepresentantes[]>> {
-  let consulta = db().from("casillas").select(COLUMNAS_CASILLA).eq("seccion_clave", seccionClave);
-
-  const alcance = alcanceDe(usuario);
-  if (alcance.tipo === "demarcacion") {
-    // Una sola clave: más barato comparar su demarcación que traer todo el catálogo de la
-    // demarcación como hace listarCasillas para su filtro .in(...).
-    if (demarcacionIdDeSeccion(seccionClave) !== alcance.demarcacionId) {
-      return { datos: [], sinEsquema: false, aviso: null };
-    }
-  } else {
-    consulta = aplicarAlcance(consulta, usuario);
-  }
+  const consulta = db()
+    .from("casillas")
+    .select(COLUMNAS_CASILLA)
+    .eq("seccion_clave", seccionClave);
 
   const r = await lista<FilaCasilla>(consulta.order("numero", { ascending: true }));
   return { ...r, datos: r.datos.map(armarCasilla) };
@@ -218,33 +180,24 @@ export async function casillaPorId(
     db().from("casillas").select(COLUMNAS_CASILLA).eq("id", id).maybeSingle(),
   );
   if (!r.datos) return { ...r, datos: null };
-
-  const territorio: ConTerritorio = {
-    seccion_clave: r.datos.seccion_clave,
-    demarcacion_id: demarcacionIdDeSeccion(r.datos.seccion_clave),
-  };
-  if (!puedeVerRegistro(usuario, territorio)) {
-    return { datos: null, sinEsquema: false, aviso: "Esta casilla está fuera de tu territorio." };
-  }
+  // Sin comprobación posterior: si RLS no la dejó ver, r.datos ya viene en null.
   return { ...r, datos: armarCasilla(r.datos) };
 }
 
 /**
  * Quién puede registrar o editar representantes de una casilla: el mismo criterio que encabezar
- * una actividad (nadie de capturista suelto, esto es coordinación), y siempre dentro de su
- * territorio. No se duplica la regla de alcance: se le pregunta a lib/permisos.ts, con la
- * demarcación resuelta desde la sección porque la casilla no la trae consigo (ver
- * demarcacionIdDeSeccion).
+ * una actividad, porque esto es coordinación y no captura suelta.
+ *
+ * Cosmética. La reja de verdad es la política `representantes_casilla_solo_admin`, que hoy solo
+ * deja al admin. El parámetro `casilla` se conserva porque la firma la usan dos componentes y
+ * quitarla obligaría a editarlos sin ganar nada.
  */
 export function puedeEditarRepresentantes(
   usuario: UsuarioActuante | null,
   casilla: Pick<Casilla, "seccion_clave">,
 ): boolean {
-  const territorio: ConTerritorio = {
-    seccion_clave: casilla.seccion_clave,
-    demarcacion_id: demarcacionIdDeSeccion(casilla.seccion_clave),
-  };
-  return puedeEncabezarActividad(usuario) && puedeVerRegistro(usuario, territorio);
+  void casilla;
+  return puedeEncabezarActividad(usuario);
 }
 
 /* ---------------------------------------------------------------------------

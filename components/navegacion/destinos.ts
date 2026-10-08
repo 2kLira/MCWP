@@ -20,7 +20,7 @@ import {
   puedeEncabezarActividad,
   puedeImportar,
   puedeVerUsuarios,
-} from "@/lib/permisos";
+} from "@/lib/puertas-ui";
 import type { UsuarioActuante } from "@/lib/tipos";
 
 export type Destino = {

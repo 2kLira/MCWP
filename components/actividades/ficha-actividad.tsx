@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft, ClipboardList, UserPlus } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
+import { InvitarBrigadistas } from "@/components/actividades/invitar-brigadistas";
 import { Tarjeta } from "@/components/tablero/tarjeta";
 import { FotosActividad } from "@/components/actividades/fotos-actividad";
 import { BotonEvidencia, LineaEvidencia } from "@/components/actividades/evidencia";
 import { demarcacionPorId } from "@/lib/demarcaciones";
-import { puedeEditar, puedeVerRegistro } from "@/lib/permisos";
+import { esAdmin, puedeEditar } from "@/lib/puertas-ui";
 import { ETIQUETA_ESTATUS, ETIQUETA_TIPO_ACTIVIDAD, type EstatusActividad } from "@/lib/tipos";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
@@ -24,9 +25,7 @@ import {
   type ParticipacionEnLista,
 } from "@/lib/datos/actividades";
 import {
-  brigadistasDeActividad,
   obtenerUsuario,
-  type Brigadista,
   type UsuarioBreve,
 } from "@/components/actividades/datos";
 
@@ -57,12 +56,6 @@ export function FichaActividad({ id }: { id: string }) {
     () => obtenerUsuario(actividad.datos?.responsable_id ?? null),
     null,
     [actividad.datos?.responsable_id, recargar],
-  );
-
-  const brigadistas = useConsulta<Brigadista[]>(
-    () => brigadistasDeActividad(id),
-    [],
-    [id, recargar],
   );
 
   const participaciones = useConsulta<ParticipacionEnLista[]>(
@@ -110,18 +103,21 @@ export function FichaActividad({ id }: { id: string }) {
 
   const a = actividad.datos;
 
-  if (!a || !puedeVerRegistro(actuante, a)) {
+  // Sin comprobación por territorio. Con RLS, si el brigadista llegó hasta aquí es porque la
+  // política `actividades_brigadista_ve` le entregó la actividad; volver a filtrar por territorio
+  // la tiraba justo antes de pintarla, que era el síntoma de "me sale vacío".
+  if (!a) {
     return (
       <div className="flex flex-col gap-4">
         <Volver />
         <p className="text-sm text-tinta-suave">
-          {actividad.aviso ?? "Esta actividad está fuera de tu territorio o no existe."}
+          {actividad.aviso ?? "Esta actividad no existe o ya no está disponible para ti."}
         </p>
       </div>
     );
   }
 
-  const editable = puedeEditar(actuante, "actividad", a);
+  const editable = puedeEditar(actuante, "actividad");
   const demarcacion = demarcacionPorId(a.demarcacion_id)?.nombre;
   const enCierre = editable && (a.estatus === "programada" || a.estatus === "en_curso");
 
@@ -151,14 +147,6 @@ export function FichaActividad({ id }: { id: string }) {
           }
         />
         <Dato etiqueta="Responsable" valor={responsable.datos?.nombre ?? "Sin asignar"} />
-        <Dato
-          etiqueta="Brigadistas"
-          valor={
-            brigadistas.datos.length > 0
-              ? brigadistas.datos.map((c) => c.nombre).join(", ")
-              : "Sin brigadistas"
-          }
-        />
         {a.objetivo && <Dato etiqueta="Objetivo" valor={a.objetivo} ancho />}
         {a.notas && <Dato etiqueta="Notas" valor={a.notas} ancho />}
       </section>
@@ -218,6 +206,12 @@ export function FichaActividad({ id }: { id: string }) {
         <UserPlus className="size-5" aria-hidden />
         Registrar personas en esta actividad
       </Link>
+
+      <InvitarBrigadistas
+        actividadId={id}
+        estatus={a.estatus}
+        puedeInvitar={esAdmin(actuante)}
+      />
 
       <Tarjeta titulo="Participaciones">
         {participaciones.cargando ? (

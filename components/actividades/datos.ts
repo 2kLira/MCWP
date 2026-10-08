@@ -1,10 +1,11 @@
 /**
  * Consultas auxiliares del módulo de actividades que no viven en lib/datos/actividades.ts:
  * usuarios asignables como responsable, brigadistas ya asignados y el nombre del responsable.
- * Mismas reglas de lib/permisos.ts, sin duplicar el filtrado por territorio.
+ * Aquí no se filtra por territorio: eso lo hace RLS. Lo único que se consulta a lib/puertas-ui.ts
+ * es qué roles pueden encabezar una actividad, que es cosmética del selector.
  */
 
-import { puedeEncabezarActividad } from "@/lib/permisos";
+import { puedeEncabezarActividad } from "@/lib/puertas-ui";
 import type { RolUsuario } from "@/lib/tipos";
 import { db, lista, resultado, uno, type Resultado } from "@/lib/datos/cliente";
 
@@ -77,4 +78,28 @@ export async function brigadistasDeActividad(
     error,
     [],
   );
+}
+
+/**
+ * Quién puede ser invitado a capturar en una actividad.
+ *
+ * NO sirve `usuariosAsignables()`: esa filtra por `puedeEncabezarActividad`, que **excluye
+ * justamente a los brigadistas**. Es el conjunto exactamente contrario al que hace falta aquí.
+ *
+ * Se piden los brigadistas activos y se quitan los que ya están invitados, para que el selector
+ * no ofrezca a alguien que ya está en la lista.
+ */
+export async function brigadistasInvitables(
+  yaInvitados: readonly string[] = [],
+): Promise<Resultado<UsuarioBreve[]>> {
+  const r = await lista<UsuarioBreve>(
+    db()
+      .from("usuarios")
+      .select("id, nombre, rol, demarcacion_id, seccion_clave")
+      .eq("activo", true)
+      .eq("rol", "brigadista")
+      .order("nombre"),
+  );
+  const fuera = new Set(yaInvitados);
+  return { ...r, datos: r.datos.filter((u) => !fuera.has(u.id)) };
 }

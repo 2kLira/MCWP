@@ -11,8 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "datos": "node scripts/publicar-datos.mjs",
-    "db:importar": "tsx scripts/importar.ts",
-    "db:sembrar": "tsx scripts/sembrar.ts"
+    "db:importar": "tsx scripts/importar.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

@@ -3,14 +3,14 @@
  * escribir nada; aplicarImportacion escribe solo lo que ya se revisó y alguien confirmó. Ningún
  * renglón llega a la base sin pasar primero por la revisión.
  *
- * El recorte territorial de cada renglón sale de puedeVerSeccion, nunca de comparar ids a mano. El
- * catálogo de secciones se trae una sola vez y se resuelve todo contra un mapa en memoria: un
- * archivo de miles de renglones no puede disparar una consulta por renglón.
+ * La sección de cada renglón se valida contra el catálogo, que se trae una sola vez y se resuelve
+ * en memoria: un archivo de miles de renglones no puede disparar una consulta por renglón. Quién
+ * puede escribir cada renglón lo decide RLS al insertar, no una comprobación previa aquí.
  */
 
 import { leerCsv } from "@/lib/csv";
 import { validarTelefonoMexicano } from "@/lib/territorio";
-import { puedeImportar, puedeVerSeccion } from "@/lib/permisos";
+import { puedeImportar } from "@/lib/puertas-ui";
 import { GENEROS } from "@/lib/tipos";
 import type { Genero, UsuarioActuante } from "@/lib/tipos";
 import { db, lista, uno, resultado, type Resultado } from "@/lib/datos/cliente";
@@ -262,9 +262,6 @@ function revisarRenglon(
     const demarcacionId = catalogoSecciones.get(clave);
     if (demarcacionId === undefined) {
       return rechazar(`La sección ${clave} no existe en el catálogo.`);
-    }
-    if (!puedeVerSeccion(usuario, clave, demarcacionId)) {
-      return rechazar(`La sección ${clave} no está en tu territorio.`);
     }
     base.seccionClave = clave;
     base.demarcacionId = demarcacionId;

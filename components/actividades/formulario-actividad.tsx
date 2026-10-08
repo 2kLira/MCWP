@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useActuante } from "@/components/proveedor-actuante";
-import { alcanceDe } from "@/lib/permisos";
+import { alcanceDe, esAdmin } from "@/lib/puertas-ui";
 import { demarcacionPorId, DEMARCACIONES } from "@/lib/demarcaciones";
 import { rasgoPorClave } from "@/lib/territorio";
 import { ETIQUETA_TIPO_ACTIVIDAD, type TipoActividad } from "@/lib/tipos";
@@ -10,6 +10,8 @@ import { crearActividad } from "@/lib/datos/actividades";
 import { usuariosAsignables, type UsuarioBreve } from "@/components/actividades/datos";
 import { CampoSeccion } from "@/components/actividades/campo-seccion";
 import { cn } from "@/lib/utils";
+import { Campo } from "@/components/campo";
+import { InvitarBrigadistas } from "@/components/actividades/invitar-brigadistas";
 
 const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
 
@@ -45,6 +47,12 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
   }, []);
 
   const [guardando, setGuardando] = useState(false);
+  /**
+   * La actividad recién creada. Mientras tenga valor, la hoja deja de ser el formulario y se
+   * vuelve el paso de invitar: una actividad sin invitados es una actividad muerta, y el admin se
+   * entera cuando un brigadista le llama a decir que la app le sale vacía.
+   */
+  const [recienCreada, setRecienCreada] = useState<{ id: string; nombre: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // La demarcación sale de la sección elegida, contra la misma cartografía cacheada que resuelve
@@ -85,12 +93,37 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
       estatus: "programada",
     });
 
+    setGuardando(false);
     if (!r.datos) {
-      setGuardando(false);
       setError(r.aviso ?? "No se pudo guardar la actividad.");
       return;
     }
-    alCrear(r.datos.id);
+    setRecienCreada({ id: r.datos.id, nombre: r.datos.nombre });
+  }
+
+  if (recienCreada) {
+    return (
+      <div className="flex flex-col gap-4">
+        <p className="medida text-sm text-tinta-suave">
+          Se creó <span className="text-tinta">{recienCreada.nombre}</span>. Invita a los
+          brigadistas que van a capturar aquí: sin invitación no la ven.
+        </p>
+
+        <InvitarBrigadistas
+          actividadId={recienCreada.id}
+          estatus="programada"
+          puedeInvitar={esAdmin(actuante)}
+        />
+
+        <button
+          type="button"
+          onClick={() => alCrear(recienCreada.id)}
+          className="transicion-ui toque-actividad rounded-control bg-naranja text-base font-medium text-sobre-naranja"
+        >
+          Listo
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -218,22 +251,3 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
   );
 }
 
-function Campo({
-  etiqueta,
-  apoyo,
-  children,
-}: {
-  etiqueta: string;
-  apoyo?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm text-tinta-suave">
-        {etiqueta}
-        {apoyo && <span className="ml-2 text-xs text-tinta-tenue">{apoyo}</span>}
-      </span>
-      {children}
-    </label>
-  );
-}

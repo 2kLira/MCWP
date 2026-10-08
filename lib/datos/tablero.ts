@@ -4,7 +4,6 @@
  * v_demarcacion_resumen, que ya vienen agregadas por la base.
  */
 
-import { aplicarAlcance } from "@/lib/permisos";
 import type { UsuarioActuante } from "@/lib/tipos";
 import { db, esFaltaDeEsquema, lista, type Resultado } from "@/lib/datos/cliente";
 import { seccionesResumen } from "@/lib/datos/catalogos";
@@ -60,7 +59,7 @@ async function contar(
   ajustar?: (c: ReturnType<typeof armar>) => ReturnType<typeof armar>,
 ): Promise<{ total: number; sinEsquema: boolean }> {
   const base = armar(tabla);
-  const consulta = aplicarAlcance(ajustar ? ajustar(base) : base, usuario);
+  const consulta = ajustar ? ajustar(base) : base;
   const { count, error } = await consulta;
   return { total: count ?? 0, sinEsquema: esFaltaDeEsquema(error) };
 }
@@ -143,10 +142,13 @@ export type CumpleanosHoy = {
   edad: number;
 };
 
-/** Quiénes cumplen años hoy, recortado al territorio del actuante. La vista aún puede no existir. */
+/** Quiénes cumplen años hoy. El recorte lo hace RLS. La vista aún puede no existir. */
 export async function cumpleanosDeHoy(
   usuario: UsuarioActuante | null,
 ): Promise<Resultado<CumpleanosHoy[]>> {
-  const consulta = aplicarAlcance(db().from("v_cumpleanos_hoy").select("*"), usuario);
+  // `usuario` ya no recorta —eso lo hace RLS— pero se conserva en la firma porque es la
+  // dependencia de useConsulta que redispara al cambiar de identidad. No lo quites.
+  void usuario;
+  const consulta = db().from("v_cumpleanos_hoy").select("*");
   return lista<CumpleanosHoy>(consulta.order("nombre", { ascending: true }));
 }

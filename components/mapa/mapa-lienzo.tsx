@@ -27,7 +27,6 @@ import {
   calcularGruposRetraso,
   retrasoDeGrupoMs,
 } from "./geometria";
-import { calcularAlcanceMapa } from "./permisos-mapa";
 import {
   crearFuncionCurva,
   leerColor,
@@ -175,7 +174,7 @@ function filtroPrioritariaPendiente(grupo: "A" | "B" | null): FilterSpecificatio
  * state "prioritariaPendiente"); atenuada si no es del grupo de la vista de prioritarias activa, o
  * si la vista activa es la de casillas —ahí todas quedan atenuadas parejo, sin excepción, para que
  * el territorio siga visible sin competir con los puntos (ver esVistaDeCasillas)—; y, aparte de las
- * tres, rebajada otra vez si además está fuera del alcance del actuante. Las secciones sin `dato`
+ * tres. Las secciones sin `dato`
  * (fuera del catálogo) no llegan aquí: las capas de relleno y borde las excluyen por filtro, ver
  * PROP_SIN_DATO.
  */
@@ -191,6 +190,9 @@ function opacidadRellenoSeccion(): DataDrivenPropertyValueSpecification<number> 
     [
       "all",
       ["boolean", ["feature-state", "atenuada"], false],
+      // Nadie pone ya `enAlcance`: el coalesce lo resuelve siempre a true, así que esta rama
+      // de apagado quedó inerte. Se deja para no tocar el pintado del mapa en la misma fase que
+      // se quitó el recorte; se puede simplificar cuando alguien trabaje este archivo.
       ["==", ["coalesce", ["feature-state", "enAlcance"], true], false],
     ],
     0.03,
@@ -210,13 +212,13 @@ function opacidadBordeSeccion(): DataDrivenPropertyValueSpecification<number> {
 export type MapaLienzoProps = {
   /** El GeoJSON ya cargado por lib/territorio.ts. El lienzo nunca lo pide él mismo. */
   coleccion: ColeccionSecciones;
-  /** El resumen real por sección, ya recortado al territorio del actuante. */
+  /** El resumen real por sección, ya recortado por RLS. */
   datos: DatosMapa;
   vista: VistaMapa;
   claveSeleccionada: string | null;
   onClicSeccion: (rasgo: RasgoSeccion, puntoPantalla: { x: number; y: number }) => void;
   onMovimiento: (moviendo: boolean) => void;
-  /** Las casillas del territorio del actuante, o null mientras no se han pedido todavía: la vista
+  /** Las casillas que el actuante alcanza a ver, o null mientras no se han pedido todavía: la vista
    *  de casillas las carga perezosa (lib/datos/casillas.ts), no al arrancar el mapa. */
   casillas: readonly CasillaConRepresentantes[] | null;
   casillaSeleccionadaId: number | null;
@@ -267,15 +269,13 @@ export function MapaLienzo({
   const claveResaltadaRef = useRef<string | null>(null);
   const casillaResaltadaRef = useRef<number | null>(null);
 
-  /** Aplica valor de vista, alcance territorial, hueco y selección a todas las secciones. */
+  /** Aplica valor de vista, hueco y selección a todas las secciones. */
   function aplicarEstadoCompleto(mapa: MapaLibreMap) {
     const {
       vista: vistaActual,
-      actuante: actuanteActual,
       claveSeleccionada: claveActual,
       datos: datosActuales,
     } = estadoRef.current;
-    const alcance = calcularAlcanceMapa(coleccionRef.current, actuanteActual);
     const pasos = calcularPasosDeVista(vistaActual, datosActuales);
     const esEstructura = vistaActual === "estructura";
     const grupoPrioritario = grupoDePrioritarias(vistaActual);
@@ -287,7 +287,6 @@ export function MapaLienzo({
         { source: FUENTE_ID, id: clave },
         {
           valor: pasos.get(clave) ?? 0,
-          enAlcance: alcance.get(clave) ?? true,
           seleccionada: clave === claveActual,
           hueco: esEstructura && dato != null && !dato.tieneResponsable,
           atenuada: esCasillas || (grupoPrioritario != null && dato?.prioridad !== grupoPrioritario),
@@ -728,20 +727,6 @@ export function MapaLienzo({
   }, [vista]);
 
   // ---------------------------------------------------------------------------
-  // Rol actuante: qué secciones caen dentro del territorio propio. Nunca decide aquí quién ve
-  // qué, solo traslada lo que ya calculó lib/permisos.ts a las feature-states del mapa.
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    const mapa = mapaRef.current;
-    if (!mapa || !mapa.getSource(FUENTE_ID)) return;
-    const alcance = calcularAlcanceMapa(coleccion, actuante);
-    for (const [clave, dentro] of alcance) {
-      mapa.setFeatureState({ source: FUENTE_ID, id: clave }, { enAlcance: dentro });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actuante]);
-
-  // ---------------------------------------------------------------------------
   // Sección elegida: resalta su borde y desplaza/ajusta la cámara con la curva y duración del
   // sistema. Nunca salta, y respeta prefers-reduced-motion.
   // ---------------------------------------------------------------------------
@@ -800,7 +785,6 @@ export function MapaLienzo({
     const mapa = mapaRef.current;
     if (!mapa || !mapa.getSource(FUENTE_CASILLAS_ID)) return;
     aplicarSeleccionCasilla(mapa, casillaSeleccionadaId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [casillaSeleccionadaId]);
 
   return (

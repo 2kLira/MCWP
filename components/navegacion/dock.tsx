@@ -6,7 +6,7 @@ import { useState } from "react";
 import { UserPlus } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { DESTINOS, destinosVisibles, estaActivo } from "@/components/navegacion/destinos";
-import { puedeCrear } from "@/lib/permisos";
+import { puedeCrear } from "@/lib/puertas-ui";
 import { cn } from "@/lib/utils";
 
 /**

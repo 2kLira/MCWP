@@ -2,11 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { Buscador } from "@/components/buscador";
-import { ConmutadorRol } from "@/components/conmutador-rol";
+import { CapsulaSesion } from "@/components/sesion/capsula-sesion";
 import { cn } from "@/lib/utils";
 
 /**
- * Barra superior de escritorio: buscador y conmutador de rol en cápsula, alineados a la derecha.
+ * Barra superior de escritorio: buscador y cápsula de sesión, alineados a la derecha.
  *
  * En el tablero no ocupa alto en el flujo: es una capa `h-0` con `overflow-visible`, así que su
  * contenido desborda hacia abajo sin empujar la página y el título grande de la pantalla —que
@@ -29,7 +29,7 @@ export function BarraSuperior() {
     >
       <div className="mx-auto flex max-w-tope items-center justify-end gap-3">
         <Buscador className="pointer-events-auto w-full max-w-[35rem]" comoCapsula />
-        <ConmutadorRol className="pointer-events-auto shrink-0" comoCapsula />
+        <CapsulaSesion className="pointer-events-auto shrink-0" comoCapsula />
       </div>
     </div>
   );

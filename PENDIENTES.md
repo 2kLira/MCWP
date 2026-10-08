@@ -445,3 +445,76 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     unidad exacta del sistema. La migración es `supabase/migraciones/2026-09-21-soet-apoyo.sql` y
     marca a tres de cada diez personas sembradas para que la demo no salga vacía. Falta confirmar si
     la demo de esta rama usa la misma base que main o una propia.
+
+## Proyecto real: login, roles y RLS (8 de octubre de 2026)
+
+58. **Dejó de ser maqueta.** Se aprobó el proyecto y se montó una base nueva
+    (`mybauwarryjnhmbvpnoe`) con login de correo y contraseña contra Supabase Auth y RLS en las
+    veinte tablas. Esto deroga dos reglas que `CLAUDE.md` tenía marcadas como no negociables —"no
+    hay login" y "ningún dato personal real"— y deroga la línea de `spec/alcance.md` que decía
+    "Row Level Security. Fuera, por la decisión de no tener login". El propio párrafo de
+    `CLAUDE.md` ya preveía el cambio: "cuando el proyecto se apruebe, ese módulo se reemplaza por
+    políticas de base de datos".
+
+    El esquema se **consolidó**: `supabase/schema.sql` es la estructura completa y
+    `supabase/seguridad.sql` la seguridad. Las once migraciones de la maqueta se archivaron en
+    `supabase/migraciones-maqueta-v1/` y no deben aplicarse, porque una apaga RLS y cuatro
+    redefinen `v_seccion_resumen` sin `security_invoker`. Eso deja obsoleta la entrada 55.
+
+    `lib/permisos.ts` (359 líneas) quedó sin uso y **todavía no se ha borrado ni reemplazado**. Es
+    lo siguiente que hay que hacer: mientras siga ahí, hay dos fuentes de verdad de permisos.
+
+59. **Bloqueante antes de capturar gente real.** Se decidió que la base ya recibe datos personales
+    reales, pero quedan dos cosas sin resolver que no son opcionales:
+
+    - El aviso de privacidad sigue siendo el texto provisional que `spec/alcance.md` marcó como
+      "pendiente de revisión legal". `personas.aviso_version` y `consentimiento_en` existen y se
+      guardan, pero están guardando consentimiento a un texto que nadie revisó.
+    - No hay política de retención ni figura definida de quién responde por los datos.
+
+    Mientras eso no se cierre, lo sensato es capturar solo con datos de prueba del rango
+    951 100 0000 a 951 100 9999.
+
+60. **Los dos roles territoriales no tienen políticas.** El enum `rol_usuario` conserva
+    `resp_demarcacion` y `resp_seccion`, pero `supabase/seguridad.sql` solo escribe políticas para
+    `admin` y `brigadista`, que son los dos roles que el cliente pidió para arrancar. Un usuario con
+    rol territorial **no ve nada**. Se dejó así a propósito en lugar de inventarles un alcance que
+    el spec no define con RLS. Las entradas 1 y 2 de este archivo describen lo que se había
+    decidido para ellos en la maqueta; sirve de punto de partida, pero hay que confirmarlo antes de
+    escribir esas políticas.
+
+61. **Detección de duplicados sin exponer datos.** El registro rápido exige avisar del teléfono
+    repetido en el momento, pero un brigadista no puede leer personas de otras capturas. Se resolvió
+    con `public.telefono_ya_registrado(tel)`, que responde sí o no y nunca devuelve el registro.
+
+    El costo es real y hay que decirlo: el brigadista se enterará de que el teléfono ya existe pero
+    **no podrá agregarle la participación a la persona existente**, que es el camino que
+    `spec/alcance.md` marcaba por defecto. Tendrá que avisarle al admin. Si eso estorba en campo, la
+    alternativa es dejarle leer las personas de su sección, que fue la opción descartada.
+
+    La función vive en `public` y es `SECURITY DEFINER`, lo que el asesor de Supabase marca como
+    aviso. Es intencional: PostgREST solo expone RPC de esquemas expuestos. Está blindada por
+    dentro (comprueba sesión y usuario activo antes de leer) y solo `authenticated` tiene `EXECUTE`.
+
+62. **Al cerrar la actividad, el brigadista pierde el acceso.** En cuanto pasa a `realizada` o
+    `cancelada` deja de ver la actividad y a las personas que capturó. Se eligió lo más estricto de
+    las tres opciones.
+
+    Queda un residuo menor sin resolver: sigue viendo su propio renglón de
+    `actividad_brigadistas`, así que sabe que fue invitado a un `actividad_id`, aunque no pueda leer
+    ni la actividad ni una sola persona. Se dejó porque es su propio registro de invitación y
+    esconderlo le quitaría la lista de "a qué me han invitado". Falta decidir si debe desaparecer.
+
+    Consecuencia operativa que hay que avisar en campo: **si la actividad se cierra con capturas a
+    medias, el brigadista ya no puede corregirlas.** Las corrige el admin.
+
+63. **Dos cosas de configuración que no se pueden hacer por SQL.**
+
+    - La protección contra contraseñas filtradas (HaveIBeenPwned) está **apagada**. El asesor de
+      seguridad la marca. Se activa en Authentication → Policies del tablero de Supabase. Conviene
+      subir ahí mismo el mínimo de longitud de contraseña.
+    - Los cuatro brigadistas se crearon con correos inventados del dominio `soet.local`
+      (`brigadista1@soet.local` … `brigadista4@soet.local`), que no es un dominio que exista. Sirve
+      para entrar, pero **no hay recuperación de contraseña posible**: si uno la olvida, el admin se
+      la tiene que reponer. Falta decidir si se les dan correos reales o si el método de acceso
+      cambia a teléfono con código, que era la opción con costo de SMS.

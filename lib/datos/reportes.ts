@@ -3,7 +3,6 @@
  * filas al navegador para agruparlas aquí.
  */
 
-import { aplicarAlcance } from "@/lib/permisos";
 import type { UsuarioActuante } from "@/lib/tipos";
 import { db, type Resultado } from "@/lib/datos/cliente";
 
@@ -35,16 +34,14 @@ export async function reporteSemanal(
   });
 
   const consultas = rangos.flatMap(({ inicio, fin }) => [
-    aplicarAlcance(
-      db().from("personas").select("*", { count: "exact", head: true }),
-      usuario,
-    )
+    db()
+      .from("personas")
+      .select("*", { count: "exact", head: true })
       .gte("created_at", inicio.toISOString())
       .lt("created_at", fin.toISOString()),
-    aplicarAlcance(
-      db().from("actividades").select("*", { count: "exact", head: true }),
-      usuario,
-    )
+    db()
+      .from("actividades")
+      .select("*", { count: "exact", head: true })
       .eq("estatus", "realizada")
       .gte("fecha", inicio.toISOString().slice(0, 10))
       .lt("fecha", fin.toISOString().slice(0, 10)),

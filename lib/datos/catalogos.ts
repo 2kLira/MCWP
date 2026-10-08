@@ -3,10 +3,8 @@
  * Las cifras salen de las vistas de la base, nunca de sumas hechas en el navegador.
  */
 
-import { aplicarAlcance, aplicarAlcanceDemarcacion, puedeVerSeccion } from "@/lib/permisos";
 import type { UsuarioActuante } from "@/lib/tipos";
 import { db, lista, type Resultado } from "@/lib/datos/cliente";
-import { cargarSecciones } from "@/lib/territorio";
 
 export type Problematica = {
   id: number;
@@ -60,7 +58,7 @@ export type SeccionResumen = {
 /**
  * Resumen por colonia, partido por demarcación y sección: 28 colonias cruzan demarcaciones, y
  * agrupar solo por colonia obligaría a decidir a qué territorio se le cuenta cada persona. Con
- * esta forma, aplicarAlcance recorta sin inventar nada; quien ve todo el municipio suma los
+ * esta forma, RLS recorta sin inventar nada; quien ve todo el municipio suma los
  * renglones por colonia.
  */
 export type ColoniaResumen = {
@@ -142,19 +140,16 @@ export type ColoniaDeSeccion = {
  * Colonias que integran una sección, ordenadas de mayor a menor traslape: primero la que ocupa
  * más territorio de la sección. Es el reemplazo de la capa de colonias que se retira del mapa: el
  * dato vive en la ficha, no en una capa aparte.
- *
- * Se recorta por territorio con `puedeVerSeccion` en vez de `aplicarAlcance` porque
- * `colonia_seccion` no lleva `demarcacion_id` propio; la sección ya viene elegida de una lista que
- * el usuario alcanza a ver, así que esto es una comprobación de cierre, no el primer filtro.
  */
 export function coloniasDeSeccionConTraslape(
   usuario: UsuarioActuante | null,
   seccionClave: string,
   demarcacionId?: number | null,
 ): Promise<Resultado<ColoniaDeSeccion[]>> {
-  if (!puedeVerSeccion(usuario, seccionClave, demarcacionId)) {
-    return Promise.resolve({ datos: [], sinEsquema: false, aviso: null });
-  }
+  // `usuario` ya no recorta —eso lo hace RLS— pero se conserva en la firma porque es la
+  // dependencia de useConsulta que redispara al cambiar de identidad. No lo quites.
+  void usuario;
+  void demarcacionId;
   return lista<ColoniaDeSeccion>(
     db()
       .from("colonia_seccion")
@@ -210,30 +205,36 @@ export function seccionesResumen(
   let consulta = db().from("v_seccion_resumen").select("*").eq("en_catalogo", true);
   if (opciones.prioridad) consulta = consulta.eq("prioridad", opciones.prioridad);
   return lista<SeccionResumen>(
-    aplicarAlcance(consulta, usuario, { seccion: "clave" }).order("clave"),
+    consulta.order("clave"),
   );
 }
 
 /**
- * Resumen por colonia, demarcación y sección a la vez, ya recortado al territorio del usuario
- * actuante. Cada renglón es la porción de una colonia dentro de una sección; una colonia partida
+ * Resumen por colonia, demarcación y sección a la vez. El recorte lo hace RLS sobre la vista,
+ * que es security_invoker. Cada renglón es la porción de una colonia dentro de una sección; una colonia partida
  * entre demarcaciones aparece en varios renglones. Devuelve vacío sin tronar si la vista todavía
  * no existe.
  */
 export function coloniaResumen(
   usuario: UsuarioActuante | null,
 ): Promise<Resultado<ColoniaResumen[]>> {
+  // `usuario` ya no recorta —eso lo hace RLS— pero se conserva en la firma porque es la
+  // dependencia de useConsulta que redispara al cambiar de identidad. No lo quites.
+  void usuario;
   const consulta = db().from("v_colonia_resumen").select("*");
-  return lista<ColoniaResumen>(aplicarAlcance(consulta, usuario).order("colonia"));
+  return lista<ColoniaResumen>(consulta.order("colonia"));
 }
 
-/** Resumen por demarcación, recortado igual. */
+/** Resumen por demarcación. El recorte lo hace RLS. */
 export function demarcacionesResumen(
   usuario: UsuarioActuante | null,
 ): Promise<Resultado<DemarcacionResumen[]>> {
+  // `usuario` ya no recorta —eso lo hace RLS— pero se conserva en la firma porque es la
+  // dependencia de useConsulta que redispara al cambiar de identidad. No lo quites.
+  void usuario;
   const consulta = db().from("v_demarcacion_resumen").select("*");
   return lista<DemarcacionResumen>(
-    aplicarAlcanceDemarcacion(consulta, usuario).order("personas", { ascending: false }),
+    consulta.order("personas", { ascending: false }),
   );
 }
 
@@ -248,10 +249,11 @@ export type MencionPorSeccion = {
 export function problematicasPorSeccion(
   usuario: UsuarioActuante | null,
 ): Promise<Resultado<MencionPorSeccion[]>> {
+  // `usuario` ya no recorta —eso lo hace RLS— pero se conserva en la firma porque es la
+  // dependencia de useConsulta que redispara al cambiar de identidad. No lo quites.
+  void usuario;
   const consulta = db().from("v_problematicas_por_seccion").select("*");
   return lista<MencionPorSeccion>(
-    aplicarAlcance(consulta, usuario, { seccion: "clave" }).order("menciones", {
-      ascending: false,
-    }),
+    consulta.order("menciones", { ascending: false }),
   );
 }

@@ -4,7 +4,7 @@
  */
 
 import type { PostgrestError } from "@supabase/supabase-js";
-import { aplicarAlcance, estatusVisibles, puedeEditar } from "@/lib/permisos";
+import { estatusVisibles, puedeEditar } from "@/lib/puertas-ui";
 import type { EstatusActividad, TipoActividad, UsuarioActuante } from "@/lib/tipos";
 import { db, lista, resultado, uno, type Resultado } from "@/lib/datos/cliente";
 
@@ -50,7 +50,10 @@ export function listarActividades(
   usuario: UsuarioActuante | null,
   filtros: FiltrosActividades = {},
 ): Promise<Resultado<Actividad[]>> {
-  let consulta = aplicarAlcance(db().from("actividades").select("*"), usuario);
+  // estatusVisibles se queda: coincide con RLS —el brigadista solo alcanza programada y en
+  // curso, y la política le quita el acceso al cerrar— así que esconde lo que de todos modos
+  // rebotaría, en vez de competir con la base.
+  let consulta = db().from("actividades").select("*");
   consulta = consulta.in("estatus", estatusVisibles(usuario));
   if (filtros.tipo) consulta = consulta.eq("tipo", filtros.tipo);
   // Si el filtro pedido cae fuera de lo que este rol alcanza a ver, el cruce con estatusVisibles
@@ -73,15 +76,15 @@ export function actividadesDeAgenda(
   hasta: string,
   estatus?: readonly EstatusActividad[],
 ): Promise<Resultado<Actividad[]>> {
-  let consulta = aplicarAlcance(db().from("actividades").select("*"), usuario);
+  let consulta = db().from("actividades").select("*");
   consulta = consulta.gte("fecha", desde).lte("fecha", hasta);
   consulta = estatus ? consulta.in("estatus", estatus) : consulta.neq("estatus", "cancelada");
   return lista<Actividad>(consulta.order("fecha").order("hora", { nullsFirst: false }));
 }
 
 /**
- * Las actividades donde este usuario está asignado como brigadista, recortadas por territorio y
- * por los estatus que su rol alcanza a ver. Sirve a la agenda propia sin que esa pantalla tenga
+ * Las actividades donde este usuario está invitado como brigadista. El recorte lo hace RLS; aquí
+ * solo se acotan los estatus que su rol alcanza a ver. Sirve a la agenda propia sin que esa pantalla tenga
  * que repetir la regla de estatusVisibles.
  */
 export async function actividadesDeBrigadista(
@@ -99,7 +102,7 @@ export async function actividadesDeBrigadista(
   const ids = (data ?? []).map((f) => (f as { actividad_id: string }).actividad_id);
   if (ids.length === 0) return { datos: [], sinEsquema: false, aviso: null };
 
-  let consulta = aplicarAlcance(db().from("actividades").select("*"), usuario);
+  let consulta = db().from("actividades").select("*");
   consulta = consulta.in("id", ids).in("estatus", estatusVisibles(usuario));
   if (rango) consulta = consulta.gte("fecha", rango.desde).lte("fecha", rango.hasta);
   return lista<Actividad>(consulta.order("fecha").order("hora", { nullsFirst: false }));
@@ -127,7 +130,10 @@ export type EntradaActividad = Partial<Omit<Actividad, "id" | "created_at">> & {
 };
 
 export function crearActividad(entrada: EntradaActividad): Promise<Resultado<Actividad | null>> {
-  return uno<Actividad>(db().from("actividades").insert(entrada).select().single());
+  return uno<Actividad>(
+    db().from("actividades").insert(entrada).select().single(),
+    "Solo el administrador general crea actividades.",
+  );
 }
 
 export async function actualizarActividad(
@@ -136,7 +142,7 @@ export async function actualizarActividad(
   cambios: Partial<EntradaActividad>,
 ): Promise<Resultado<Actividad | null>> {
   const actual = await obtenerActividad(usuario, id);
-  if (!actual.datos || !puedeEditar(usuario, "actividad", actual.datos)) {
+  if (!actual.datos || !puedeEditar(usuario, "actividad")) {
     return { datos: null, sinEsquema: false, aviso: "No puedes editar esta actividad." };
   }
   return uno<Actividad>(db().from("actividades").update(cambios).eq("id", id).select().single());
@@ -157,7 +163,7 @@ export async function cambiarEstatus(
 ): Promise<Resultado<Actividad | null>> {
   const actual = await obtenerActividad(usuario, id);
   if (!actual.datos) return { datos: null, sinEsquema: actual.sinEsquema, aviso: "No existe." };
-  if (!puedeEditar(usuario, "actividad", actual.datos)) {
+  if (!puedeEditar(usuario, "actividad")) {
     return { datos: null, sinEsquema: false, aviso: "No puedes mover esta actividad." };
   }
   if (!TRANSICIONES[actual.datos.estatus].includes(estatus)) {
@@ -179,7 +185,7 @@ export async function cerrarActividad(
   conclusion: string,
 ): Promise<Resultado<Actividad | null>> {
   const actual = await obtenerActividad(usuario, id);
-  if (!actual.datos || !puedeEditar(usuario, "actividad", actual.datos)) {
+  if (!actual.datos || !puedeEditar(usuario, "actividad")) {
     return { datos: null, sinEsquema: false, aviso: "No puedes cerrar esta actividad." };
   }
   return uno<Actividad>(
@@ -302,10 +308,13 @@ export async function registrarParticipacion(entrada: {
     .select("id")
     .single();
 
-  if (error) return resultado(null, error, null);
+  if (error) return resultado(null, error, null, "Esta actividad ya no está abierta para ti.");
 
   if (entrada.problematicas?.length) {
-    await db()
+    // El resultado de este segundo viaje se recoge. Antes se tiraba, así que si la política
+    // rechazaba las problemáticas la participación quedaba guardada y nadie se enteraba de que
+    // las problemáticas no.
+    const { error: errorMenciones } = await db()
       .from("menciones_problematica")
       .upsert(
         entrada.problematicas.map((p) => ({
@@ -315,6 +324,14 @@ export async function registrarParticipacion(entrada: {
         })),
         { onConflict: "participacion_id,problematica_id" },
       );
+    if (errorMenciones) {
+      return resultado(
+        data,
+        errorMenciones,
+        data,
+        "La persona sí quedó registrada, pero no sus problemáticas.",
+      );
+    }
   }
 
   return { datos: data, sinEsquema: false, aviso: null };
@@ -326,22 +343,21 @@ export type MomentoFoto = "inicio" | "cierre";
 export type Foto = {
   id: string;
   actividad_id: string | null;
+  /**
+   * **La ruta dentro del bucket privado, no una URL.** Por ejemplo
+   * `actividades/<id>/inicio-1234-ab.webp`.
+   *
+   * La columna conserva el nombre `url` porque el esquema está consolidado y no valía una
+   * migración de rename, pero su contrato cambió al volverse privado el bucket: una URL firmada
+   * caduca, así que guardarla haría que la columna se pudriera sola. Se firma al mostrar, con
+   * `firmarFotos` de lib/datos/almacenamiento.ts.
+   */
   url: string;
   subida_por: string | null;
   created_at: string;
-  /**
-   * NOTA DE ESQUEMA: columna `fotos.momento` (text, check en ('inicio','cierre'), nula en el
-   * resto de la galería) todavía no existe en supabase/schema.sql. Mientras no exista, las filas
-   * que llegan de la base simplemente no traen esta propiedad (queda undefined en tiempo de
-   * ejecución, aunque el tipo diga null) y toda comparación `=== "inicio"` o `=== "cierre"` da
-   * falso sin tronar. En cuanto la columna exista, esto empieza a distinguir solo.
-   */
+  /** Evidencia de inicio o de cierre. Nula en el resto de la galería. */
   momento: MomentoFoto | null;
-  /**
-   * NOTA DE ESQUEMA: columnas `fotos.lat` y `fotos.lng` (double precision, nulas cuando el GPS
-   * no respondió o el permiso se negó) tampoco existen todavía. Mismo comportamiento de
-   * degradación que `momento` mientras no se apliquen.
-   */
+  /** Coordenada del GPS al subir. Nulas si no respondió o si el permiso se negó. */
   lat: number | null;
   lng: number | null;
 };
@@ -375,20 +391,35 @@ export function agregarFoto(entrada: {
   if (entrada.lat !== undefined) fila.lat = entrada.lat;
   if (entrada.lng !== undefined) fila.lng = entrada.lng;
 
-  return uno<Foto>(db().from("fotos").insert(fila).select().single());
+  return uno<Foto>(
+    db().from("fotos").insert(fila).select().single(),
+    "No puedes subir fotos a esta actividad.",
+  );
 }
 
-export function agregarBrigadista(actividadId: string, usuarioId: string) {
-  return db().from("actividad_brigadistas").upsert({
+/**
+ * Invitar es dar permiso: un renglón aquí, más la actividad abierta, es todo el acceso del
+ * brigadista. Devuelve Resultado para que el rechazo de política llegue traducido a la pantalla.
+ */
+export async function agregarBrigadista(
+  actividadId: string,
+  usuarioId: string,
+): Promise<Resultado<null>> {
+  const { error } = await db().from("actividad_brigadistas").upsert({
     actividad_id: actividadId,
     usuario_id: usuarioId,
   });
+  return resultado(null, error, null, "Solo el administrador general invita brigadistas.");
 }
 
-export function quitarBrigadista(actividadId: string, usuarioId: string) {
-  return db()
+export async function quitarBrigadista(
+  actividadId: string,
+  usuarioId: string,
+): Promise<Resultado<null>> {
+  const { error } = await db()
     .from("actividad_brigadistas")
     .delete()
     .eq("actividad_id", actividadId)
     .eq("usuario_id", usuarioId);
+  return resultado(null, error, null, "Solo el administrador general quita brigadistas.");
 }

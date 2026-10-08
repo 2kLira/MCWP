@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId } from "@/lib/demarcaciones";
-import { puedeEditar } from "@/lib/permisos";
+import { puedeEditarPersona } from "@/lib/puertas-ui";
 import { cumpleHoy, etiquetaEdad } from "@/lib/personas";
 import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido } from "@/lib/transicion";
@@ -77,7 +77,7 @@ export function FichaPersona({ id }: { id: string }) {
   }
 
   const demarcacion = demarcacionPorId(p.demarcacion_id)?.nombre;
-  const editable = puedeEditar(actuante, "persona", p);
+  const editable = puedeEditarPersona(actuante, p);
 
   // Se guarda el valor aquí y no dentro de la función: el estrechamiento de `p` no sobrevive al
   // cierre de una función declarada, y adentro TypeScript vuelve a verlo como posiblemente nulo.

@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera } from "lucide-react";
 import { clienteSupabase } from "@/lib/supabase";
 import { agregarFoto, type Foto } from "@/lib/datos/actividades";
 import { comprimirFoto } from "@/components/actividades/comprimir";
+import { CUBETA_FOTOS, firmarFotos, rutaDeFoto } from "@/lib/datos/almacenamiento";
 
-const CUBETA = "fotos";
 
 export function FotosActividad({
   actividadId,
@@ -26,6 +26,27 @@ export function FotosActividad({
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
+
+  /**
+   * El bucket es privado, así que cada imagen se firma para mostrarla. `fotos[].url` guarda la
+   * ruta, no una URL. Se firma en lote: un viaje para toda la galería.
+   */
+  const [firmadas, setFirmadas] = useState<Map<string, string>>(new Map());
+  const rutas = fotos.map((f) => f.url).join("|");
+
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      const mapa = await firmarFotos(fotos.map((f) => f.url));
+      if (vivo) setFirmadas(mapa);
+    })();
+    return () => {
+      vivo = false;
+    };
+    // Se depende de la lista de rutas, no del arreglo: `fotos` es una referencia nueva en cada
+    // render del padre y volvería a firmar sin que haya cambiado ninguna foto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rutas]);
 
   async function elegirArchivo(evento: React.ChangeEvent<HTMLInputElement>) {
     const archivo = evento.target.files?.[0];
@@ -50,24 +71,23 @@ export function FotosActividad({
         return;
       }
 
-      const ruta = `${actividadId}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
+      const ruta = rutaDeFoto(actividadId);
       const { error: errorSubida } = await supabase
-        .storage.from(CUBETA)
+        .storage.from(CUBETA_FOTOS)
         .upload(ruta, comprimida.archivo, { contentType: "image/webp" });
 
       if (errorSubida) {
         setSubiendo(false);
         setError(
-          `No se pudo subir la foto: ${errorSubida.message}. Revisa que el bucket "fotos" exista en Supabase Storage.`,
+          `No se pudo subir la foto: ${errorSubida.message}.`,
         );
         return;
       }
 
-      const { data: publica } = supabase.storage.from(CUBETA).getPublicUrl(ruta);
-
+      // Se guarda la ruta, no una URL: el bucket es privado y las firmas caducan.
       const r = await agregarFoto({
         actividadId,
-        url: publica.publicUrl,
+        url: ruta,
         subidaPor: usuarioId,
       });
 
@@ -94,16 +114,26 @@ export function FotosActividad({
         <p className="text-sm text-tinta-suave">Todavía no hay fotos de esta actividad.</p>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {fotos.map((foto) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={foto.id}
-              src={foto.url}
-              alt=""
-              className="aspect-square w-full rounded-tarjeta border border-borde object-cover"
-              loading="lazy"
-            />
-          ))}
+          {fotos.map((foto) => {
+            const firmada = firmadas.get(foto.url);
+            // Mientras se firma —y si una foto concreta no se pudo firmar— se queda el mismo
+            // esqueleto que ya usa el estado de carga, en lugar de una imagen rota.
+            return firmada ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={foto.id}
+                src={firmada}
+                alt=""
+                className="aspect-square w-full rounded-tarjeta border border-borde object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div
+                key={foto.id}
+                className="aspect-square animate-pulse rounded-tarjeta bg-superficie-hundida"
+              />
+            );
+          })}
         </div>
       )}
 

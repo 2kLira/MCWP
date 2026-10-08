@@ -18,15 +18,19 @@ import {
   crearPersona,
   crearSolicitud,
   buscarPorTelefono,
+  telefonoYaRegistrado,
   coincidenciasPorNombre,
   type Persona,
   type PersonaEnLista,
 } from "@/lib/datos/personas";
 import { registrarParticipacion } from "@/lib/datos/actividades";
 import { crearSeguimiento } from "@/lib/datos/seguimientos";
+import { ElegirActividad } from "@/components/registro/elegir-actividad";
+import { esAdmin } from "@/lib/puertas-ui";
 import { coloniasDeSeccion, problematicas, type ColoniaBreve, type Problematica } from "@/lib/datos/catalogos";
 import { GENEROS, ETIQUETA_GENERO, type Genero } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
+import { Campo } from "@/components/campo";
 
 /** El texto del aviso va provisional, con nota visible de que falta revisión legal. */
 const AVISO_VERSION = "provisional-1";
@@ -104,6 +108,11 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const [colonias, setColonias] = useState<ColoniaBreve[]>([]);
   const [duplicada, setDuplicada] = useState<Persona | null>(null);
   const [caminoDuplicado, setCaminoDuplicado] = useState<"agregar" | "otra">("agregar");
+  /**
+   * El teléfono existe pero no se alcanza a leer la ficha. Es el caso normal del brigadista: la
+   * RPC avisa del duplicado sin exponer datos de personas ajenas a su actividad.
+   */
+  const [duplicadoSinFicha, setDuplicadoSinFicha] = useState(false);
 
   const [estado, setEstado] = useState<Estado>("capturando");
   const [error, setError] = useState<string | null>(null);
@@ -197,16 +206,41 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   }, [textoPromotor, llegoPorPromotor, promotor]);
 
   // Deduplicación en el momento: en cuanto hay diez dígitos, se busca.
-  const revisarTelefono = useCallback(async (valor: string) => {
-    const norm = normalizarTelefono(valor);
-    if (!norm || norm.length < 10) {
+  const revisarTelefono = useCallback(
+    async (valor: string) => {
+      const norm = normalizarTelefono(valor);
+      if (!norm || norm.length < 10) {
+        setDuplicada(null);
+        setDuplicadoSinFicha(false);
+        return;
+      }
+
+      // El sí o no se pregunta SIEMPRE, por RPC. Es lo único que funciona para un brigadista:
+      // buscarPorTelefono le devolvería null por RLS y perdería el aviso en silencio.
+      const existe = await telefonoYaRegistrado(norm);
+      if (!existe.datos) {
+        setDuplicada(null);
+        setDuplicadoSinFicha(false);
+        return;
+      }
+
+      // La ficha completa solo se pide si quien captura puede verla. Si no, el aviso se queda en
+      // "ya está registrado" y el camino de agregar la participación no se ofrece, porque la
+      // base lo rechazaría.
+      if (esAdmin(actuante)) {
+        const r = await buscarPorTelefono(norm);
+        setDuplicada(r.datos);
+        setDuplicadoSinFicha(r.datos === null);
+        setCaminoDuplicado("agregar");
+        return;
+      }
+
       setDuplicada(null);
-      return;
-    }
-    const r = await buscarPorTelefono(norm);
-    setDuplicada(r.datos);
-    setCaminoDuplicado("agregar");
-  }, []);
+      setDuplicadoSinFicha(true);
+      setCaminoDuplicado("otra");
+    },
+    [actuante],
+  );
 
   // No regaña mientras se escribe: valida hasta que hay diez dígitos o al salir del campo.
   const validarTelefonoEnVivo = useCallback((valor: string) => {
@@ -269,8 +303,9 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     setEstado("guardando");
     setError(null);
 
-    const hayDuplicado = !!duplicada;
-    const agregarAExistente = hayDuplicado && caminoDuplicado === "agregar";
+    const hayDuplicado = !!duplicada || duplicadoSinFicha;
+    // Solo se puede agregar la participación a una ficha que de verdad se alcanzó a leer.
+    const agregarAExistente = !!duplicada && caminoDuplicado === "agregar";
 
     let personaId = duplicada?.id ?? null;
 
@@ -306,7 +341,10 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
       }
       personaId = r.datos.id;
 
-      if (hayDuplicado) {
+      // La nota de "marcada para revisión" va a seguimientos, que es tabla de gabinete y solo el
+      // admin puede escribir. Para un brigadista esto rebotaría en silencio y la marca se
+      // perdería, así que no se intenta. Queda pendiente decidir si la política se ensancha.
+      if (hayDuplicado && esAdmin(actuante)) {
         await crearSeguimiento({
           personaId,
           tipo: "otro",
@@ -373,6 +411,13 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     setResultadosPromotor([]);
     setEstado("capturando");
     nombreRef.current?.focus();
+  }
+
+  // Un brigadista no puede capturar fuera de una actividad: la política lo rechaza. Así que en
+  // lugar del formulario se le ofrece elegir una de sus actividades abiertas. Para el admin,
+  // capturar sin actividad sigue siendo válido y el formulario se pinta normal.
+  if (!actividadId && actuante.rol === "brigadista") {
+    return <ElegirActividad />;
   }
 
   if (estado === "guardada") {
@@ -547,6 +592,17 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
           />
           {errorTelefono && <p className="text-sm text-alerta">{errorTelefono}</p>}
         </Campo>
+
+        {duplicadoSinFicha && (
+          <div className="rounded-tarjeta border border-borde bg-superficie-hundida p-3">
+            <p className="text-sm font-medium text-tinta">Este teléfono ya está registrado</p>
+            <p className="medida mt-1 text-sm text-tinta-suave">
+              No puedes ver de quién es porque está fuera de tu actividad. Guárdala como persona
+              distinta sin teléfono y avísale al administrador general, o pídele que le agregue la
+              participación.
+            </p>
+          </div>
+        )}
 
         {duplicada && (
           <div className="rounded-tarjeta border border-borde bg-superficie-hundida p-3">
@@ -828,26 +884,6 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         />
       )}
     </>
-  );
-}
-
-function Campo({
-  etiqueta,
-  apoyo,
-  children,
-}: {
-  etiqueta: string;
-  apoyo?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm text-tinta-suave">
-        {etiqueta}
-        {apoyo && <span className="ml-2 text-xs text-tinta-tenue">{apoyo}</span>}
-      </span>
-      {children}
-    </label>
   );
 }
 
