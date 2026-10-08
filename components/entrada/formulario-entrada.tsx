@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Campo } from "@/components/campo";
@@ -30,13 +31,39 @@ function mensajeDeError(codigo: string | undefined): string {
 export function FormularioEntrada({ siguiente }: { siguiente?: string }) {
   const router = useRouter();
   const campoCorreo = useRef<HTMLInputElement>(null);
+  const campoContrasena = useRef<HTMLInputElement>(null);
 
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");
+  const [verContrasena, setVerContrasena] = useState(false);
   const [entrando, setEntrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const listo = correo.trim().length > 3 && contrasena.length > 0;
+
+  /**
+   * Cambiar el `type` de un input manda el cursor al final. Se guarda la posición y se restaura
+   * después de que React vuelve a pintar, para que alternar el ojito no obligue a buscar dónde
+   * se iba escribiendo.
+   */
+  function alternarContrasena() {
+    const campo = campoContrasena.current;
+    const inicio = campo?.selectionStart ?? null;
+    const fin = campo?.selectionEnd ?? null;
+    setVerContrasena((v) => !v);
+    requestAnimationFrame(() => {
+      const actual = campoContrasena.current;
+      if (!actual) return;
+      actual.focus();
+      if (inicio !== null && fin !== null) {
+        try {
+          actual.setSelectionRange(inicio, fin);
+        } catch {
+          // Algunos navegadores no permiten setSelectionRange según el tipo. No pasa nada.
+        }
+      }
+    });
+  }
 
   async function entrar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -91,15 +118,33 @@ export function FormularioEntrada({ siguiente }: { siguiente?: string }) {
       </Campo>
 
       <Campo etiqueta="Contraseña">
-        <input
-          className="campo"
-          type="password"
-          name="contrasena"
-          autoComplete="current-password"
-          required
-          value={contrasena}
-          onChange={(e) => setContrasena(e.target.value)}
-        />
+        {/* Mismo patrón que el buscador de personas: contenedor relativo y el control encima del
+            campo, aquí a la derecha. El `pr-11` evita que el texto pase por debajo del botón. */}
+        <div className="relative">
+          <input
+            ref={campoContrasena}
+            className="campo pr-11"
+            type={verContrasena ? "text" : "password"}
+            name="contrasena"
+            autoComplete="current-password"
+            required
+            value={contrasena}
+            onChange={(e) => setContrasena(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={alternarContrasena}
+            aria-label={verContrasena ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-pressed={verContrasena}
+            className="transicion-ui absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-control text-tinta-tenue transition-colors hover:text-tinta"
+          >
+            {verContrasena ? (
+              <EyeOff className="size-4" aria-hidden />
+            ) : (
+              <Eye className="size-4" aria-hidden />
+            )}
+          </button>
+        </div>
       </Campo>
 
       <button
