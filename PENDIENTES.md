@@ -530,16 +530,25 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     `components/mapa/tokens.ts` y los dos `themeColor` de `app/layout.tsx`. El CSS compilado no
     contiene un solo hexadecimal azul.
 
-    **Lo único que NO se revirtió, y por qué.** El token `--sobre-naranja` nació con el azul y hoy
-    lo usan 21 archivos. Borrarlo habría obligado a editar los 21, así que se conservó y se le dio
-    el valor correcto para naranja: `#24211e`, la tinta oscura, **fija en claro y en oscuro**.
+    **El token `--sobre-naranja` sobrevive**, porque nació con el azul pero hoy lo usan 21
+    archivos y borrarlo habría obligado a editarlos todos. Vale `var(--tinta)`, que es exactamente
+    lo que hace mcwp con `--primary-foreground`.
 
-    No es `var(--tinta)` a propósito. En modo oscuro `--tinta` se vuelve casi blanca, y `main`
-    nunca redefine `--naranja` en oscuro, así que apuntar ahí daría blanco sobre naranja: 2.49 a 1,
-    exactamente lo que el sistema de diseño prohíbe. Con la tinta fija da 6.44 a 1 en los dos
-    modos. De paso eso corrige un hueco que `main` arrastra: su `--primary-foreground: var(--tinta)`
-    produce ese blanco sobre naranja en oscuro, y aquí apunta a `--sobre-naranja`.
+    **Deuda de contraste conocida y aceptada a propósito.** En modo oscuro `--tinta` se invierte a
+    casi blanco y `main` nunca redefine `--naranja`, así que el texto sobre un relleno naranja
+    queda en **2.49 a 1**, por debajo del mínimo de 4.5 que pide el propio `spec/sistema-diseno.md`
+    y en contra de su regla "nunca blanco sobre naranja". No es un descuido: se comparó contra el
+    despliegue vivo de mcwp y **mcwp se comporta igual** —se ve en su dock, el icono sobre el
+    cuadro naranja es blanco— y la instrucción fue "estilo mcwp".
 
-    Contrastes verificados de la paleta restaurada: tinta sobre relleno 6.44; naranja tipográfico
-    sobre fondo claro 5.53; naranja claro sobre fondo oscuro 8.97; tinta sobre fondo 14.72;
-    tinta tenue sobre fondo 4.79. Todos por encima del mínimo de 4.5.
+    Si algún día pesa más el contraste que la fidelidad, el arreglo es **una línea**:
+    `--sobre-naranja: #24211e` fijo en `app/globals.css`. Da 6.44 a 1 en los dos modos y no toca
+    ninguna pantalla, porque las 21 ya leen el token. Vale la pena resolverlo antes de que esto
+    pase por una revisión de accesibilidad.
+
+    Contrastes verificados del resto de la paleta: naranja tipográfico sobre fondo claro 5.53;
+    naranja claro sobre fondo oscuro 8.97; tinta sobre fondo 14.72; tinta tenue sobre fondo 4.79.
+    Ésos sí están por encima del mínimo.
+
+    La comparación se hizo bajando el CSS de `https://mcwp.vercel.app`: los veinte tokens de color,
+    en claro y en oscuro, son idénticos.

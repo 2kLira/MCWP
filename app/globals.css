@@ -27,10 +27,13 @@
   --naranja-claro: #ff9b33; /* naranja tipográfico en oscuro, 8.91 sobre el fondo */
   --naranja-tipografico: var(--naranja-texto);
   --naranja-fuerte: #e87400; /* relleno naranja al pasar el cursor */
-  /* Texto encima del relleno naranja. Es la tinta oscura, FIJA en claro y en oscuro: no puede ser
-     var(--tinta) porque en oscuro esa se vuelve casi blanca y daría blanco sobre naranja (2.1 a 1),
-     que es exactamente lo que el sistema de diseño prohíbe. Contra #ff8200 da 6.8 a 1. */
-  --sobre-naranja: #24211e;
+  /* Texto encima del relleno naranja. Apunta a --tinta, que es lo que hace mcwp: en claro da la
+     tinta oscura (6.44 a 1) y en oscuro se invierte a casi blanco.
+     Ese segundo caso queda en 2.49 a 1, por debajo del mínimo de 4.5 del propio sistema de
+     diseño. Se deja así a propósito, para no divergir de mcwp. Si algún día se prefiere el
+     contraste sobre la fidelidad, esta línea pasa a `#24211e` fijo y el problema desaparece sin
+     tocar nada más: el token ya lo usan las 21 pantallas. Anotado en PENDIENTES.md. */
+  --sobre-naranja: var(--tinta);
   --naranja-suave: #fff0e1; /* fondo de selección */
   --naranja-suave-fuerte: #ffe4cb;
 
