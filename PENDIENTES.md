@@ -623,3 +623,16 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     puerta a la cápsula de sesión y a cerrar sesión. Su lista de destinos queda vacía y en su lugar
     va un renglón con el enlace a la agenda. Falta decidir si la cápsula de sesión debería vivir en
     algún lugar de la agenda y `/mas` desaparecerle del todo.
+
+- **"Servicios públicos" retirada del catálogo de problemáticas (9 de octubre de 2026).** A
+  petición del cliente deja de aparecer en el formulario de registro. `spec/modelo-datos.md` la
+  lista; esto lo supera. Se desactivó con `activa = false` y no se borró, porque ya había menciones
+  que la referencian y deben seguir contando en los reportes históricos.
+
+- **El brigadista escribe la conclusión general (9 de octubre de 2026).** Pedido del cliente.
+  `spec/alcance.md` dice que el responsable escribe la conclusión; esto lo amplía. Va por la
+  función `guardar_conclusion_actividad` de `supabase/seguridad.sql`, que solo toca la columna
+  `conclusion`, solo con la actividad abierta y solo si quien llama está invitado. Cerrar sigue
+  siendo del administrador, que ve el texto ya escrito y puede ajustarlo. Queda abierto: es un solo
+  campo compartido, así que si dos brigadistas de la misma actividad escriben, gana el último
+  que guarda. Si el cliente quiere una conclusión por brigadista, hace falta una tabla aparte.

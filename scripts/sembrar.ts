@@ -1303,7 +1303,6 @@ async function main() {
     "Baches y calles",
     "Transporte y movilidad",
     "Parques y espacios públicos",
-    "Servicios públicos",
     "Servicios de salud",
     "Otro",
   ] as const;

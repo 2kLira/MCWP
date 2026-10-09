@@ -584,3 +584,7 @@ insert into problematicas (nombre, orden) values
   ('Parques y espacios públicos', 7), ('Servicios públicos', 8),
   ('Servicios de salud', 9), ('Otro', 10)
 on conflict (nombre) do nothing;
+
+-- Retirada del formulario el 9 de octubre de 2026 a petición del cliente. Se desactiva y no se
+-- borra: hay menciones que la referencian y deben seguir contándose en reportes.
+update problematicas set activa = false where nombre = 'Servicios públicos';

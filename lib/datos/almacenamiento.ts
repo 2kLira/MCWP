@@ -54,10 +54,12 @@ export async function firmarFotos(
  * segmento como el id de la actividad, con `privado.actividad_de_ruta`. Sin el prefijo, leerían
  * el nombre del archivo como si fuera un uuid.
  */
-export function rutaDeFoto(actividadId: string, prefijo?: string): string {
+export function rutaDeFoto(actividadId: string, archivo: File, prefijo?: string): string {
   const azar = Math.random().toString(36).slice(2);
   const nombre = [prefijo, Date.now(), azar].filter(Boolean).join("-");
-  return `actividades/${actividadId}/${nombre}.webp`;
+  // WebP donde el navegador lo sabe codificar, JPEG en Safari de iPhone (ver comprimir.ts).
+  const extension = archivo.type === "image/jpeg" ? "jpg" : "webp";
+  return `actividades/${actividadId}/${nombre}.${extension}`;
 }
 
 /**

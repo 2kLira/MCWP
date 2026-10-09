@@ -103,10 +103,10 @@ export function BotonEvidencia({
 
     // El prefijo "actividades/" lo exigen las políticas de storage.objects: leen el segundo
     // segmento de la ruta como el id de la actividad.
-    const ruta = rutaDeFoto(actividadId, momento);
+    const ruta = rutaDeFoto(actividadId, comprimida.archivo, momento);
     const { error: errorSubida } = await supabase
       .storage.from(CUBETA_FOTOS)
-      .upload(ruta, comprimida.archivo, { contentType: "image/webp" });
+      .upload(ruta, comprimida.archivo, { contentType: comprimida.archivo.type });
 
     if (errorSubida) {
       setEstado("listo");

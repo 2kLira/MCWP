@@ -185,6 +185,44 @@ revoke all on function public.marcar_actividad_en_curso(uuid) from public;
 grant execute on function public.marcar_actividad_en_curso(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- 3c. Escribir la conclusión general de una actividad
+-- ---------------------------------------------------------------------------
+-- Pedido del cliente (9 de octubre de 2026): el brigadista también escribe la conclusión general.
+-- Mismo razonamiento que 3b: no se le da UPDATE sobre `actividades`, se le da una función que solo
+-- toca la columna `conclusion`, solo mientras la actividad siga abierta y solo si está invitado.
+-- Cerrar sigue siendo del administrador; al cerrar ve este texto ya escrito y puede ajustarlo.
+-- Es un solo campo compartido: si escriben dos brigadistas, queda lo último que se guardó.
+create or replace function public.guardar_conclusion_actividad(a_id uuid, texto text)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare movidas integer;
+begin
+  if auth.uid() is null then
+    raise exception 'Se requiere sesión';
+  end if;
+  if not exists (select 1 from public.usuarios u where u.id = auth.uid() and u.activo) then
+    raise exception 'Usuario sin acceso';
+  end if;
+  if length(texto) > 4000 then
+    raise exception 'La conclusión es demasiado larga';
+  end if;
+
+  if not (privado.es_admin() or privado.actividad_abierta_mia(a_id)) then
+    return false;
+  end if;
+
+  update public.actividades
+     set conclusion = nullif(btrim(texto), '')
+   where id = a_id and estatus in ('programada', 'en_curso');
+
+  get diagnostics movidas = row_count;
+  return movidas > 0;
+end $$;
+
+revoke all on function public.guardar_conclusion_actividad(uuid, text) from public;
+revoke all on function public.guardar_conclusion_actividad(uuid, text) from anon;
+grant execute on function public.guardar_conclusion_actividad(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- 4. RLS en todas las tablas
 -- ---------------------------------------------------------------------------
 -- Sin excepciones. Una tabla de public sin RLS es una tabla abierta.
@@ -450,13 +488,14 @@ create policy fotos_delete on fotos for delete to authenticated
 --
 -- 512000 bytes porque components/actividades/comprimir.ts ya rechaza arriba de 400 KB: el tope del
 -- bucket es el cinturón que respalda ese tirante, para que una subida que no pase por el compresor
--- tampoco entre. Solo WebP, que es lo único que produce el compresor.
+-- tampoco entre. WebP y JPEG, que es lo único que produce el compresor: Safari de iPhone no codifica
+-- WebP desde canvas y ahí el compresor cae a JPEG.
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('fotos', 'fotos', false, 512000, array['image/webp'])
-on conflict (id) do nothing;
+values ('fotos', 'fotos', false, 512000, array['image/webp', 'image/jpeg'])
+on conflict (id) do update set allowed_mime_types = excluded.allowed_mime_types;
 
--- Convención de ruta: actividades/<actividad_id>/<archivo>.webp
+-- Convención de ruta: actividades/<actividad_id>/<archivo>.webp (o .jpg)
 --
 -- Este envoltorio existe porque `(storage.foldername(name))[2]::uuid` **lanza** 22P02 si ese
 -- segmento no es un uuid, y una excepción dentro de una política no es un "no": es un error 500

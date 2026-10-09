@@ -45,3 +45,6 @@ next-env.d.ts
 
 # Copias generadas desde data/ por el script de preparación.
 /public/datos
+
+# Informe de auditoría: inventario de huecos abiertos, no va a un repo público
+AUDITORIA-SEGURIDAD.md

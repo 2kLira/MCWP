@@ -76,10 +76,10 @@ export function FotosActividad({
         return;
       }
 
-      const ruta = rutaDeFoto(actividadId);
+      const ruta = rutaDeFoto(actividadId, comprimida.archivo);
       const { error: errorSubida } = await supabase
         .storage.from(CUBETA_FOTOS)
-        .upload(ruta, comprimida.archivo, { contentType: "image/webp" });
+        .upload(ruta, comprimida.archivo, { contentType: comprimida.archivo.type });
 
       if (errorSubida) {
         setSubiendo(false);

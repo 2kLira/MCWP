@@ -442,3 +442,21 @@ export async function marcarActividadEnCurso(
   const { data, error } = await db().rpc("marcar_actividad_en_curso", { a_id: actividadId });
   return resultado(data === true, error, false);
 }
+
+/**
+ * El brigadista escribe la conclusión general sin poder cerrar la actividad.
+ *
+ * Por RPC por la misma razón que `marcarActividadEnCurso`: `public.guardar_conclusion_actividad`
+ * solo toca la columna `conclusion`, solo con la actividad abierta y solo si quien llama está
+ * invitado. Falso quiere decir que no se guardó: ya se cerró o ya no está invitado.
+ */
+export async function guardarConclusion(
+  actividadId: string,
+  texto: string,
+): Promise<Resultado<boolean>> {
+  const { data, error } = await db().rpc("guardar_conclusion_actividad", {
+    a_id: actividadId,
+    texto,
+  });
+  return resultado(data === true, error, false);
+}

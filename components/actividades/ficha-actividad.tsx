@@ -16,6 +16,7 @@ import {
   cambiarEstatus,
   cerrarActividad,
   consolidadoDeActividad,
+  guardarConclusion,
   fotosDeActividad,
   obtenerActividad,
   participacionesDeActividad,
@@ -296,6 +297,15 @@ export function FichaActividad({ id }: { id: string }) {
         </div>
       </Tarjeta>
 
+      {subirDesdeTarjeta && (
+        <ConclusionBrigadista
+          key={a.conclusion ?? ""}
+          id={id}
+          inicial={a.conclusion ?? ""}
+          alGuardar={() => setRecargar((v) => v + 1)}
+        />
+      )}
+
       <Tarjeta titulo="Fotos">
         {/* Decisión: el brigadista también sube a la galería general, no solo la evidencia de
             inicio y cierre.
@@ -323,7 +333,9 @@ export function FichaActividad({ id }: { id: string }) {
 
       {enCierre ? (
         <BloqueCierre
+          key={a.conclusion ?? ""}
           id={id}
+          conclusionInicial={a.conclusion ?? ""}
           consolidado={consolidado.datos}
           cargandoConsolidado={consolidado.cargando}
           fotoCierre={fotoCierre}
@@ -349,6 +361,7 @@ export function FichaActividad({ id }: { id: string }) {
 
 function BloqueCierre({
   id,
+  conclusionInicial,
   consolidado,
   cargandoConsolidado,
   fotoCierre,
@@ -356,6 +369,7 @@ function BloqueCierre({
   alCerrar,
 }: {
   id: string;
+  conclusionInicial: string;
   consolidado: Consolidado;
   cargandoConsolidado: boolean;
   fotoCierre: Foto | null;
@@ -363,7 +377,8 @@ function BloqueCierre({
   alCerrar: () => void;
 }) {
   const { actuante } = useActuante();
-  const [conclusion, setConclusion] = useState("");
+  // Arranca con lo que haya escrito el brigadista, si escribió algo.
+  const [conclusion, setConclusion] = useState(conclusionInicial);
   const [cerrando, setCerrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -430,6 +445,81 @@ function BloqueCierre({
         >
           {cerrando ? "Cerrando…" : "Confirmar cierre"}
         </button>
+      </div>
+    </Tarjeta>
+  );
+}
+
+/**
+ * La conclusión general que escribe el brigadista. Guarda sin cerrar: el cierre sigue siendo del
+ * administrador, que la encuentra ya escrita en su bloque de cierre.
+ */
+function ConclusionBrigadista({
+  id,
+  inicial,
+  alGuardar,
+}: {
+  id: string;
+  inicial: string;
+  alGuardar: () => void;
+}) {
+  const [texto, setTexto] = useState(inicial);
+  const [guardando, setGuardando] = useState(false);
+  const [aviso, setAviso] = useState<{ tono: "ok" | "error"; texto: string } | null>(null);
+  const sinCambios = texto.trim() === inicial.trim();
+
+  async function guardar() {
+    if (guardando || sinCambios) return;
+    setGuardando(true);
+    setAviso(null);
+    const r = await guardarConclusion(id, texto.trim());
+    setGuardando(false);
+    if (r.aviso) {
+      setAviso({ tono: "error", texto: r.aviso });
+      return;
+    }
+    if (!r.datos) {
+      setAviso({
+        tono: "error",
+        texto: "No se guardó: la actividad ya se cerró o ya no estás invitado.",
+      });
+      return;
+    }
+    setAviso({ tono: "ok", texto: "Conclusión guardada." });
+    alGuardar();
+  }
+
+  return (
+    <Tarjeta titulo="Conclusión general">
+      <div className="flex flex-col gap-3">
+        <textarea
+          value={texto}
+          onChange={(e) => {
+            setTexto(e.target.value);
+            setAviso(null);
+          }}
+          rows={3}
+          maxLength={4000}
+          aria-label="Conclusión general"
+          className="campo min-h-24 resize-y py-2"
+          placeholder="Cómo salió la actividad, en unas líneas."
+        />
+        {aviso && (
+          <p className={`text-sm ${aviso.tono === "error" ? "text-alerta" : "text-tinta-suave"}`}>
+            {aviso.texto}
+          </p>
+        )}
+        <button
+          type="button"
+          disabled={guardando || sinCambios}
+          onClick={guardar}
+          className="transicion-ui rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
+        >
+          {guardando ? "Guardando…" : "Guardar conclusión"}
+        </button>
+        <p className="text-xs text-tinta-tenue">
+          El administrador la ve al cerrar la actividad y puede ajustarla.
+        </p>
       </div>
     </Tarjeta>
   );
