@@ -2,7 +2,9 @@
 
 import { usePathname } from "next/navigation";
 import { Buscador } from "@/components/buscador";
+import { useActuante } from "@/components/proveedor-actuante";
 import { CapsulaSesion } from "@/components/sesion/capsula-sesion";
+import { puedeVerListadosGenerales } from "@/lib/puertas-ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,7 +20,14 @@ import { cn } from "@/lib/utils";
  */
 export function BarraSuperior() {
   const ruta = usePathname();
+  const { actuante } = useActuante();
   const flotante = ruta === "/";
+
+  // El buscador general no se le pinta a quien solo tiene la agenda. Las tres cosas que resuelve
+  // —persona, clave de sección, nombre de colonia o demarcación— desembocan en /personas/[id],
+  // /mapa y /territorio, que al brigadista ya no se le muestran: sería un cajón de texto cuyo
+  // único destino posible es un portón. La cápsula de sesión sí se queda, es como sale.
+  const conBuscador = puedeVerListadosGenerales(actuante);
 
   return (
     <div
@@ -28,7 +37,9 @@ export function BarraSuperior() {
       )}
     >
       <div className="mx-auto flex max-w-tope items-center justify-end gap-3">
-        <Buscador className="pointer-events-auto w-full max-w-[35rem]" comoCapsula />
+        {conBuscador && (
+          <Buscador className="pointer-events-auto w-full max-w-[35rem]" comoCapsula />
+        )}
         <CapsulaSesion className="pointer-events-auto shrink-0" comoCapsula />
       </div>
     </div>

@@ -19,6 +19,7 @@ import {
   puedeCrear,
   puedeEncabezarActividad,
   puedeImportar,
+  puedeVerListadosGenerales,
   puedeVerUsuarios,
 } from "@/lib/puertas-ui";
 import type { UsuarioActuante } from "@/lib/tipos";
@@ -31,16 +32,47 @@ export type Destino = {
   visible?: (usuario: UsuarioActuante) => boolean;
 };
 
-/** Lista completa. Es la que se muestra en la barra lateral de escritorio. */
+/**
+ * Lista completa. Es la que se muestra en la barra lateral de escritorio.
+ *
+ * Los siete módulos de vista agregada llevan `puedeVerListadosGenerales`, que es falso para el
+ * brigadista: su módulo único es la agenda. Agenda y Registrar persona no llevan ese predicado a
+ * propósito, son lo único que le queda. Ver el comentario de esa función en lib/puertas-ui.ts.
+ */
 export const DESTINOS: readonly Destino[] = [
-  { href: "/", etiqueta: "Tablero", icono: LayoutDashboard },
-  { href: "/mapa", etiqueta: "Mapa", icono: Map },
-  { href: "/personas", etiqueta: "Personas alcanzadas", icono: Users },
-  { href: "/actividades", etiqueta: "Actividades", icono: ClipboardList },
+  { href: "/", etiqueta: "Tablero", icono: LayoutDashboard, visible: puedeVerListadosGenerales },
+  { href: "/mapa", etiqueta: "Mapa", icono: Map, visible: puedeVerListadosGenerales },
+  {
+    href: "/personas",
+    etiqueta: "Personas alcanzadas",
+    icono: Users,
+    visible: puedeVerListadosGenerales,
+  },
+  {
+    href: "/actividades",
+    etiqueta: "Actividades",
+    icono: ClipboardList,
+    visible: puedeVerListadosGenerales,
+  },
   { href: "/agenda", etiqueta: "Agenda", icono: CalendarDays },
-  { href: "/territorio", etiqueta: "Estructura territorial", icono: Building2 },
-  { href: "/seguimiento", etiqueta: "Seguimiento", icono: ListChecks },
-  { href: "/reportes", etiqueta: "Reportes", icono: ChartColumn },
+  {
+    href: "/territorio",
+    etiqueta: "Estructura territorial",
+    icono: Building2,
+    visible: puedeVerListadosGenerales,
+  },
+  {
+    href: "/seguimiento",
+    etiqueta: "Seguimiento",
+    icono: ListChecks,
+    visible: puedeVerListadosGenerales,
+  },
+  {
+    href: "/reportes",
+    etiqueta: "Reportes",
+    icono: ChartColumn,
+    visible: puedeVerListadosGenerales,
+  },
   {
     href: "/registrar",
     etiqueta: "Registrar persona",
@@ -72,12 +104,32 @@ export const DESTINOS: readonly Destino[] = [
 /**
  * Los cinco destinos de la barra inferior de celular. Registrar va al centro, en relleno naranja,
  * y es la única acción naranja de esa barra.
+ *
+ * Al brigadista le quedan tres: Agenda, Registrar y Más. Registrar **se queda**, y es una
+ * decisión, no un descuido:
+ *
+ * - Capturar es lo único que hace en la calle. Es la acción del sistema, no un módulo: lo que el
+ *   cliente mandó esconder son los ocho destinos de consulta, y este botón no consulta nada.
+ * - `/registrar` sin actividad ya no es una trampa. Antes llevaba a un formulario que la política
+ *   `personas_brigadista_captura` rechazaba al guardar; hoy `components/registro/
+ *   elegir-actividad.tsx` le ofrece primero sus actividades abiertas, y si no tiene ninguna se lo
+ *   dice de entrada. Así que el botón nunca es un callejón.
+ * - Quitarlo costaría tres toques —agenda, actividad, registrar— en la pantalla donde más prisa
+ *   hay, con el celular en una mano.
+ *
+ * Más también se queda: en celular es donde vive la cápsula de sesión, y es la única forma de
+ * cerrar sesión. La pantalla se adapta a que su lista quede vacía (ver app/(aplicacion)/mas).
  */
 export const DESTINOS_CELULAR: readonly Destino[] = [
-  { href: "/", etiqueta: "Tablero", icono: LayoutDashboard },
+  { href: "/", etiqueta: "Tablero", icono: LayoutDashboard, visible: puedeVerListadosGenerales },
   { href: "/agenda", etiqueta: "Agenda", icono: CalendarDays },
-  { href: "/registrar", etiqueta: "Registrar", icono: UserPlus },
-  { href: "/mapa", etiqueta: "Mapa", icono: Map },
+  {
+    href: "/registrar",
+    etiqueta: "Registrar",
+    icono: UserPlus,
+    visible: (usuario) => puedeCrear(usuario, "persona"),
+  },
+  { href: "/mapa", etiqueta: "Mapa", icono: Map, visible: puedeVerListadosGenerales },
   { href: "/mas", etiqueta: "Más", icono: Ellipsis },
 ];
 

@@ -39,7 +39,7 @@ export function FormularioEntrada({ siguiente }: { siguiente?: string }) {
   const [entrando, setEntrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const listo = correo.trim().length > 3 && contrasena.length > 0;
+  const listo = correo.trim().length > 3 && contrasena.trim().length > 0;
 
   /**
    * Cambiar el `type` de un input manda el cursor al final. Se guarda la posición y se restaura
@@ -80,7 +80,13 @@ export function FormularioEntrada({ siguiente }: { siguiente?: string }) {
 
     const { error: fallo } = await supabase.auth.signInWithPassword({
       email: correo.trim(),
-      password: contrasena,
+      // Se recorta el espacio en blanco, que normalmente NO se hace con contraseñas porque una
+      // persona puede haber elegido una que empiece o termine con espacio. Aquí no puede: todas
+      // las contraseñas del sistema las genera el servidor desde un alfabeto sin espacios, en
+      // lib/api/porton-admin.ts. Y como se entregan copiándolas y pegándolas —no hay correo de
+      // recuperación—, un espacio invisible al final del portapapeles daba "Correo o contraseña
+      // incorrectos" sin que nadie pudiera adivinar por qué.
+      password: contrasena.trim(),
     });
 
     if (fallo) {

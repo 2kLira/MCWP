@@ -11,7 +11,8 @@ import {
   type RenglonRevisado,
   type SaldoImportacion,
 } from "@/lib/datos/importacion";
-import { puedeImportar } from "@/lib/puertas-ui";
+import { PortonAgenda } from "@/components/porton-agenda";
+import { puedeImportar, puedeVerListadosGenerales } from "@/lib/puertas-ui";
 
 /** Cuántos renglones se pintan por montón antes de resumir el resto con "y N más". */
 const MAX_VISIBLES = 5;
@@ -50,6 +51,13 @@ export default function Importar() {
   const [importando, setImportando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [saldo, setSaldo] = useState<SaldoImportacion | null>(null);
+
+  // Dos portones, no uno, porque son dos conversaciones distintas. Al responsable de sección se
+  // le dice que esta pantalla es de otro rol, porque el resto del sistema sí es suyo. Al
+  // brigadista se le devuelve a su agenda, porque es lo único que tiene.
+  if (!puedeVerListadosGenerales(actuante)) {
+    return <PortonAgenda titulo="Carga masiva" />;
+  }
 
   if (!puedeImportar(actuante)) {
     return (

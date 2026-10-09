@@ -3,9 +3,14 @@
 import { useRef, useState } from "react";
 import { Camera, LoaderCircle, MapPin } from "lucide-react";
 import { clienteSupabase } from "@/lib/supabase";
-import { agregarFoto, type Foto, type MomentoFoto } from "@/lib/datos/actividades";
+import {
+  agregarFoto,
+  marcarActividadEnCurso,
+  type Foto,
+  type MomentoFoto,
+} from "@/lib/datos/actividades";
 import { comprimirFoto } from "@/components/actividades/comprimir";
-import { CUBETA_FOTOS, rutaDeFoto } from "@/lib/datos/almacenamiento";
+import { avisoDeAlmacenamiento, CUBETA_FOTOS, rutaDeFoto } from "@/lib/datos/almacenamiento";
 
 
 const ETIQUETA_MOMENTO: Record<MomentoFoto, string> = {
@@ -13,6 +18,25 @@ const ETIQUETA_MOMENTO: Record<MomentoFoto, string> = {
   cierre: "foto de evidencia final",
 };
 
+/**
+ * Lo que se pinta debajo del botón. Son dos cosas que antes compartían el mismo gris tenue y se
+ * confundían: `nota` es informativa y la foto sí quedó guardada (por ejemplo, sin coordenada);
+ * `error` es que no quedó.
+ */
+type Aviso = { tono: "error" | "nota"; texto: string };
+
+/**
+ * Traducción del rechazo del almacenamiento.
+ *
+ * Esto **no** duplica `resultado()` de lib/datos/cliente.ts. Esa traduce lo que contesta
+ * PostgREST, y por ahí ya viaja el renglón de la tabla `fotos` a través de `agregarFoto`, que
+ * pasa su propio contexto. Pero la subida del archivo ocurre antes y la contesta Storage, que no
+ * es un PostgrestError y por lo mismo nunca entra a esa traducción: sin esto, un rechazo de
+ * `almacen_fotos_insert` le aparecía al brigadista en inglés y hablando de políticas.
+ *
+ * Lo desconocido no se tapa, misma regla que en cliente.ts: si no se reconoce, se muestra el
+ * mensaje original.
+ */
 /**
  * Coordenada del GPS del dispositivo, con el mismo permiso que ya pide el registro de personas.
  * Si el navegador no lo tiene, no responde o el usuario lo niega, resuelve null: la foto se sube
@@ -50,7 +74,7 @@ export function BotonEvidencia({
   alSubir: (foto: Foto) => void;
 }) {
   const [estado, setEstado] = useState<"listo" | "ubicando" | "subiendo">("listo");
-  const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<Aviso | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
 
   async function elegirArchivo(evento: React.ChangeEvent<HTMLInputElement>) {
@@ -58,7 +82,7 @@ export function BotonEvidencia({
     evento.target.value = "";
     if (!archivo) return;
 
-    setError(null);
+    setAviso(null);
     setEstado("ubicando");
     const coordenada = await pedirCoordenada();
 
@@ -66,14 +90,14 @@ export function BotonEvidencia({
     const comprimida = await comprimirFoto(archivo);
     if (!comprimida.ok) {
       setEstado("listo");
-      setError(comprimida.error);
+      setAviso({ tono: "error", texto: comprimida.error });
       return;
     }
 
     const supabase = clienteSupabase();
     if (!supabase) {
       setEstado("listo");
-      setError("Este despliegue no está conectado a la base de datos.");
+      setAviso({ tono: "error", texto: "Este despliegue no está conectado a la base de datos." });
       return;
     }
 
@@ -86,7 +110,9 @@ export function BotonEvidencia({
 
     if (errorSubida) {
       setEstado("listo");
-      setError(`No se pudo subir la foto: ${errorSubida.message}.`);
+      setAviso({ tono: "error", texto: avisoDeAlmacenamiento(errorSubida.message) });
+      // El detalle crudo va a la consola, igual que hace `resultado()`: en pantalla va qué hacer.
+      console.warn(errorSubida);
       return;
     }
 
@@ -103,12 +129,28 @@ export function BotonEvidencia({
 
     setEstado("listo");
     if (!r.datos) {
-      setError(r.aviso ?? "La foto se subió pero no se pudo guardar en la actividad.");
+      // Aquí ya no se traduce nada: `agregarFoto` pasó por `resultado()` con el contexto
+      // "No puedes subir fotos a esta actividad.", así que `r.aviso` ya viene en español.
+      setAviso({
+        tono: "error",
+        texto: r.aviso ?? "La foto se subió pero no se pudo guardar en la actividad.",
+      });
       return;
     }
     if (!coordenada) {
-      setError("Se guardó sin coordenada: el GPS no respondió o el permiso se negó.");
+      setAviso({
+        tono: "nota",
+        texto: "Se guardó sin coordenada: el GPS no respondió o el permiso se negó.",
+      });
     }
+    // Subir la evidencia de inicio es el gesto que marca que la actividad arrancó, así que se
+    // hace aquí y no en una pantalla: vale igual desde la tarjeta del brigadista que desde el
+    // flujo del responsable. Si devuelve falso —ya estaba en curso, o quien sube no está
+    // invitado— no se dice nada: no es un error, es que no había nada que mover.
+    if (momento === "inicio") {
+      await marcarActividadEnCurso(actividadId);
+    }
+
     alSubir(r.datos);
   }
 
@@ -145,7 +187,11 @@ export function BotonEvidencia({
         hidden
         onChange={elegirArchivo}
       />
-      {error && <p className="text-xs text-tinta-tenue">{error}</p>}
+      {aviso && (
+        <p className={aviso.tono === "error" ? "text-xs text-alerta" : "text-xs text-tinta-tenue"}>
+          {aviso.texto}
+        </p>
+      )}
     </div>
   );
 }

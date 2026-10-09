@@ -6,13 +6,17 @@ import { SelectorPunto } from "@/components/registro/selector-punto";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId, DEMARCACIONES } from "@/lib/demarcaciones";
 import {
+  cargarCatalogoColonias,
+  cargarCatalogoSecciones,
   cargarSecciones,
+  coloniasDeSeccionEnCatalogo,
   normalizarTelefono,
   rasgoPorClave,
   seccionPorPunto,
   validarTelefonoMexicano,
   type ColeccionSecciones,
-  type PropiedadesSeccion,
+  type ColoniaCatalogo,
+  type SeccionCatalogo,
 } from "@/lib/territorio";
 import {
   crearPersona,
@@ -27,7 +31,7 @@ import { registrarParticipacion } from "@/lib/datos/actividades";
 import { crearSeguimiento } from "@/lib/datos/seguimientos";
 import { ElegirActividad } from "@/components/registro/elegir-actividad";
 import { esAdmin } from "@/lib/puertas-ui";
-import { coloniasDeSeccion, problematicas, type ColoniaBreve, type Problematica } from "@/lib/datos/catalogos";
+import { problematicas, type Problematica } from "@/lib/datos/catalogos";
 import { GENEROS, ETIQUETA_GENERO, type Genero } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
 import { Campo } from "@/components/campo";
@@ -65,6 +69,9 @@ type Ubicacion = {
 
 type Estado = "capturando" | "guardando" | "guardada";
 
+/** Una opción del selector de sección. `conGeometria` falso = el mapa no la puede mostrar. */
+type OpcionSeccion = { clave: string; demarcacion: string; conGeometria: boolean };
+
 export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const { actuante } = useActuante();
 
@@ -79,7 +86,6 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const [quiereInfo, setQuiereInfo] = useState(true);
   const [esPromovido, setEsPromovido] = useState(false);
   const [quiereSerRepresentante, setQuiereSerRepresentante] = useState(false);
-  const [recibioApoyo, setRecibioApoyo] = useState(false);
   const [elegidas, setElegidas] = useState<number[]>([]);
   const [comentario, setComentario] = useState("");
   const [consiente, setConsiente] = useState(false);
@@ -103,9 +109,18 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   // termina en otra sección. Una vez que el GPS contesta, esta clave ya no cambia.
   const [claveGps, setClaveGps] = useState<string | null>(null);
   const [coleccionSecciones, setColeccionSecciones] = useState<ColeccionSecciones | null>(null);
+  /**
+   * Las 169 del catálogo. El geojson solo dibuja 157: en las otras 18 el GPS no resuelve y el
+   * mapa no las ofrece, así que sin esta lista la captura ahí se quedaba sin sección.
+   */
+  const [catalogoSecciones, setCatalogoSecciones] = useState<SeccionCatalogo[]>([]);
 
   const [catalogo, setCatalogo] = useState<Problematica[]>([]);
-  const [colonias, setColonias] = useState<ColoniaBreve[]>([]);
+  /**
+   * Las colonias del catálogo estático, no de la base: la captura en campo no debe depender de
+   * la red ni de que el rol pueda leer `colonias`. Alfabéticas, sin el orden por traslape.
+   */
+  const [catalogoColonias, setCatalogoColonias] = useState<ColoniaCatalogo[]>([]);
   const [duplicada, setDuplicada] = useState<Persona | null>(null);
   const [caminoDuplicado, setCaminoDuplicado] = useState<"agregar" | "otra">("agregar");
   /**
@@ -121,6 +136,12 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   // El GPS resuelve la sección al instante contra los polígonos cacheados, sin red.
   useEffect(() => {
     let vigente = true;
+
+    // El catálogo completo va en paralelo: es un archivo chico y hace falta tanto para el
+    // selector como para resolver la demarcación de las 18 secciones sin polígono.
+    void cargarCatalogoSecciones().then((catalogo) => {
+      if (vigente) setCatalogoSecciones(catalogo);
+    });
 
     cargarSecciones()
       .then((coleccion) => {
@@ -142,7 +163,12 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
               setClaveGps(clave);
               setUbicacion({ lat: latitude, lng: longitude, clave, origen: "gps" });
             } else {
-              setErrorGps("La ubicación quedó fuera del municipio.");
+              // No siempre es que esté fuera: 18 secciones del catálogo no tienen polígono, así
+              // que un punto legítimo dentro de una de ellas tampoco resuelve. El texto ya no
+              // afirma lo que no sabe, y señala la salida.
+              setErrorGps(
+                "No se pudo resolver la sección desde el GPS. Márcala en el mapa o elígela a mano.",
+              );
             }
           },
           () => {
@@ -171,7 +197,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   useEffect(() => {
     if (!ubicacion) return;
     let vigente = true;
-    coloniasDeSeccion(ubicacion.clave).then((r) => vigente && setColonias(r.datos));
+    void cargarCatalogoColonias().then((c) => vigente && setCatalogoColonias(c));
     return () => {
       vigente = false;
     };
@@ -255,18 +281,42 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const edad = edadCumplida(fechaNacimiento);
 
   const rasgo = ubicacion ? rasgoPorClave(ubicacion.clave) : null;
-  const demarcacionNombre = rasgo?.properties.demarcacion ?? null;
+  // Para las 18 sin polígono, rasgoPorClave devuelve null y la captura se guardaba sin
+  // demarcación. El catálogo la trae.
+  const demarcacionNombre =
+    rasgo?.properties.demarcacion ??
+    (ubicacion
+      ? (catalogoSecciones.find((s) => s.clave === ubicacion.clave)?.demarcacion ?? null)
+      : null);
   const demarcacionId =
     DEMARCACIONES.find((d) => d.nombre === demarcacionNombre)?.id ?? null;
 
-  // Opciones del selector de corrección, ordenadas por clave. Sale de la misma cartografía
-  // cacheada que ya resuelve el punto del GPS: no pide nada nuevo a la red.
-  const opcionesSeccion = useMemo(() => {
-    if (!coleccionSecciones) return [];
-    return [...coleccionSecciones.features]
-      .map((f) => f.properties)
-      .sort((a, b) => a.clave.localeCompare(b.clave));
-  }, [coleccionSecciones]);
+  /** Las colonias que tocan la sección resuelta. Alfabéticas; la sección es la que manda. */
+  const colonias = useMemo(
+    () =>
+      ubicacion ? coloniasDeSeccionEnCatalogo(catalogoColonias, ubicacion.clave) : [],
+    [catalogoColonias, ubicacion],
+  );
+
+  /**
+   * Opciones del selector: las 157 de la cartografía más las 18 del catálogo que no tienen
+   * polígono. Las segundas van marcadas, porque al elegirlas el mapa no va a poder mostrarlas y
+   * más vale decirlo que dejar a alguien buscando por qué no se dibuja nada.
+   *
+   * Las dos fuentes son archivos estáticos cacheados: esto no pide nada a la base ni a la red.
+   */
+  const opcionesSeccion = useMemo<OpcionSeccion[]>(() => {
+    const dibujadas = (coleccionSecciones?.features ?? []).map((f) => ({
+      clave: f.properties.clave,
+      demarcacion: f.properties.demarcacion,
+      conGeometria: true,
+    }));
+    const yaEstan = new Set(dibujadas.map((s) => s.clave));
+    const soloEnCatalogo = catalogoSecciones
+      .filter((s) => !yaEstan.has(s.clave))
+      .map((s) => ({ clave: s.clave, demarcacion: s.demarcacion, conGeometria: false }));
+    return [...dibujadas, ...soloEnCatalogo].sort((a, b) => a.clave.localeCompare(b.clave));
+  }, [coleccionSecciones, catalogoSecciones]);
 
   // Aviso discreto: la persona corrigió a mano y quedó en otra sección que la que dio el GPS.
   // No bloquea nada, solo lo deja dicho.
@@ -327,7 +377,6 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         quiere_info: quiereInfo,
         es_promovido: esPromovido,
         quiere_ser_representante: quiereSerRepresentante,
-        recibio_apoyo: recibioApoyo,
         aviso_version: AVISO_VERSION,
         consentimiento_en: new Date().toISOString(),
         registrada_por: actuante.id,
@@ -398,7 +447,6 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     setQuiereInfo(true);
     setEsPromovido(false);
     setQuiereSerRepresentante(false);
-    setRecibioApoyo(false);
     setElegidas([]);
     setComentario("");
     setConsiente(false);
@@ -652,6 +700,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
               {colonias.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre}
+                  {c.cp ? ` · CP ${c.cp}` : ""}
                 </option>
               ))}
             </select>
@@ -760,11 +809,6 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
             etiqueta="Quiere ser representante de casilla"
             valor={quiereSerRepresentante}
             alCambiar={setQuiereSerRepresentante}
-          />
-          <Interruptor
-            etiqueta="Recibió apoyo"
-            valor={recibioApoyo}
-            alCambiar={setRecibioApoyo}
           />
         </div>
 
@@ -964,7 +1008,7 @@ function SelectorSeccion({
   valor,
   onCambiar,
 }: {
-  opciones: PropiedadesSeccion[];
+  opciones: OpcionSeccion[];
   valor: string;
   onCambiar: (clave: string) => void;
 }) {
@@ -980,6 +1024,7 @@ function SelectorSeccion({
       {opciones.map((s) => (
         <option key={s.clave} value={s.clave}>
           {s.clave} · {s.demarcacion}
+          {s.conGeometria ? "" : " · sin mapa"}
         </option>
       ))}
     </select>

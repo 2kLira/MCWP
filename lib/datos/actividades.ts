@@ -423,3 +423,22 @@ export async function quitarBrigadista(
     .eq("usuario_id", usuarioId);
   return resultado(null, error, null, "Solo el administrador general quita brigadistas.");
 }
+
+/**
+ * Subir la foto de inicio arranca la actividad.
+ *
+ * Va por RPC y no por un `update` normal porque Row Level Security es por renglón, no por
+ * columna: una política que le dejara al brigadista poner `en_curso` también le dejaría cambiar
+ * el nombre, la fecha o el objetivo. `public.marcar_actividad_en_curso` solo sabe hacer una cosa
+ * —pasar de `programada` a `en_curso` sobre una actividad a la que el que llama está invitado— y
+ * nada más.
+ *
+ * Devuelve falso sin ruido cuando no había nada que mover: la actividad ya estaba en curso, o
+ * quien llama no está invitado. No es un error que haya que mostrar.
+ */
+export async function marcarActividadEnCurso(
+  actividadId: string,
+): Promise<Resultado<boolean>> {
+  const { data, error } = await db().rpc("marcar_actividad_en_curso", { a_id: actividadId });
+  return resultado(data === true, error, false);
+}

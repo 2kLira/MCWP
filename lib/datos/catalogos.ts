@@ -106,28 +106,6 @@ export function problematicas(): Promise<Resultado<Problematica[]>> {
   );
 }
 
-/**
- * Colonias para el autocompletado del registro. Es capa de referencia, nunca fuente de verdad
- * territorial: si la colonia y la sección se contradicen, gana la sección.
- */
-export function coloniasDeSeccion(
-  seccionClave: string,
-): Promise<Resultado<ColoniaBreve[]>> {
-  return lista<ColoniaBreve>(
-    db()
-      .from("colonia_seccion")
-      .select("traslape_pct, colonias!inner(id, nombre, cp, demarcacion_principal_id)")
-      .eq("seccion_clave", seccionClave)
-      .order("traslape_pct", { ascending: false })
-      .then(({ data, error }) => ({
-        data:
-          (data as { colonias: ColoniaBreve }[] | null)?.map((f) => f.colonias) ??
-          null,
-        error,
-      })),
-  );
-}
-
 /** Una colonia dentro de la ficha de una sección, con qué tanto de la sección ocupa. */
 export type ColoniaDeSeccion = {
   colonia_id: number;

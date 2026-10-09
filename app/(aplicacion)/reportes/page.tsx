@@ -12,9 +12,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { PortonAgenda } from "@/components/porton-agenda";
 import { Tarjeta } from "@/components/tablero/tarjeta";
 import { useActuante } from "@/components/proveedor-actuante";
 import { descargarCsv } from "@/lib/csv";
+import { puedeVerListadosGenerales } from "@/lib/puertas-ui";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
   demarcacionesResumen,
@@ -54,6 +56,13 @@ export default function Reportes() {
   }, [menciones.datos]);
 
   const conDatos = demarcaciones.datos.filter((d) => d.personas > 0);
+
+  // Mismo portón que Actividades y Personas. Los reportes se calculan en vivo sobre lo que el
+  // usuario alcanza: para el brigadista serían tres gráficas en cero y un botón de exportar un
+  // CSV vacío.
+  if (!puedeVerListadosGenerales(actuante)) {
+    return <PortonAgenda titulo="Reportes" />;
+  }
 
   return (
     <div className="flex flex-col gap-5">

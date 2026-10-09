@@ -35,8 +35,6 @@ export type Persona = {
   promovido_en: string | null;
   promovido_por: string | null;
   quiere_ser_representante: boolean;
-  /** Si ya recibió algún apoyo. Sí o no; qué apoyo fue no se registra todavía. */
-  recibio_apoyo: boolean;
   /**
    * Quién la trajo, si llegó por un promotor. Columna nueva, todavía sin migración aplicada: ver
    * PENDIENTES.md / el reporte de la fase D. Se codifica contra este nombre para que la migración
@@ -61,7 +59,6 @@ export type PersonaEnLista = Pick<
   | "fecha_nacimiento"
   | "es_promovido"
   | "quiere_ser_representante"
-  | "recibio_apoyo"
 >;
 
 export type FiltrosPersonas = {
@@ -72,13 +69,11 @@ export type FiltrosPersonas = {
   texto?: string;
   promovido?: boolean;
   representante?: boolean;
-  /** true: solo quien recibió apoyo; false: solo quien no; null o ausente: todas. */
-  apoyo?: boolean | null;
   genero?: Genero | null;
 };
 
 const COLUMNAS_LISTA =
-  "id, nombre, telefono_norm, calle, colonia_id, seccion_clave, demarcacion_id, quiere_participar, quiere_info, created_at, genero, fecha_nacimiento, es_promovido, quiere_ser_representante, recibio_apoyo";
+  "id, nombre, telefono_norm, calle, colonia_id, seccion_clave, demarcacion_id, quiere_participar, quiere_info, created_at, genero, fecha_nacimiento, es_promovido, quiere_ser_representante";
 
 export async function listarPersonas(
   usuario: UsuarioActuante | null,
@@ -100,7 +95,6 @@ export async function listarPersonas(
   if (filtros.promovido) consulta = consulta.eq("es_promovido", true);
   if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
   if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
-  if (filtros.apoyo != null) consulta = consulta.eq("recibio_apoyo", filtros.apoyo);
 
   const texto = filtros.texto?.trim();
   if (texto) {
@@ -201,7 +195,6 @@ export type EntradaPersona = {
   fecha_nacimiento?: string | null;
   es_promovido?: boolean;
   quiere_ser_representante?: boolean;
-  recibio_apoyo?: boolean;
   /** Quién trajo a esta persona. Apunta a personas, no a usuarios. */
   promotor_id?: string | null;
 };
@@ -338,7 +331,6 @@ export async function listarPromovidosExportar(
   if (filtros.quiereInfo) consulta = consulta.eq("quiere_info", true);
   if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
   if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
-  if (filtros.apoyo != null) consulta = consulta.eq("recibio_apoyo", filtros.apoyo);
 
   const texto = filtros.texto?.trim();
   if (texto) {

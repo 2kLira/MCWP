@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { esVistaDeCasillas, grupoDePrioritarias, VISTAS_MAPA, type VistaMapa } from "./datos-mapa";
 
 /** Las cinco vistas que se pintan con la escala de cinco pasos, por cuantiles. */
-const VISTAS_DE_ESCALA = new Set<VistaMapa>(["personas", "promovidos", "apoyos", "actividad", "recorridos"]);
+const VISTAS_DE_ESCALA = new Set<VistaMapa>(["personas", "promovidos", "actividad", "recorridos"]);
 
 /**
  * Una muestra de color junto a su etiqueta, fiel a como esa sección se pinta en el mapa: relleno

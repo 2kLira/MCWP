@@ -59,3 +59,30 @@ export function rutaDeFoto(actividadId: string, prefijo?: string): string {
   const nombre = [prefijo, Date.now(), azar].filter(Boolean).join("-");
   return `actividades/${actividadId}/${nombre}.webp`;
 }
+
+/**
+ * Traducción de los rechazos de Storage.
+ *
+ * Existe aparte de la tabla de códigos de `lib/datos/cliente.ts` por una razón concreta: esa
+ * traduce `PostgrestError`, y la subida del archivo la contesta Storage con un `StorageError`,
+ * que nunca pasa por `resultado()`. Sin esto, un rechazo de `almacen_fotos_insert` se mostraba
+ * crudo y en inglés.
+ *
+ * Misma regla que en cliente.ts: lo desconocido NO se tapa con una frase amable, se muestra tal
+ * cual y el objeto completo va a la consola.
+ */
+export function avisoDeAlmacenamiento(mensaje: string): string {
+  if (/row-level security|unauthorized|not authorized|forbidden|permission/i.test(mensaje)) {
+    return "No puedes subir fotos a esta actividad. Revisa que sigas invitado y que no esté cerrada.";
+  }
+  if (/jwt|token|expired/i.test(mensaje)) {
+    return "Tu sesión terminó. Vuelve a entrar.";
+  }
+  if (/exceeded the maximum allowed size|payload too large/i.test(mensaje)) {
+    return "La foto pesa más de lo que acepta el sistema, incluso comprimida.";
+  }
+  if (/mime type|not supported/i.test(mensaje)) {
+    return "Ese formato de imagen no se acepta.";
+  }
+  return `No se pudo subir la foto: ${mensaje}.`;
+}

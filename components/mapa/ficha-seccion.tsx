@@ -178,7 +178,6 @@ export function FichaSeccion({
             <dl className="grid grid-cols-2 gap-3 border-b border-borde py-4">
               <Renglon etiqueta="Personas alcanzadas" valor={formatoCifra.format(dato.personas)} />
               <Renglon etiqueta="Promovidos" valor={formatoCifra.format(dato.promovidos)} />
-              <Renglon etiqueta="Recibieron apoyo" valor={formatoCifra.format(dato.apoyos)} />
               <Renglon
                 etiqueta="Quieren participar"
                 valor={formatoCifra.format(dato.quierenParticipar)}

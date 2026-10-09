@@ -6,7 +6,8 @@ import { useActuante } from "@/components/proveedor-actuante";
 import { HojaContrasena } from "@/components/usuarios/hoja-contrasena";
 import { HojaUsuario } from "@/components/usuarios/hoja-usuario";
 import { demarcacionPorId } from "@/lib/demarcaciones";
-import { puedeVerUsuarios } from "@/lib/puertas-ui";
+import { PortonAgenda } from "@/components/porton-agenda";
+import { puedeVerListadosGenerales, puedeVerUsuarios } from "@/lib/puertas-ui";
 import { ETIQUETA_ROL } from "@/lib/tipos";
 import { useConsulta } from "@/lib/usar-consulta";
 import { cambiarActivo, listarUsuarios, type Usuario } from "@/lib/datos/usuarios";
@@ -26,6 +27,12 @@ export default function Usuarios() {
   );
 
   const recargar = () => setVersion((v) => v + 1);
+
+  // Igual que en Carga masiva: al brigadista se le devuelve a su agenda, que es su módulo único;
+  // a los demás roles se les dice de quién es esta pantalla.
+  if (!puedeVerListadosGenerales(actuante)) {
+    return <PortonAgenda titulo="Usuarios" />;
+  }
 
   if (!puedeVerUsuarios(actuante)) {
     return (

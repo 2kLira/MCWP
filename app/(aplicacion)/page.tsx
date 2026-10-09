@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { MessageCircle } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useActuante } from "@/components/proveedor-actuante";
+import { PortonAgenda } from "@/components/porton-agenda";
 import { demarcacionPorId } from "@/lib/demarcaciones";
-import { etiquetaAlcance } from "@/lib/puertas-ui";
+import { etiquetaAlcance, puedeVerListadosGenerales } from "@/lib/puertas-ui";
 import { ETIQUETA_TIPO_ACTIVIDAD } from "@/lib/tipos";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
@@ -38,7 +40,43 @@ function fechaCorta(iso: string): string {
   });
 }
 
-export default function Tablero() {
+/**
+ * La raíz. Aquí se decide quién ve el tablero y quién no.
+ *
+ * Al brigadista se le **redirige** a /agenda en lugar de mostrarle un portón, y eso es a
+ * propósito: esta no es una pantalla a la que haya llegado por su cuenta, es la pantalla a la que
+ * el sistema lo manda. `proxy.ts` manda a "/" a todo el que entra con sesión y a todo el que
+ * pisa /entrar estando dentro, así que un aviso aquí significaría que el brigadista choca con una
+ * pared **cada vez que abre la aplicación**, y que su primera pantalla del día es una que le dice
+ * que no tiene permiso. Un portón está bien para una URL que alguien escribió; para la puerta de
+ * entrada, no.
+ *
+ * La redirección es de cliente porque el rol vive en el cliente: el proxy responde una sola
+ * pregunta, si el JWT es válido, y leer la base en cada petición para saber el rol es justo lo
+ * que la documentación de Next pide no hacer ahí.
+ *
+ * El portón se pinta mientras la navegación ocurre. Dura un cuadro, y es la red de seguridad si
+ * la redirección no llega a correr: lo peor que puede pasar es que vea el camino a su agenda
+ * escrito, no una pantalla en blanco.
+ *
+ * El tablero de verdad vive en TableroCompleto, un componente aparte, para que sus tres consultas
+ * no se disparen para quien no va a ver el resultado.
+ */
+export default function Pagina() {
+  const { actuante } = useActuante();
+  const router = useRouter();
+  const soloAgenda = !puedeVerListadosGenerales(actuante);
+
+  useEffect(() => {
+    if (soloAgenda) router.replace("/agenda");
+  }, [soloAgenda, router]);
+
+  if (soloAgenda) return <PortonAgenda titulo="Tablero" />;
+
+  return <TableroCompleto />;
+}
+
+function TableroCompleto() {
   const { actuante } = useActuante();
   const territorio = etiquetaAlcance(
     actuante,

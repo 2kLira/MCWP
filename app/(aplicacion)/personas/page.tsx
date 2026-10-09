@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { format } from "date-fns";
 import { Download, Search, Star } from "lucide-react";
+import { PortonAgenda } from "@/components/porton-agenda";
 import { useActuante } from "@/components/proveedor-actuante";
 import { DEMARCACIONES, demarcacionPorId } from "@/lib/demarcaciones";
-import { alcanceDe } from "@/lib/puertas-ui";
+import { alcanceDe, puedeVerListadosGenerales } from "@/lib/puertas-ui";
 import { edadDesde, etiquetaEdad } from "@/lib/personas";
 import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido, useNavegarConTransicion } from "@/lib/transicion";
@@ -61,7 +62,6 @@ export default function Personas() {
   const [promovido, setPromovido] = useState(false);
   const [representante, setRepresentante] = useState(false);
   const [genero, setGenero] = useState<Genero | null>(null);
-  const [apoyo, setApoyo] = useState<boolean | null>(null);
 
   const [filas, setFilas] = useState<PersonaEnLista[]>([]);
   const [total, setTotal] = useState(0);
@@ -94,9 +94,8 @@ export default function Personas() {
       promovido: promovido || undefined,
       representante: representante || undefined,
       genero,
-      apoyo,
     }),
-    [textoDiferido, demarcacionId, seccionClave, participar, info, promovido, representante, genero, apoyo],
+    [textoDiferido, demarcacionId, seccionClave, participar, info, promovido, representante, genero],
   );
 
   useEffect(() => {
@@ -137,6 +136,12 @@ export default function Personas() {
     const r = await listarPromovidosExportar(actuante, filtrosActivos);
     descargarCsv("promovidos", COLUMNAS_PROMOVIDOS, r.datos.map(filaPromovidoExportable));
     setExportando(false);
+  }
+
+  // Mismo portón que Actividades. El brigadista solo tiene su agenda, y aquí RLS le devuelve
+  // cero filas: sin el portón vería un listado vacío con el buscador y nueve filtros encima.
+  if (!puedeVerListadosGenerales(actuante)) {
+    return <PortonAgenda titulo="Personas alcanzadas" />;
   }
 
   return (
@@ -209,16 +214,6 @@ export default function Personas() {
                 {ETIQUETA_GENERO[g]}
               </option>
             ))}
-          </select>
-          <select
-            value={apoyo == null ? "" : apoyo ? "si" : "no"}
-            onChange={(e) => setApoyo(e.target.value === "" ? null : e.target.value === "si")}
-            aria-label="Filtrar por apoyo recibido"
-            className="campo w-auto"
-          >
-            <option value="">Con y sin apoyo</option>
-            <option value="si">Recibió apoyo</option>
-            <option value="no">Sin apoyo</option>
           </select>
           <Filtro etiqueta="Quiere participar" activo={participar} alCambiar={setParticipar} />
           <Filtro etiqueta="Quiere información" activo={info} alCambiar={setInfo} />
@@ -298,7 +293,6 @@ export default function Personas() {
                           Promovido
                         </span>
                       )}
-                      {persona.recibio_apoyo && <span className="pildora">Apoyo</span>}
                       {persona.quiere_participar && <span className="pildora">Participa</span>}
                       {persona.quiere_info && <span className="pildora">Info</span>}
                     </span>

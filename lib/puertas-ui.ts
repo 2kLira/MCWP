@@ -203,8 +203,23 @@ export function estatusVisibles(
 }
 
 /**
- * El brigadista no navega el sistema: se le invita a una actividad y captura. Las pantallas de
- * listado general no son para él, y con RLS además le saldrían vacías.
+ * El brigadista no navega el sistema: se le invita a una actividad y captura.
+ *
+ * Esta es **la** pregunta de la que cuelga el módulo único del brigadista. El cliente lo pidió
+ * así: "al brigadista nada más le debe salir el de agenda y ya es su módulo único". De aquí salen
+ * tres cosas, y de aquí sola, para que no puedan contradecirse:
+ *
+ * 1. Qué destinos se pintan en el riel de escritorio y en la barra de celular
+ *    (`components/navegacion/destinos.ts`).
+ * 2. Qué pantallas lo reciben con un portón si llega por URL (`components/porton-agenda.tsx`).
+ * 3. Si la agenda que se le muestra es la propia o la del territorio
+ *    (`components/agenda/datos.ts`).
+ *
+ * El nombre dice "listados" porque eso es lo que se le esconde en el fondo: el tablero, el mapa,
+ * las personas, el territorio, el seguimiento y los reportes son todos vistas agregadas de datos
+ * que no alcanza. Con RLS le saldrían vacías, así que esconderlas coincide con la base en lugar
+ * de competir con ella. Lo que sí conserva es su agenda y el botón de registrar, que es su
+ * trabajo.
  */
 export function puedeVerListadosGenerales(usuario: UsuarioActuante | null): boolean {
   if (!usuario || !usuario.activo) return false;

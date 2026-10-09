@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
+import { PortonAgenda } from "@/components/porton-agenda";
 import { useActuante } from "@/components/proveedor-actuante";
 import { estatusVisibles, puedeCrear, puedeVerListadosGenerales } from "@/lib/puertas-ui";
 import { useConsulta } from "@/lib/usar-consulta";
@@ -46,17 +47,11 @@ export default function Actividades() {
   );
 
   // El brigadista no navega el sistema por listados generales: se le manda a una actividad
-  // concreta y captura ahí. Esta pantalla no es para él.
+  // concreta y captura ahí. Esta pantalla no es para él. El portón es el mismo párrafo que ya
+  // había aquí, movido a components/porton-agenda.tsx para que las diez pantallas que lo
+  // necesitan digan lo mismo, y ahora con el enlace de vuelta a la agenda.
   if (!puedeVerListadosGenerales(actuante)) {
-    return (
-      <section className="flex flex-col gap-3">
-        <h1 className="text-xl">Actividades</h1>
-        <p className="medida text-sm text-tinta-suave">
-          Esta pantalla no es para tu rol. Tu trabajo está en la agenda: ahí están tus actividades
-          programadas y en curso.
-        </p>
-      </section>
-    );
+    return <PortonAgenda titulo="Actividades" />;
   }
 
   return (

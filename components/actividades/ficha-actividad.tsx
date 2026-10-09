@@ -9,7 +9,7 @@ import { Tarjeta } from "@/components/tablero/tarjeta";
 import { FotosActividad } from "@/components/actividades/fotos-actividad";
 import { BotonEvidencia, LineaEvidencia } from "@/components/actividades/evidencia";
 import { demarcacionPorId } from "@/lib/demarcaciones";
-import { esAdmin, puedeEditar } from "@/lib/puertas-ui";
+import { esAdmin, puedeCrear, puedeEditar } from "@/lib/puertas-ui";
 import { ETIQUETA_ESTATUS, ETIQUETA_TIPO_ACTIVIDAD, type EstatusActividad } from "@/lib/tipos";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
@@ -117,9 +117,28 @@ export function FichaActividad({ id }: { id: string }) {
     );
   }
 
-  const editable = puedeEditar(actuante, "actividad");
+  // Dos permisos distintos que antes compartían una sola variable llamada `editable`, y de ahí
+  // venía el reclamo del cliente: al brigadista se le cerraba la cámara por una puerta que en
+  // realidad hablaba de otra cosa.
+  //
+  //  · `puedeEditarActividad` es tocar la actividad: moverla de estatus, cancelarla, reprogramarla
+  //    y cerrarla escribiendo la conclusión. Sigue siendo del administrador y de los responsables,
+  //    y además lo vuelven a exigir `cambiarEstatus` y `cerrarActividad` en lib/datos/actividades,
+  //    así que abrir la cámara no abre el cierre ni por accidente.
+  //  · `puedeSubirEvidencia` es adjuntar fotos, nada más. Esto es espejo de la política
+  //    `fotos_insert`: el administrador siempre; cualquier otro, solo mientras la actividad siga
+  //    abierta. La política pide además estar invitado, y eso aquí no se puede saber: si no lo
+  //    está, el rechazo llega traducido al subir.
+  const puedeEditarActividad = puedeEditar(actuante, "actividad");
+  const actividadAbierta = a.estatus === "programada" || a.estatus === "en_curso";
+  const puedeSubirEvidencia =
+    esAdmin(actuante) || (puedeCrear(actuante, "foto") && actividadAbierta);
+  // Quien puede editar la actividad ya tiene su botón de subir dentro de su propio flujo: el
+  // bloque de "marcar en curso" y el de cierre. Para no pintar el mismo botón dos veces, la
+  // tarjeta de evidencia ofrece subir solo a quien no tiene esos flujos, que es el brigadista.
+  const subirDesdeTarjeta = puedeSubirEvidencia && !puedeEditarActividad;
   const demarcacion = demarcacionPorId(a.demarcacion_id)?.nombre;
-  const enCierre = editable && (a.estatus === "programada" || a.estatus === "en_curso");
+  const enCierre = puedeEditarActividad && actividadAbierta;
 
   return (
     <div className="flex flex-col gap-5">
@@ -161,7 +180,7 @@ export function FichaActividad({ id }: { id: string }) {
           </p>
         )}
 
-      {editable && a.estatus !== "realizada" && (
+      {puedeEditarActividad && a.estatus !== "realizada" && (
         <div className="flex flex-col gap-3">
           {a.estatus === "programada" &&
             (fotoInicio ? (
@@ -235,26 +254,68 @@ export function FichaActividad({ id }: { id: string }) {
       </Tarjeta>
 
       <Tarjeta titulo="Evidencia de inicio y cierre">
-        <div className="flex flex-col gap-2">
-          <LineaEvidencia
-            etiqueta="Inicio"
-            foto={fotoInicio}
-            faltaAviso={
-              !fotoInicio && (a.estatus === "en_curso" || a.estatus === "realizada")
-                ? "Esta actividad ya arrancó y no tiene foto de inicio."
-                : undefined
-            }
-          />
-          <LineaEvidencia etiqueta="Cierre" foto={fotoCierre} />
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
+            <LineaEvidencia
+              etiqueta="Inicio"
+              foto={fotoInicio}
+              faltaAviso={
+                !fotoInicio && (a.estatus === "en_curso" || a.estatus === "realizada")
+                  ? "Esta actividad ya arrancó y no tiene foto de inicio."
+                  : undefined
+              }
+            />
+            {!fotoInicio && subirDesdeTarjeta && (
+              <BotonEvidencia
+                actividadId={id}
+                momento="inicio"
+                usuarioId={actuante.id}
+                alSubir={() => setRecargar((v) => v + 1)}
+              />
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <LineaEvidencia etiqueta="Cierre" foto={fotoCierre} />
+            {!fotoCierre && subirDesdeTarjeta && (
+              <BotonEvidencia
+                actividadId={id}
+                momento="cierre"
+                usuarioId={actuante.id}
+                alSubir={() => setRecargar((v) => v + 1)}
+              />
+            )}
+          </div>
+
+          {subirDesdeTarjeta && (
+            <p className="text-xs text-tinta-tenue">
+              Tú subes la foto de inicio y la de cierre. Cerrar la actividad lo hace el
+              administrador.
+            </p>
+          )}
         </div>
       </Tarjeta>
 
       <Tarjeta titulo="Fotos">
+        {/* Decisión: el brigadista también sube a la galería general, no solo la evidencia de
+            inicio y cierre.
+            A favor pesan tres cosas. Una, la política `fotos_insert` ya se lo permite, y este
+            proyecto tiene documentado en lib/puertas-ui.ts que una puerta de interfaz más
+            estricta que la política es un error, no una precaución: es el mismo bug que se
+            arregló con el botón de corregir personas. Dos, `CREA.foto` ya lista al brigadista,
+            o sea que la intención estaba escrita y nada más no se usaba. Tres, una foto de más
+            en la galería no cambia ningún número: el consolidado del cierre se calcula de
+            participaciones, no de fotos.
+            Lo que el cliente pidió —inicio y fin— se trata distinto de todos modos: tiene su
+            propia tarjeta, su propia etiqueta, y es lo único que bloquea marcar en curso y
+            cerrar. La galería queda como evidencia adicional.
+            Ojo con el estatus: aquí no se usa `actividadAbierta` a secas porque el administrador
+            sí puede seguir agregando fotos a una actividad ya realizada, igual que la política. */}
         <FotosActividad
           actividadId={id}
           fotos={galeria}
           cargando={fotos.cargando}
-          puedeSubir={editable}
+          puedeSubir={puedeSubirEvidencia}
           usuarioId={actuante.id}
           alSubir={() => setRecargar((v) => v + 1)}
         />

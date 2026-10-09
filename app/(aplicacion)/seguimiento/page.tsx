@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { PortonAgenda } from "@/components/porton-agenda";
 import { useActuante } from "@/components/proveedor-actuante";
 import { DEMARCACIONES } from "@/lib/demarcaciones";
-import { alcanceDe, puedeCrear } from "@/lib/puertas-ui";
+import { alcanceDe, puedeCrear, puedeVerListadosGenerales } from "@/lib/puertas-ui";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
   bandeja,
@@ -106,6 +107,12 @@ export default function Seguimiento() {
   function alGuardar() {
     setFilaAbierta(null);
     setVersion((v) => v + 1);
+  }
+
+  // Mismo portón que Actividades y Personas. La bandeja de seguimiento es trabajo de quien
+  // coordina: el brigadista ni la alcanza con RLS ni puede registrar un seguimiento.
+  if (!puedeVerListadosGenerales(actuante)) {
+    return <PortonAgenda titulo="Seguimiento" />;
   }
 
   return (

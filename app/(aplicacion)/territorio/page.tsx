@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Check, ChevronRight } from "lucide-react";
+import { PortonAgenda } from "@/components/porton-agenda";
 import { useActuante } from "@/components/proveedor-actuante";
+import { puedeVerListadosGenerales } from "@/lib/puertas-ui";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
   coloniasDeSeccionConTraslape,
@@ -294,6 +296,13 @@ export default function Territorio() {
   }
 
   const cargando = demarcaciones.cargando || secciones.cargando;
+
+  // Mismo portón que Actividades y Personas: la estructura territorial es una vista agregada de
+  // las catorce demarcaciones, y el brigadista no alcanza ninguna. Su territorio no es un
+  // polígono, son las actividades a las que lo invitan.
+  if (!puedeVerListadosGenerales(actuante)) {
+    return <PortonAgenda titulo="Estructura territorial" />;
+  }
 
   return (
     <div className="flex flex-col gap-8">

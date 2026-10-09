@@ -77,6 +77,124 @@ export async function cargarSecciones(): Promise<ColeccionSecciones> {
   return promesaEnCurso;
 }
 
+/* ---------------------------------------------------------------------------
+ * Catálogo de secciones
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Una sección del catálogo del cliente. Son 169; el geojson solo dibuja 157.
+ *
+ * Las 18 sin geometría existen en el catálogo pero no tienen polígono publicado en este marco,
+ * así que el GPS no resuelve ahí —el punto no cae en ninguna— y el toque en el mapa tampoco las
+ * ofrece. Sin esta lista, capturar en esas 18 dejaba a la persona sin sección, y la sección es la
+ * única unidad territorial exacta del sistema.
+ *
+ * Sale de un archivo estático, no de la base: así sigue funcionando sin red, igual que la
+ * cartografía, y no depende de que el rol pueda leer la tabla `secciones`.
+ */
+export type SeccionCatalogo = {
+  clave: string;
+  demarcacion: string;
+  /** Falso en las 18 que no se pueden dibujar ni resolver por GPS. */
+  conGeometria: boolean;
+};
+
+let catalogoCacheado: SeccionCatalogo[] | null = null;
+let promesaCatalogo: Promise<SeccionCatalogo[]> | null = null;
+
+/**
+ * Pide `/datos/secciones-catalogo.json` con la misma caché de módulo que la cartografía.
+ *
+ * Degrada a lista vacía en vez de lanzar: si el archivo falta, el selector se queda con las 157
+ * del geojson, que es peor pero no rompe la captura.
+ */
+export async function cargarCatalogoSecciones(): Promise<SeccionCatalogo[]> {
+  if (catalogoCacheado) return catalogoCacheado;
+  if (promesaCatalogo) return promesaCatalogo;
+
+  promesaCatalogo = (async () => {
+    try {
+      const respuesta = await fetch("/datos/secciones-catalogo.json");
+      if (!respuesta.ok) throw new Error(String(respuesta.status));
+      const datos = (await respuesta.json()) as SeccionCatalogo[];
+      catalogoCacheado = datos;
+      return datos;
+    } catch {
+      console.warn(
+        "No se pudo cargar /datos/secciones-catalogo.json. El selector de sección se queda " +
+          "solo con las que tienen geometría.",
+      );
+      catalogoCacheado = [];
+      return catalogoCacheado;
+    } finally {
+      promesaCatalogo = null;
+    }
+  })();
+
+  return promesaCatalogo;
+}
+
+/* ---------------------------------------------------------------------------
+ * Catálogo de colonias
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Una colonia del catálogo, sin geometría. 286 en total.
+ *
+ * La colonia es referencia y autocompletado, nunca fuente de verdad: si hay conflicto entre
+ * colonia y sección, gana la sección (spec/alcance.md). Por eso basta con el nombre, el CP y a
+ * qué secciones pertenece.
+ *
+ * Sale de un archivo estático para que la captura en campo no dependa de la red ni de que el rol
+ * pueda leer las tablas `colonias` y `colonia_seccion`. Lo que NO trae es el porcentaje de
+ * traslape: el desplegable del registro queda alfabético. La ficha de sección, que sí lo
+ * necesita para ordenar "primero la que ocupa más", sigue leyéndolo de la base.
+ */
+export type ColoniaCatalogo = {
+  id: number;
+  nombre: string;
+  cp: string | null;
+  demarcacion: string | null;
+  secciones: string[];
+};
+
+let coloniasCacheadas: ColoniaCatalogo[] | null = null;
+let promesaColonias: Promise<ColoniaCatalogo[]> | null = null;
+
+/** Pide `/datos/colonias-catalogo.json` y lo cachea. Degrada a lista vacía, nunca lanza. */
+export async function cargarCatalogoColonias(): Promise<ColoniaCatalogo[]> {
+  if (coloniasCacheadas) return coloniasCacheadas;
+  if (promesaColonias) return promesaColonias;
+
+  promesaColonias = (async () => {
+    try {
+      const respuesta = await fetch("/datos/colonias-catalogo.json");
+      if (!respuesta.ok) throw new Error(String(respuesta.status));
+      coloniasCacheadas = (await respuesta.json()) as ColoniaCatalogo[];
+      return coloniasCacheadas;
+    } catch {
+      console.warn(
+        "No se pudo cargar /datos/colonias-catalogo.json. El campo Colonia del registro se " +
+          "queda vacío; la sección, que es la que manda, no se afecta.",
+      );
+      coloniasCacheadas = [];
+      return coloniasCacheadas;
+    } finally {
+      promesaColonias = null;
+    }
+  })();
+
+  return promesaColonias;
+}
+
+/** Las colonias que tocan una sección, en orden alfabético. Sobre el catálogo ya cargado. */
+export function coloniasDeSeccionEnCatalogo(
+  catalogo: readonly ColoniaCatalogo[],
+  seccionClave: string,
+): ColoniaCatalogo[] {
+  return catalogo.filter((c) => c.secciones.includes(seccionClave));
+}
+
 /** Lo que ya esté en caché, o null si `cargarSecciones` no se ha resuelto todavía. */
 export function seccionesCargadas(): ColeccionSecciones | null {
   return coleccionCacheada;

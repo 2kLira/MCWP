@@ -14,7 +14,23 @@ import { cn } from "@/lib/utils";
  * Celular: una píldora de vidrio que flota sobre la lámina, separada del borde. Cinco destinos,
  * con Registrar al centro en relleno naranja, la única acción naranja de la barra. El texto
  * sobre el naranja es --tinta, nunca blanco.
+ *
+ * No siempre son cinco: al brigadista, cuyo módulo único es la agenda, le quedan tres. Las
+ * columnas se cuentan a partir de los destinos que de verdad se pintan, porque una rejilla fija
+ * de cinco con tres hijos los apiña a la izquierda y deja media píldora vacía.
+ *
+ * Las clases de columna son literales, no interpoladas: Tailwind lee el código fuente para
+ * decidir qué CSS genera, y un `grid-cols-${n}` armado en tiempo de ejecución no existiría en la
+ * hoja de estilos.
  */
+const COLUMNAS: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-4",
+  5: "grid-cols-5",
+};
+
 export function BarraInferior() {
   const ruta = usePathname();
   const { actuante } = useActuante();
@@ -25,7 +41,12 @@ export function BarraInferior() {
       aria-label="Navegación principal"
       className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 md:hidden"
     >
-      <ul className="dock grid grid-cols-5 items-center rounded-hoja p-1.5">
+      <ul
+        className={cn(
+          "dock grid items-center rounded-hoja p-1.5",
+          COLUMNAS[destinos.length] ?? "grid-cols-5",
+        )}
+      >
         {destinos.map(({ href, etiqueta, icono: Icono }) => {
           const activo = estaActivo(href, ruta);
           const esRegistrar = href === "/registrar";

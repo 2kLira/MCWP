@@ -160,7 +160,6 @@ create table personas (
   promovido_por      uuid references usuarios(id),
 
   quiere_ser_representante boolean not null default false,
-  recibio_apoyo      boolean not null default false,
 
   -- Quién trajo a esta persona. Se elige de entre la gente ya registrada, así que apunta a
   -- personas y no a usuarios.
@@ -444,8 +443,7 @@ select
   coalesce(a.recorridos_realizados, 0) > 0        as recorrida,
   coalesce(c.casillas, 0)                         as casillas,
   -- Deuda 38: la fuente de verdad de si hay polígono es la base, no el GeoJSON del cliente.
-  exists (select 1 from secciones_geom g where g.clave = s.clave) as tiene_geometria,
-  coalesce(p.apoyos, 0)                           as apoyos
+  exists (select 1 from secciones_geom g where g.clave = s.clave) as tiene_geometria
 from secciones s
 join demarcaciones d on d.id = s.demarcacion_id
 left join asignaciones_responsable ar
@@ -456,8 +454,7 @@ left join lateral (
     count(*) filter (where pe.quiere_participar)         as quieren_participar,
     count(*) filter (where pe.quiere_info)               as quieren_info,
     count(*) filter (where pe.es_promovido)              as promovidos,
-    count(*) filter (where pe.quiere_ser_representante)  as aspirantes_representante,
-    count(*) filter (where pe.recibio_apoyo)             as apoyos
+    count(*) filter (where pe.quiere_ser_representante)  as aspirantes_representante
   from personas pe where pe.seccion_clave = s.clave
 ) p on true
 left join lateral (

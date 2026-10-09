@@ -5,7 +5,12 @@ import { Camera } from "lucide-react";
 import { clienteSupabase } from "@/lib/supabase";
 import { agregarFoto, type Foto } from "@/lib/datos/actividades";
 import { comprimirFoto } from "@/components/actividades/comprimir";
-import { CUBETA_FOTOS, firmarFotos, rutaDeFoto } from "@/lib/datos/almacenamiento";
+import {
+  avisoDeAlmacenamiento,
+  CUBETA_FOTOS,
+  firmarFotos,
+  rutaDeFoto,
+} from "@/lib/datos/almacenamiento";
 
 
 export function FotosActividad({
@@ -78,9 +83,8 @@ export function FotosActividad({
 
       if (errorSubida) {
         setSubiendo(false);
-        setError(
-          `No se pudo subir la foto: ${errorSubida.message}.`,
-        );
+        console.warn("Storage rechazó la subida:", errorSubida);
+        setError(avisoDeAlmacenamiento(errorSubida.message));
         return;
       }
 

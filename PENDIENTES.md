@@ -552,3 +552,74 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
 
     La comparación se hizo bajando el CSS de `https://mcwp.vercel.app`: los veinte tokens de color,
     en claro y en oscuro, son idénticos.
+
+65. **Fuera el apoyo recibido.** Se revirtió la entrada 57 completa, a pedido del cliente. Salió de
+    las nueve vistas del mapa (quedan ocho), del filtro y la píldora de Personas, de la píldora y
+    el botón de la ficha, del interruptor del registro, del renglón de la ficha de sección, del
+    tipo y el filtro de la capa de datos, de `personas.recibio_apoyo` y del campo `apoyos` de
+    `v_seccion_resumen`. La base tenía cero personas, así que no se perdió ningún dato.
+
+    **Error de secuencia que hay que no repetir.** Se soltó la columna de la base mientras el
+    despliegue de Vercel seguía sirviendo el código anterior, que todavía la mandaba al insertar.
+    Resultado: el registro de personas quedó roto en producción con
+    `Could not find the 'recibio_apoyo' column of 'personas' in the schema cache`. Se repuso de
+    inmediato y queda pendiente volver a soltarla **después** de desplegar.
+
+    La regla: en una aplicación ya desplegada, una columna se quita en dos pasos y en este orden
+    —primero el código deja de usarla y se despliega, después se suelta la columna— nunca al revés.
+
+66. **El nombre del dueño.** El cliente pidió que su nombre no aparezca en ningún lado y que el
+    líder, dueño y administrador sea Carlos Lira. El nombre no estaba en ningún archivo del
+    proyecto, solo en la base.
+
+    `Carlos Lira` (`carloslira@soet.local`) es ahora el único administrador activo. La cuenta
+    anterior se renombró a "Cuenta de respaldo" y se desactivó **en lugar de borrarla**, porque es
+    la única del sistema con correo real y por tanto la única vía de recuperación si se pierde la
+    contraseña de Carlos, que usa un dominio inexistente. Está pendiente decidir si se borra del
+    todo, aceptando quedarse sin esa red.
+
+    **Queda un lugar sin limpiar:** la autoría de git. Los commits ya empujados llevan el nombre y
+    el correo anteriores, y reescribir historia publicada no se hizo sin pedirlo. Para los commits
+    futuros basta cambiar `git config user.name` y `user.email`.
+
+67. **Los errores de Storage no pasaban por la traducción centralizada.** `resultado()` en
+    `lib/datos/cliente.ts` traduce `PostgrestError`, pero la subida del archivo la contesta Storage
+    con un `StorageError`, que nunca entra ahí. Un rechazo de `almacen_fotos_insert` se mostraba
+    crudo y en inglés.
+
+    Se añadió `avisoDeAlmacenamiento()` en `lib/datos/almacenamiento.ts` —junto al resto de lo del
+    bucket, no en un componente— y la usan tanto la evidencia de inicio y cierre como la galería.
+    Respeta la misma regla: lo desconocido no se tapa con una frase amable.
+
+    Si mañana aparece otra ruta que hable con Storage, tiene que usar esa función. El embudo de
+    `cliente.ts` no la ve.
+
+68. **El brigadista solo ve Agenda, y dos decisiones que el spec no cubría.** El cliente lo pidió
+    así: "al brigadista nada más le debe salir el de agenda y ya es su módulo único". Los siete
+    módulos de vista agregada —tablero, mapa, personas, actividades, estructura territorial,
+    seguimiento y reportes— cuelgan ahora de `puedeVerListadosGenerales` en
+    `components/navegacion/destinos.ts`, y las diez rutas que le quedaban alcanzables por URL
+    reciben el portón de `components/porton-agenda.tsx`, que explica y devuelve a `/agenda`.
+    Esconderlas coincide con RLS en lugar de competir con él: ahí ya le salían vacías.
+
+    Dos cosas no estaban en `spec/alcance.md` y se decidieron aquí:
+
+    - **Registrar se queda** en la barra inferior de celular y en el riel de escritorio. Es una
+      acción, no un módulo de consulta, y es lo único que el brigadista hace en la calle. Desde que
+      `components/registro/elegir-actividad.tsx` le ofrece primero sus actividades abiertas,
+      `/registrar` sin actividad ya no es la trampa que era. Quitarlo costaría tres toques en la
+      pantalla donde más prisa hay.
+    - **La raíz redirige, no avisa.** `proxy.ts` manda a `/` a todo el que entra con sesión, así
+      que un portón ahí sería una pared cada vez que el brigadista abre la aplicación. Se le
+      redirige a `/agenda` desde el cliente, porque el rol vive en el cliente y el proxy no lee la
+      base. El portón se pinta mientras la navegación ocurre y es la red si no corre.
+
+    Se agregó una tercera, por coherencia: **el buscador general de escritorio no se le pinta**.
+    Sus tres salidas son `/personas/[id]`, `/mapa` y `/territorio`, o sea un cajón de texto cuyo
+    único destino posible sería un portón. Las colonias y demarcaciones salen de archivos locales,
+    no de la base, así que RLS no lo habría dejado vacío solo.
+
+    Lo que queda sin resolver: `/mas` en celular sigue existiendo para él, porque es la única
+    puerta a la cápsula de sesión y a cerrar sesión. Su lista de destinos queda vacía y en su lugar
+    va un renglón con el enlace a la agenda. Falta decidir si la cápsula de sesión debería vivir en
+    algún lugar de la agenda y `/mas` desaparecerle del todo.

@@ -2,7 +2,8 @@
 
 import { useActuante } from "@/components/proveedor-actuante";
 import { FormularioRepresentante } from "@/components/casillas/formulario-representante";
-import { puedeEncabezarActividad } from "@/lib/puertas-ui";
+import { PortonAgenda } from "@/components/porton-agenda";
+import { puedeEncabezarActividad, puedeVerListadosGenerales } from "@/lib/puertas-ui";
 
 /**
  * Portón igual al de app/usuarios/page.tsx: el rol que no alcanza ve un aviso, no un formulario a
@@ -11,6 +12,13 @@ import { puedeEncabezarActividad } from "@/lib/puertas-ui";
  */
 export default function Pagina() {
   const { actuante } = useActuante();
+
+  // Al brigadista, su agenda; a quien sí coordina territorio pero no esta pantalla, el aviso de
+  // siempre. Hoy ambas puertas se cierran para el mismo rol, pero son dos razones distintas y el
+  // día que una cambie no hay que volver a pensar la otra.
+  if (!puedeVerListadosGenerales(actuante)) {
+    return <PortonAgenda titulo="Registrar representante" />;
+  }
 
   if (!puedeEncabezarActividad(actuante)) {
     return (

@@ -72,6 +72,19 @@ returns boolean language sql stable security definer set search_path = '' as $$
   );
 $$;
 
+-- El catálogo territorial no es para el brigadista: su alcance son las actividades a las que lo
+-- inviten, y con la agenda como módulo único no tiene pantalla que lo necesite. La captura en
+-- campo tampoco lo necesita: la sección la resuelve el GeoJSON estático de public/datos/ y las
+-- colonias salen de un catálogo estático; y las llaves foráneas de `personas` **no pasan por
+-- RLS**, así que puede guardar una sección y una colonia que no alcanza a leer. Verificado.
+create or replace function privado.ve_catalogo()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.usuarios u
+    where u.id = auth.uid() and u.activo and u.rol <> 'brigadista'
+  );
+$$;
+
 -- Sirve para tablas que apuntan a una persona ya existente (solicitudes, por ejemplo).
 -- Cuidado: NO usarla en la política de SELECT de personas. Es STABLE, así que vuelve a leer
 -- personas con la instantánea anterior a la sentencia; en un INSERT ... RETURNING el renglón
@@ -86,6 +99,9 @@ returns boolean language sql stable security definer set search_path = '' as $$
     where pa.persona_id = p_id and privado.actividad_abierta_mia(pa.actividad_id)
   );
 $$;
+
+revoke all on function privado.ve_catalogo() from public;
+grant execute on function privado.ve_catalogo() to authenticated;
 
 revoke all on function privado.es_admin(), privado.es_usuario_activo(),
                        privado.actividad_abierta_mia(uuid),
@@ -132,6 +148,43 @@ grant execute on function public.normalizar_telefono(text) to authenticated;
 grant execute on function public.seccion_por_punto(double precision, double precision) to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- 3b. Marcar una actividad en curso
+-- ---------------------------------------------------------------------------
+-- El brigadista sube la foto de inicio y con eso la actividad arranca. Pero NO puede tener
+-- permiso de UPDATE sobre `actividades`: RLS es por renglón, no por columna, así que una política
+-- que le dejara poner `en_curso` también le dejaría cambiar el nombre, la fecha o el objetivo.
+--
+-- Por eso va una función que solo sabe hacer una cosa: pasar de `programada` a `en_curso` sobre
+-- una actividad a la que el que llama está invitado. El `where estatus = 'programada'` impide
+-- además revivir una cerrada. Probado: con la suya devuelve true; con una a la que nadie lo
+-- invitó, false; repetida, false; y por la vía normal no puede cambiar ni el nombre ni cerrarla.
+create or replace function public.marcar_actividad_en_curso(a_id uuid)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare movidas integer;
+begin
+  if auth.uid() is null then
+    raise exception 'Se requiere sesión';
+  end if;
+  if not exists (select 1 from public.usuarios u where u.id = auth.uid() and u.activo) then
+    raise exception 'Usuario sin acceso';
+  end if;
+
+  if not (privado.es_admin() or privado.actividad_abierta_mia(a_id)) then
+    return false;
+  end if;
+
+  update public.actividades
+     set estatus = 'en_curso'
+   where id = a_id and estatus = 'programada';
+
+  get diagnostics movidas = row_count;
+  return movidas > 0;
+end $$;
+
+revoke all on function public.marcar_actividad_en_curso(uuid) from public;
+grant execute on function public.marcar_actividad_en_curso(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- 4. RLS en todas las tablas
 -- ---------------------------------------------------------------------------
 -- Sin excepciones. Una tabla de public sin RLS es una tabla abierta.
@@ -154,20 +207,42 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- 5. Catálogo territorial y de referencia
 -- ---------------------------------------------------------------------------
--- Lo lee cualquier usuario activo porque el mapa y la resolución de sección por GPS lo
--- necesitan, y no contiene datos personales. Escribir, solo el admin.
+-- Dos listas, porque no todos los usuarios activos necesitan lo mismo.
+--
+-- `problematicas` la lee cualquier usuario activo, incluido el brigadista: son diez renglones sin
+-- un solo dato personal, y sin leerlas el bloque de problemáticas del registro **desaparece sin
+-- avisar**, que es justo el dato cualitativo por el que existe la actividad.
+--
+-- El resto del catálogo lo leen solo admin y roles territoriales. Escribir, solo el admin.
+
+create policy problematicas_lectura on problematicas for select
+  to authenticated using ((select privado.es_usuario_activo()));
 
 do $$
 declare t text;
 begin
   foreach t in array array[
-    'demarcaciones','secciones','colonias','colonia_seccion','secciones_geom',
-    'problematicas','casillas','resultados_historicos','asignaciones_responsable'
+    'demarcaciones','secciones','secciones_geom','colonias','colonia_seccion',
+    'casillas','resultados_historicos','asignaciones_responsable'
   ]
   loop
     execute format($f$
       create policy %1$s_lectura on public.%1$I for select
-        to authenticated using ((select privado.es_usuario_activo()));
+        to authenticated using ((select privado.ve_catalogo()));
+    $f$, t);
+  end loop;
+end $$;
+
+-- La escritura del catálogo completo, problemáticas incluidas: solo el admin.
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'demarcaciones','secciones','secciones_geom','colonias','colonia_seccion',
+    'problematicas','casillas','resultados_historicos','asignaciones_responsable'
+  ]
+  loop
+    execute format($f$
       create policy %1$s_admin_inserta on public.%1$I for insert
         to authenticated with check ((select privado.es_admin()));
       create policy %1$s_admin_actualiza on public.%1$I for update
