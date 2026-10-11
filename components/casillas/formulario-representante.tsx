@@ -61,8 +61,12 @@ export function FormularioRepresentante() {
   // a) La casilla. Se busca por la clave de sección, de cuatro dígitos exactos: es la única
   // unidad territorial exacta, así que no hay razón para aceptar coincidencias parciales.
   const [claveSeccion, setClaveSeccion] = useState("");
-  const [buscandoCasillas, setBuscandoCasillas] = useState(false);
-  const [casillas, setCasillas] = useState<CasillaConRepresentantes[]>([]);
+  // Las casillas encontradas se guardan con la clave que las trajo: si la clave cambió, la
+  // respuesta guardada ya no le corresponde y no se usa. Así nada se limpia dentro del efecto.
+  const [busquedaCasillas, setBusquedaCasillas] = useState<{
+    clave: string;
+    casillas: CasillaConRepresentantes[];
+  } | null>(null);
   const [casillaId, setCasillaId] = useState<number | null>(null);
 
   // c) El cargo.
@@ -73,8 +77,11 @@ export function FormularioRepresentante() {
   const [personaId, setPersonaId] = useState<string | null>(null);
   const [telefono, setTelefono] = useState("");
   const [errorTelefono, setErrorTelefono] = useState<string | null>(null);
-  const [resultadosNombre, setResultadosNombre] = useState<PersonaEnLista[]>([]);
-  const [buscandoNombre, setBuscandoNombre] = useState(false);
+  const [busquedaNombre, setBusquedaNombre] = useState<{
+    consulta: string;
+    seccion: string | null;
+    resultados: PersonaEnLista[];
+  } | null>(null);
   const [mostrarResultadosNombre, setMostrarResultadosNombre] = useState(false);
 
   // e) Los tres estados. Nunca preseleccionados a ciegas: arrancan en lo pendiente, a propósito.
@@ -94,57 +101,55 @@ export function FormularioRepresentante() {
 
   // Buscar casillas en cuanto la clave tiene sus cuatro dígitos. Si solo hay una (lo más común:
   // una básica sin contiguas), se elige sola; si hay varias, que la persona elija cuál.
+  const claveCompleta = claveSeccion.length === 4;
+  const casillas =
+    claveCompleta && busquedaCasillas?.clave === claveSeccion ? busquedaCasillas.casillas : [];
+  const buscandoCasillas = claveCompleta && busquedaCasillas?.clave !== claveSeccion;
+
   useEffect(() => {
-    if (claveSeccion.length !== 4) {
-      setCasillas([]);
-      setCasillaId(null);
-      setBuscandoCasillas(false);
-      return;
-    }
+    if (!claveCompleta) return;
     let vigente = true;
-    setBuscandoCasillas(true);
     buscarCasillasPorSeccion(actuante, claveSeccion).then((r) => {
       if (!vigente) return;
-      setCasillas(r.datos);
+      setBusquedaCasillas({ clave: claveSeccion, casillas: r.datos });
       setCasillaId(r.datos.length === 1 ? r.datos[0].id : null);
-      setBuscandoCasillas(false);
     });
     return () => {
       vigente = false;
     };
-  }, [claveSeccion, actuante]);
+  }, [claveSeccion, claveCompleta, actuante]);
+
+  const casilla = casillas.find((c) => c.id === casillaId) ?? null;
+  const demarcacion = casilla ? (rasgoPorClave(casilla.seccion_clave)?.properties.demarcacion ?? null) : null;
 
   // Buscador de persona ya registrada, mismo patrón con retardo que el promotor del registro
   // rápido y que el nombre en la ficha de casilla: con miles de personas un <select> no sirve.
+  // La sección de la casilla elegida entra en la búsqueda. Antes se leía de una variable declarada
+  // más abajo y fuera de las dependencias, así que al cambiar de casilla seguía buscando en la
+  // sección anterior.
+  const consultaNombre = nombre.trim();
+  const seccionNombre = casilla?.seccion_clave ?? null;
+  const buscaNombre = !personaId && consultaNombre.length >= 2;
+  const respuestaVigente =
+    busquedaNombre?.consulta === consultaNombre && busquedaNombre.seccion === seccionNombre;
+  const buscandoNombre = buscaNombre && !respuestaVigente;
+  const resultadosNombre = buscaNombre && respuestaVigente ? busquedaNombre!.resultados : [];
+
   useEffect(() => {
-    if (personaId) {
-      setResultadosNombre([]);
-      return;
-    }
-    const consulta = nombre.trim();
-    if (consulta.length < 2) {
-      setResultadosNombre([]);
-      setBuscandoNombre(false);
-      return;
-    }
+    if (!buscaNombre) return;
     let vigente = true;
-    setBuscandoNombre(true);
     const temporizador = setTimeout(() => {
-      coincidenciasPorNombre(consulta, casilla?.seccion_clave ?? null).then((r) => {
-        if (!vigente) return;
-        setResultadosNombre(r.datos);
-        setBuscandoNombre(false);
+      coincidenciasPorNombre(consultaNombre, seccionNombre).then((r) => {
+        if (vigente) {
+          setBusquedaNombre({ consulta: consultaNombre, seccion: seccionNombre, resultados: r.datos });
+        }
       });
     }, 250);
     return () => {
       vigente = false;
       clearTimeout(temporizador);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nombre, personaId]);
-
-  const casilla = casillas.find((c) => c.id === casillaId) ?? null;
-  const demarcacion = casilla ? (rasgoPorClave(casilla.seccion_clave)?.properties.demarcacion ?? null) : null;
+  }, [consultaNombre, seccionNombre, buscaNombre]);
 
   const representanteDelCargo: RepresentanteCasilla | null =
     casilla && cargo ? (cargo === "titular" ? casilla.titular : casilla.suplente) : null;
@@ -167,7 +172,7 @@ export function FormularioRepresentante() {
   function alElegirPersona(persona: PersonaEnLista) {
     setNombre(persona.nombre);
     setPersonaId(persona.id);
-    setResultadosNombre([]);
+    setBusquedaNombre(null);
     setMostrarResultadosNombre(false);
   }
 
@@ -180,7 +185,7 @@ export function FormularioRepresentante() {
     setPersonaId(null);
     setTelefono("");
     setErrorTelefono(null);
-    setResultadosNombre([]);
+    setBusquedaNombre(null);
     setCapacitacion(CAPACITACION_INICIAL);
     setManual(MANUAL_INICIAL);
     setAcreditacion(ACREDITACION_INICIAL);
@@ -229,7 +234,13 @@ export function FormularioRepresentante() {
     // ocupación que se vea al capturar otro representante es la que de verdad quedó guardada.
     const fresca = await casillaPorId(actuante, casilla.id);
     if (fresca.datos) {
-      setCasillas((actual) => actual.map((c) => (c.id === fresca.datos!.id ? fresca.datos! : c)));
+      const casillaFresca = fresca.datos;
+      setBusquedaCasillas((actual) =>
+        actual && {
+          ...actual,
+          casillas: actual.casillas.map((c) => (c.id === casillaFresca.id ? casillaFresca : c)),
+        },
+      );
     }
 
     setEstado("guardada");
@@ -244,7 +255,7 @@ export function FormularioRepresentante() {
 
   function otraSeccion() {
     setClaveSeccion("");
-    setCasillas([]);
+    setBusquedaCasillas(null);
     setCasillaId(null);
     otraCaptura();
     claveRef.current?.focus();

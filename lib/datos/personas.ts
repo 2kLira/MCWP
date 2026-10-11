@@ -8,7 +8,14 @@
 import { puedeEditarPersona } from "@/lib/puertas-ui";
 import { normalizarTelefono } from "@/lib/territorio";
 import type { Genero, UsuarioActuante } from "@/lib/tipos";
-import { db, lista, resultado, uno, type Resultado } from "@/lib/datos/cliente";
+import {
+  db,
+  lista,
+  resultado,
+  textoDeBusqueda,
+  uno,
+  type Resultado,
+} from "@/lib/datos/cliente";
 
 export type Persona = {
   id: string;
@@ -36,9 +43,9 @@ export type Persona = {
   promovido_por: string | null;
   quiere_ser_representante: boolean;
   /**
-   * Quién la trajo, si llegó por un promotor. Columna nueva, todavía sin migración aplicada: ver
-   * PENDIENTES.md / el reporte de la fase D. Se codifica contra este nombre para que la migración
-   * solo tenga que agregar la columna, sin tocar el código.
+   * Quién la trajo, si llegó por un promotor. Apunta a `personas`, no a `usuarios`: a la gente la
+   * trae gente ya registrada. La columna **existe** en el esquema consolidado; la nota de que
+   * faltaba la migración quedó obsoleta.
    */
   promotor_id: string | null;
 };
@@ -96,7 +103,8 @@ export async function listarPersonas(
   if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
   if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
 
-  const texto = filtros.texto?.trim();
+  // textoDeBusqueda quita comodines y lo que rompe la gramática del filtro. Ver cliente.ts.
+  const texto = textoDeBusqueda(filtros.texto ?? "");
   if (texto) {
     const digitos = texto.replace(/\D/g, "");
     consulta =
@@ -170,13 +178,18 @@ export function coincidenciasPorNombre(
   nombre: string,
   seccionClave: string | null,
 ): Promise<Resultado<PersonaEnLista[]>> {
-  let consulta = db().from("personas").select(COLUMNAS_LISTA).ilike("nombre", `%${nombre}%`);
+  const limpio = textoDeBusqueda(nombre);
+  if (!limpio) return Promise.resolve({ datos: [], sinEsquema: false, aviso: null });
+  let consulta = db().from("personas").select(COLUMNAS_LISTA).ilike("nombre", `%${limpio}%`);
   if (seccionClave) consulta = consulta.eq("seccion_clave", seccionClave);
   return lista<PersonaEnLista>(consulta.limit(5));
 }
 
 export type EntradaPersona = {
   nombre: string;
+  nombres?: string | null;
+  apellido_paterno?: string | null;
+  apellido_materno?: string | null;
   telefono_raw?: string | null;
   calle?: string | null;
   colonia_id?: number | null;
@@ -332,7 +345,8 @@ export async function listarPromovidosExportar(
   if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
   if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
 
-  const texto = filtros.texto?.trim();
+  // textoDeBusqueda quita comodines y lo que rompe la gramática del filtro. Ver cliente.ts.
+  const texto = textoDeBusqueda(filtros.texto ?? "");
   if (texto) {
     const digitos = texto.replace(/\D/g, "");
     consulta =

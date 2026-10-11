@@ -57,6 +57,45 @@ export async function portonAdmin(): Promise<Porton> {
 }
 
 /**
+ * Portón de sesión, para los handlers que **no** son de administración.
+ *
+ * Mismo primer paso que `portonAdmin` y mismo principio: la identidad sale del token verificado y
+ * de la tabla `usuarios`, nunca del cuerpo de la petición. La diferencia es que aquí no se exige
+ * rol: basta una cuenta activa, y **quién alcanza qué lo decide después RLS**, que es donde vive
+ * esa respuesta. Un handler que recibe fotos no tiene por qué saber de roles.
+ */
+export type PortonSesion =
+  | { ok: true; usuarioId: string; esAdmin: boolean }
+  | { ok: false; estado: number; mensaje: string };
+
+export async function portonSesion(): Promise<PortonSesion> {
+  const supabase = await clienteServidor();
+  if (!supabase) {
+    return {
+      ok: false,
+      estado: 503,
+      mensaje: "Este despliegue no está conectado a la base de datos.",
+    };
+  }
+
+  const { data } = await supabase.auth.getClaims();
+  const sub = typeof data?.claims?.sub === "string" ? data.claims.sub : null;
+  if (!sub) return { ok: false, estado: 401, mensaje: "Se requiere sesión." };
+
+  const { data: fila } = await supabase
+    .from("usuarios")
+    .select("rol, activo")
+    .eq("id", sub)
+    .maybeSingle<{ rol: string; activo: boolean }>();
+
+  if (!fila || !fila.activo) {
+    return { ok: false, estado: 403, mensaje: "Tu cuenta no tiene acceso." };
+  }
+
+  return { ok: true, usuarioId: sub, esAdmin: fila.rol === "admin" };
+}
+
+/**
  * Respuesta JSON que ningún intermediario puede guardar. Una respuesta de un handler de
  * administración no tiene nada que hacer en una caché.
  */

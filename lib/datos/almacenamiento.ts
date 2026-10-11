@@ -12,8 +12,17 @@ import { clienteSupabase } from "@/lib/supabase";
 
 export const CUBETA_FOTOS = "fotos";
 
-/** Una hora. Si una jornada dura más, se recarga la pantalla y se vuelve a firmar. */
-const SEGUNDOS_POR_OMISION = 3600;
+/**
+ * Cinco minutos.
+ *
+ * Una URL firmada es una credencial al portador: quien la tenga ve la foto, sin sesión y sin que
+ * importe que se le haya quitado el acceso. Estaba en una hora, y eso significaba que una URL
+ * copiada del inspector seguía sirviendo evidencia una hora después de dar de baja a quien la
+ * copió. Cinco minutos cubre el uso real —se abre la galería y se mira— porque cada montaje de la
+ * galería vuelve a firmar en lote; no cubre guardarse el enlace, que es justo lo que no debe
+ * funcionar.
+ */
+const SEGUNDOS_POR_OMISION = 300;
 
 /**
  * Firma varias rutas de una sola vez. Devuelve un mapa de ruta a URL firmada.
@@ -48,18 +57,51 @@ export async function firmarFotos(
 }
 
 /**
- * La ruta de una foto nueva dentro del bucket.
+ * Sube una foto y devuelve su **ruta** dentro de la cubeta.
  *
- * El prefijo `actividades/` no es decorativo: las políticas de `storage.objects` leen el segundo
- * segmento como el id de la actividad, con `privado.actividad_de_ruta`. Sin el prefijo, leerían
- * el nombre del archivo como si fuera un uuid.
+ * No sube a Storage directamente, aunque antes sí lo hacía. Va por `POST /api/fotos`, que valida
+ * los bytes en el servidor y quita los metadatos, porque la cubeta compara el `Content-Type` que
+ * declara el cliente y no el contenido: con la subida directa se podía meter cualquier cosa de
+ * hasta 500 KB etiquetándola `image/webp`. Medido, no supuesto.
+ *
+ * El nombre del archivo lo pone el servidor. Aquí solo se dice en qué actividad va y si es la foto
+ * de inicio, la de fin o una de la galería, porque la ruta es lo que las políticas de lectura usan
+ * para decidir quién ve la foto: no la elige el cliente.
+ *
+ * Degrada con aviso en español en lugar de lanzar, igual que el resto de la capa de datos.
  */
-export function rutaDeFoto(actividadId: string, archivo: File, prefijo?: string): string {
-  const azar = Math.random().toString(36).slice(2);
-  const nombre = [prefijo, Date.now(), azar].filter(Boolean).join("-");
-  // WebP donde el navegador lo sabe codificar, JPEG en Safari de iPhone (ver comprimir.ts).
-  const extension = archivo.type === "image/jpeg" ? "jpg" : "webp";
-  return `actividades/${actividadId}/${nombre}.${extension}`;
+/**
+ * Los tres destinos posibles de una foto. Son los de `MomentoFoto` más la galería, y el servidor
+ * no acepta otro: la ruta es lo que las políticas de lectura usan para decidir quién ve la foto,
+ * así que no la elige el cliente.
+ */
+export type PrefijoFoto = "inicio" | "cierre" | "galeria";
+
+export type SubidaFoto = { ok: true; ruta: string } | { ok: false; aviso: string };
+
+export async function subirFoto(
+  actividadId: string,
+  archivo: File,
+  prefijo?: PrefijoFoto,
+): Promise<SubidaFoto> {
+  const cuerpo = new FormData();
+  cuerpo.set("actividadId", actividadId);
+  cuerpo.set("archivo", archivo);
+  if (prefijo) cuerpo.set("prefijo", prefijo);
+
+  try {
+    const respuesta = await fetch("/api/fotos", { method: "POST", body: cuerpo });
+    const datos = (await respuesta.json().catch(() => null)) as
+      | { ruta?: string; mensaje?: string }
+      | null;
+
+    if (!respuesta.ok || !datos?.ruta) {
+      return { ok: false, aviso: datos?.mensaje ?? "No se pudo subir la foto." };
+    }
+    return { ok: true, ruta: datos.ruta };
+  } catch {
+    return { ok: false, aviso: "No se pudo contactar al servidor. Revisa tu conexión." };
+  }
 }
 
 /**
@@ -87,4 +129,19 @@ export function avisoDeAlmacenamiento(mensaje: string): string {
     return "Ese formato de imagen no se acepta.";
   }
   return `No se pudo subir la foto: ${mensaje}.`;
+}
+
+/**
+ * Borra archivos de la cubeta. Lo usa la eliminación de actividades: la base no puede borrar
+ * objetos de Storage desde SQL, así que regresa las rutas y el cliente las borra aquí. Si falla,
+ * los renglones ya no existen y los archivos quedan huérfanos: nadie los enlaza y solo el
+ * administrador los alcanza. Se avisa en consola; no se revierte nada.
+ */
+export async function borrarArchivos(rutas: string[]): Promise<boolean> {
+  if (rutas.length === 0) return true;
+  const supabase = clienteSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase.storage.from(CUBETA_FOTOS).remove(rutas);
+  if (error) console.warn("No se pudieron borrar los archivos de la actividad:", error);
+  return !error;
 }

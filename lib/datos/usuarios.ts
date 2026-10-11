@@ -27,15 +27,46 @@ export function listarUsuarios(
   return lista<Usuario>(db().from("usuarios").select("*").order("rol").order("nombre"));
 }
 
-export function cambiarActivo(
+/** Cuánto capturó cada usuario. Lo cuenta la vista `v_capturas_por_usuario`, no el navegador. */
+export type CapturasUsuario = {
+  usuario_id: string;
+  personas: number;
+  personas_hoy: number;
+  personas_7_dias: number;
+  asistencias: number;
+  ultima_captura: string | null;
+};
+
+export function capturasPorUsuario(
+  usuario: UsuarioActuante | null,
+): Promise<Resultado<CapturasUsuario[]>> {
+  if (!esAdmin(usuario)) return Promise.resolve({ datos: [], sinEsquema: false, aviso: null });
+  return lista<CapturasUsuario>(db().from("v_capturas_por_usuario").select("*"));
+}
+
+/**
+ * Dar de baja o reactivar.
+ *
+ * Esto era un `update` directo desde el navegador y pasó a un handler privilegiado por una razón
+ * medida en la auditoría: `activo = false` cierra los datos en el acto, pero **no cerraba la
+ * sesión**, y el refresh token de una cuenta desactivada seguía emitiendo tokens. Suspender la
+ * cuenta de acceso exige la llave secreta, que nunca puede ir al navegador.
+ *
+ * El motivo del rechazo —por ejemplo el candado del último administrador— llega en el mensaje del
+ * handler, así que aquí no se duplica ninguna regla.
+ */
+export async function cambiarActivo(
   usuario: UsuarioActuante | null,
   id: string,
   activo: boolean,
-): Promise<Resultado<Usuario | null>> {
+): Promise<Resultado<{ nombre: string; activo: boolean } | null>> {
   if (!esAdmin(usuario)) {
-    return Promise.resolve({ datos: null, sinEsquema: false, aviso: "No tienes permiso." });
+    return { datos: null, sinEsquema: false, aviso: "No tienes permiso." };
   }
-  return uno<Usuario>(db().from("usuarios").update({ activo }).eq("id", id).select().single());
+  return pedirAlApi<{ nombre: string; activo: boolean }>(
+    `/api/admin/usuarios/${encodeURIComponent(id)}/activo`,
+    { method: "PATCH", cuerpo: { activo } },
+  );
 }
 
 /**

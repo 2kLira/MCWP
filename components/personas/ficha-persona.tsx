@@ -10,7 +10,6 @@ import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido } from "@/lib/transicion";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
-  actualizarPersona,
   historialPersona,
   marcarPromovido,
   obtenerPersona,

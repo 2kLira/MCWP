@@ -3,10 +3,7 @@
 import Link from "next/link";
 import { CapsulaSesion } from "@/components/sesion/capsula-sesion";
 import { useActuante } from "@/components/proveedor-actuante";
-import {
-  DESTINOS_EN_MAS,
-  destinosVisibles,
-} from "@/components/navegacion/destinos";
+import { destinosEnMas } from "@/components/navegacion/destinos";
 
 /**
  * Pantalla Más, solo para celular: recoge los destinos que no caben en la barra inferior y aloja
@@ -20,7 +17,7 @@ import {
  */
 export default function Pagina() {
   const { actuante } = useActuante();
-  const destinos = destinosVisibles(DESTINOS_EN_MAS, actuante);
+  const destinos = destinosEnMas(actuante);
 
   return (
     <section className="flex flex-col gap-6">

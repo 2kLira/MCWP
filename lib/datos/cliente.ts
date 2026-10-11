@@ -221,3 +221,34 @@ export async function uno<T>(
   const { data, error } = await consulta;
   return resultado(data ?? null, error, null, contexto);
 }
+
+/**
+ * Texto de búsqueda listo para entrar en un filtro.
+ *
+ * Dos problemas, y el segundo no se ve hasta que alguien teclea el carácter equivocado.
+ *
+ * **Comodines.** En un `ilike`, `%` y `_` son comodines. Si el texto va crudo, el comodín lo pone
+ * quien busca: teclear `%` lista el padrón entero.
+ *
+ * **Gramática del filtro.** Las búsquedas que miran nombre *y* teléfono se arman con
+ * `.or("nombre.ilike.%texto%,telefono_norm.ilike.%digitos%")`, y esa cadena la parsea PostgREST.
+ * Una coma, un paréntesis o un punto en el texto rompe la gramática: no es inyección de SQL —lo
+ * parsea PostgREST, no Postgres, y RLS sigue aplicando igual— pero sí es un filtro que deja de
+ * decir lo que el código cree que dice, y un error en pantalla sin explicación.
+ *
+ * Se resuelve quitando lo que no es letra, número ni espacio, en lugar de escapando. Escapar aquí
+ * exige dos pasadas que se pisan —el `\` de LIKE y el `\` de las comillas de PostgREST— y es la
+ * clase de código que se escribe mal una vez y nadie vuelve a leer. Para un buscador de nombres
+ * no se pierde nada: nadie busca a alguien por un porcentaje.
+ *
+ * Lo que sí se conserva, porque aparece en nombres de verdad y no significa nada ni en LIKE ni en
+ * la gramática del filtro: acentos, la ñ, el apóstrofo y el guion. "Pérez-Gómez" y "O'Brien" se
+ * buscan tal como se escriben.
+ */
+export function textoDeBusqueda(crudo: string): string {
+  return crudo
+    .normalize("NFC")
+    .replace(/[^\p{L}\p{N} '-]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}

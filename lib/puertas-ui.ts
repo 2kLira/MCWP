@@ -176,6 +176,24 @@ export function puedeImportar(usuario: UsuarioActuante | null): boolean {
   return usuario.rol === "admin" || usuario.rol === "resp_demarcacion";
 }
 
+/**
+ * Levantar un reporte del territorio. Cualquier cuenta activa, brigadista incluido: no depende de
+ * una actividad ni de una persona. Espejo de la política `reportes_territorio_insert`.
+ */
+export function puedeLevantarReporte(usuario: UsuarioActuante | null): boolean {
+  return !!usuario?.activo;
+}
+
+/**
+ * Bajar tablas a Excel. Mismo criterio que la carga masiva: un archivo con el padrón sale del
+ * sistema y deja de estar protegido por RLS, así que solo lo bajan quienes responden por un
+ * territorio completo. Lo que trae el archivo lo sigue recortando RLS por renglón: el responsable
+ * de demarcación baja su demarcación.
+ */
+export function puedeExportar(usuario: UsuarioActuante | null): boolean {
+  return puedeImportar(usuario);
+}
+
 /* ---------------------------------------------------------------------------
  * Qué actividades se listan
  * ------------------------------------------------------------------------- */

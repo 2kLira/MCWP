@@ -71,6 +71,58 @@ select
   privado.actividad_de_ruta('basura/f.webp')                                            as sin_prefijo,
   privado.actividad_de_ruta(null)                                                       as nula;
 
+-- 1h-bis. La cubeta NO tiene política de INSERT. Debe devolver CERO.
+-- Es el invariante que sostiene que toda foto pasó por app/api/fotos, el único sitio donde se
+-- validan los bytes. Si aquí aparece una política, volvió a existir un camino sin validar.
+select polname as storage_con_insert
+from pg_policy p join pg_class c on c.oid = p.polrelid
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'storage' and c.relname = 'objects' and p.polcmd = 'a';
+
+-- 1i. Toda tabla que guarda autoría o fecha de captura tiene su trigger de sellado. Debe
+-- devolver CERO.
+-- RLS decide el renglón, no la columna, y `authenticated` tiene UPDATE sobre todas las columnas.
+-- Sin estos triggers, `registrada_por`, `promovido_por`, `created_at` y `telefono_norm` los
+-- afirma el cliente.
+select t.tabla as tabla_sin_sellado
+from (values ('personas'), ('participaciones'), ('fotos'), ('actividades'),
+             ('representantes_casilla'), ('importaciones'), ('seguimientos'),
+             ('solicitudes'), ('casillas'), ('usuarios'), ('reportes_territorio')) as t(tabla)
+where not exists (
+  select 1 from pg_trigger g
+  join pg_class c on c.oid = g.tgrelid
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relname = t.tabla
+    and not g.tgisinternal and g.tgname like 'sellar%');
+
+-- 1j. Las funciones de sellado viven fuera de public y con search_path fijado. Debe devolver
+-- CERO.
+-- En public una función SECURITY DEFINER es, por definición, una RPC pública.
+select p.oid::regprocedure::text as sellado_mal_colocado
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where p.proname like 'sellar%'
+  and (n.nspname <> 'privado'
+       or not p.prosecdef
+       or p.proconfig is null
+       or not exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%'));
+
+-- 1k. La normalización del teléfono en la base da lo mismo que normalizarTelefono de
+-- lib/territorio.ts. Si no, la deduplicación miente.
+-- Debe dar: 9511004821, 9511004821, null, null.
+select
+  privado.normalizar_telefono('+52 (951) 100-4821') as con_lada,
+  privado.normalizar_telefono('951 100 4821')       as con_espacios,
+  privado.normalizar_telefono('sin digitos')        as basura,
+  privado.normalizar_telefono(null)                 as nulo;
+
+-- 1l. El candado del último administrador existe y muerde. Debe LANZAR la excepción en español.
+-- Se corre dentro de una transacción que se deshace, así que no cambia nada.
+-- begin;
+--   set local role authenticated;
+--   set local "request.jwt.claims" = '{"sub":"<id del único admin activo>","role":"authenticated"}';
+--   update public.usuarios set activo = false where id = '<ese mismo id>';
+-- rollback;
+
 -- ===========================================================================
 -- 2. Comprobaciones con identidad simulada.
 -- ===========================================================================

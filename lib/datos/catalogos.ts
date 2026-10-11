@@ -4,7 +4,7 @@
  */
 
 import type { UsuarioActuante } from "@/lib/tipos";
-import { db, lista, type Resultado } from "@/lib/datos/cliente";
+import { db, lista, textoDeBusqueda, type Resultado } from "@/lib/datos/cliente";
 
 export type Problematica = {
   id: number;
@@ -159,7 +159,7 @@ export function buscarColonias(
     db()
       .from("colonias")
       .select("id, nombre, cp, demarcacion_principal_id")
-      .ilike("nombre", `%${texto}%`)
+      .ilike("nombre", `%${textoDeBusqueda(texto)}%`)
       .order("nombre")
       .limit(limite),
   );

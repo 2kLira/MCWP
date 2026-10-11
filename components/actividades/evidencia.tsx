@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { Camera, LoaderCircle, MapPin } from "lucide-react";
-import { clienteSupabase } from "@/lib/supabase";
 import {
   agregarFoto,
   marcarActividadEnCurso,
@@ -10,7 +9,7 @@ import {
   type MomentoFoto,
 } from "@/lib/datos/actividades";
 import { comprimirFoto } from "@/components/actividades/comprimir";
-import { avisoDeAlmacenamiento, CUBETA_FOTOS, rutaDeFoto } from "@/lib/datos/almacenamiento";
+import { subirFoto } from "@/lib/datos/almacenamiento";
 
 
 const ETIQUETA_MOMENTO: Record<MomentoFoto, string> = {
@@ -94,27 +93,15 @@ export function BotonEvidencia({
       return;
     }
 
-    const supabase = clienteSupabase();
-    if (!supabase) {
+    // La subida va por /api/fotos, que valida los bytes y nombra el archivo. El mensaje de
+    // rechazo ya viene traducido del servidor.
+    const subida = await subirFoto(actividadId, comprimida.archivo, momento);
+    if (!subida.ok) {
       setEstado("listo");
-      setAviso({ tono: "error", texto: "Este despliegue no está conectado a la base de datos." });
+      setAviso({ tono: "error", texto: subida.aviso });
       return;
     }
-
-    // El prefijo "actividades/" lo exigen las políticas de storage.objects: leen el segundo
-    // segmento de la ruta como el id de la actividad.
-    const ruta = rutaDeFoto(actividadId, comprimida.archivo, momento);
-    const { error: errorSubida } = await supabase
-      .storage.from(CUBETA_FOTOS)
-      .upload(ruta, comprimida.archivo, { contentType: comprimida.archivo.type });
-
-    if (errorSubida) {
-      setEstado("listo");
-      setAviso({ tono: "error", texto: avisoDeAlmacenamiento(errorSubida.message) });
-      // El detalle crudo va a la consola, igual que hace `resultado()`: en pantalla va qué hacer.
-      console.warn(errorSubida);
-      return;
-    }
+    const ruta = subida.ruta;
 
     // Se guarda la RUTA, no una URL. El bucket es privado y una URL firmada caduca: persistirla
     // haría que la columna se pudriera sola.

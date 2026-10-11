@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ArrowLeft, ClipboardList, UserPlus } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { InvitarBrigadistas } from "@/components/actividades/invitar-brigadistas";
+import { EliminarActividad } from "@/components/actividades/eliminar-actividad";
 import { Tarjeta } from "@/components/tablero/tarjeta";
 import { FotosActividad } from "@/components/actividades/fotos-actividad";
 import { BotonEvidencia, LineaEvidencia } from "@/components/actividades/evidencia";
@@ -355,6 +356,13 @@ export function FichaActividad({ id }: { id: string }) {
           </div>
         </Tarjeta>
       ) : null}
+
+      {/* Al final de la ficha y separado, para que nadie lo toque buscando otra cosa. */}
+      {esAdmin(actuante) && (
+        <div className="mt-4 flex flex-col border-t border-borde pt-5">
+          <EliminarActividad actividadId={id} />
+        </div>
+      )}
     </div>
   );
 }

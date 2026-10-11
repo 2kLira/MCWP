@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextProxy } from "next/server";
+import { MAX_EDAD_COOKIE_SESION, OPCIONES_COOKIE_SESION } from "@/lib/sesion";
 
 /**
  * Portón de rutas y refresco de sesión.
@@ -34,6 +35,7 @@ export const proxy: NextProxy = async (peticion) => {
   if (!url || !publicable) return respuesta;
 
   const supabase = createServerClient(url, publicable, {
+    cookieOptions: OPCIONES_COOKIE_SESION,
     cookies: {
       getAll() {
         return peticion.cookies.getAll();
@@ -50,8 +52,20 @@ export const proxy: NextProxy = async (peticion) => {
         // 2. Se rehace la respuesta, ya con la petición mutada.
         respuesta = NextResponse.next({ request: peticion });
         // 3. A la respuesta, para que el navegador guarde el token nuevo.
+        //
+        // Con el tope de vigencia impuesto aquí, porque `cookieOptions` no alcanza: @supabase/ssr
+        // vuelve a poner sus 400 días después de aplicar los nuestros (ver lib/sesion.ts). Solo se
+        // recorta hacia abajo, y nunca un maxAge de 0: ése es el borrado de la cookie al salir, y
+        // alargarlo dejaría la sesión viva después de cerrarla.
         for (const { name, value, options } of cookiesAEscribir) {
-          respuesta.cookies.set(name, value, options);
+          const vigencia = options?.maxAge;
+          respuesta.cookies.set(
+            name,
+            value,
+            vigencia && vigencia > MAX_EDAD_COOKIE_SESION
+              ? { ...options, maxAge: MAX_EDAD_COOKIE_SESION }
+              : options,
+          );
         }
         // 4. Las anti-caché. Este paso no es opcional.
         for (const [clave, valor] of Object.entries(cabeceras)) {

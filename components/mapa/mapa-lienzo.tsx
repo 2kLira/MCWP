@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type {
   DataDrivenPropertyValueSpecification,
@@ -11,6 +11,7 @@ import type {
 import { useActuante } from "@/components/proveedor-actuante";
 import { MUNICIPIO } from "@/lib/demarcaciones";
 import { avanceDeCasilla, type CasillaConRepresentantes } from "@/lib/datos/casillas";
+import type { ReporteTerritorio } from "@/lib/datos/reportes-territorio";
 import { bboxDeRasgo, rasgoPorClave, type ColeccionSecciones, type RasgoSeccion } from "@/lib/territorio";
 import {
   calcularPasosDeVista,
@@ -20,6 +21,7 @@ import {
   type VistaMapa,
 } from "./datos-mapa";
 import { estiloCartoDe, usePreferenciaOscura } from "./estilo-base";
+import { MarcadoresReportes } from "./marcadores-reportes";
 import {
   GRUPOS_RETRASO,
   PROP_GRUPO_RETRASO,
@@ -223,6 +225,10 @@ export type MapaLienzoProps = {
   casillas: readonly CasillaConRepresentantes[] | null;
   casillaSeleccionadaId: number | null;
   onClicCasilla: (id: number, puntoPantalla: { x: number; y: number }) => void;
+  /** Reportes del territorio pendientes. Se pintan en todas las vistas menos la de casillas. */
+  reportes: readonly ReporteTerritorio[];
+  reporteSeleccionadoId: string | null;
+  onClicReporte: (id: string) => void;
 };
 
 /**
@@ -240,10 +246,16 @@ export function MapaLienzo({
   casillas,
   casillaSeleccionadaId,
   onClicCasilla,
+  reportes,
+  reporteSeleccionadoId,
+  onClicReporte,
 }: MapaLienzoProps) {
   const { actuante } = useActuante();
   const contenedorRef = useRef<HTMLDivElement>(null);
   const mapaRef = useRef<MapaLibreMap | null>(null);
+  // El mismo mapa que mapaRef, pero como estado: los marcadores de reportes necesitan enterarse
+  // de cuándo existe, y un ref no avisa.
+  const [mapaCargado, setMapaCargado] = useState<MapaLibreMap | null>(null);
   const oscura = usePreferenciaOscura();
 
   // Refs "espejo" de las props/estado más recientes, para leerlas desde manejadores de eventos
@@ -567,6 +579,7 @@ export function MapaLienzo({
       }
       mapaCreado = mapa;
       mapaRef.current = mapa;
+      setMapaCargado(mapa);
 
       // Botones de zoom, sin brújula: el aspecto de vidrio lo pone globals.css sobre
       // .maplibregl-ctrl-group. La atribución (compact, ver arriba) se queda en la misma esquina.
@@ -788,6 +801,7 @@ export function MapaLienzo({
   }, [casillaSeleccionadaId]);
 
   return (
+    <>
     <div
       ref={contenedorRef}
       // El CSS de MapLibre marca .maplibregl-map como position: relative y le gana a la clase
@@ -800,5 +814,13 @@ export function MapaLienzo({
           : "Mapa de secciones electorales de Oaxaca de Juárez"
       }
     />
+    <MarcadoresReportes
+      mapa={mapaCargado}
+      reportes={reportes}
+      visible={!esVistaDeCasillas(vista)}
+      seleccionadoId={reporteSeleccionadoId}
+      onClic={onClicReporte}
+    />
+    </>
   );
 }

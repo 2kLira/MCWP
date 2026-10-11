@@ -3,9 +3,16 @@
  * teléfono para deduplicación.
  *
  * `seccionPorPunto` es la contraparte en el cliente de la función `seccion_por_punto` de
- * supabase/schema.sql (st_contains contra secciones_geom, primer resultado). Ambas rutas deben
- * dar el mismo resultado; la comprobación cruzada contra la base queda pendiente porque el
- * esquema y los datos todavía no existen ahí.
+ * supabase/schema.sql (st_contains contra secciones_geom, primer resultado). Ambas rutas deben dar
+ * el mismo resultado, y el 11 de octubre de 2026 se comprobó: cinco puntos, incluidos dos fuera de
+ * toda geometría, dieron lo mismo por las dos vías (0555, 0535, 0586, null, null). La nota anterior
+ * decía que la comprobación era imposible porque el esquema y los datos no existían en la base;
+ * eso quedó obsoleto.
+ *
+ * **Cuál manda, desde el sellado de columnas:** la de la base. El trigger `privado.sellar_persona`
+ * resuelve la sección desde la coordenada y sobrescribe lo que mande el cliente. Esta función sigue
+ * sirviendo para que el formulario muestre la sección antes de guardar —sin esperar un viaje— pero
+ * ya no decide nada.
  */
 
 export type PropiedadesSeccion = {

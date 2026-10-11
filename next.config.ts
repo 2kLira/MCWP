@@ -120,8 +120,12 @@ const cabecerasDeSeguridad = [
   },
   {
     // Impide que el navegador adivine el tipo. Aquí pesa por la cartografía: /datos/*.geojson se
-    // sirve como application/geo+json, un tipo que el navegador no renderiza, y por las fotos de
-    // evidencia, que son contenido subido.
+    // sirve como application/geo+json, un tipo que el navegador no renderiza.
+    //
+    // Lo que esta cabecera **no** cubre, y conviene no dar por cubierto: las fotos de evidencia.
+    // Son el único contenido que sube un tercero, pero las sirve Supabase desde su URL firmada, en
+    // otro origen; `headers()` de next.config no toca esas respuestas. Su `nosniff` lo pone
+    // Storage.
     key: "X-Content-Type-Options",
     value: "nosniff",
   },
@@ -166,6 +170,13 @@ const cabecerasDeSeguridad = [
     // No se abre ninguna ventana emergente —no hay proveedores OAuth, el login es correo y
     // contraseña— así que aislar el grupo de contexto no tiene contraindicación.
     key: "Cross-Origin-Opener-Policy",
+    value: "same-origin",
+  },
+  {
+    // Acompaña al COOP: nadie fuera de este origen puede embeber nuestras respuestas. Las fotos
+    // de evidencia no pasan por aquí —las sirve Supabase— y el mapa pide recursos a CARTO, que es
+    // la dirección contraria y esta cabecera no toca.
+    key: "Cross-Origin-Resource-Policy",
     value: "same-origin",
   },
   {

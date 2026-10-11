@@ -11,6 +11,8 @@ import {
   type CasillaConRepresentantes,
   type RepresentanteCasilla,
 } from "@/lib/datos/casillas";
+import { reportesPendientes, type ReporteTerritorio } from "@/lib/datos/reportes-territorio";
+import { esAdmin } from "@/lib/puertas-ui";
 import { cargarSecciones, type ColeccionSecciones, type RasgoSeccion } from "@/lib/territorio";
 import { cn } from "@/lib/utils";
 import { BarraMapa } from "./barra-mapa";
@@ -25,6 +27,7 @@ import {
   type VistaMapa,
 } from "./datos-mapa";
 import { EsqueletoMapa } from "./esqueleto-mapa";
+import { FichaReporte } from "./ficha-reporte";
 import { FichaSeccion } from "./ficha-seccion";
 import { LeyendaMapa } from "./leyenda-mapa";
 import { MapaLienzo } from "./mapa-lienzo";
@@ -58,7 +61,17 @@ export function MapaPagina({
   const [coleccion, setColeccion] = useState<ColeccionSecciones | null>(null);
   const [errorColeccion, setErrorColeccion] = useState<string | null>(null);
   const [datos, setDatos] = useState<DatosMapa | null>(null);
-  const [vista, setVista] = useState<VistaMapa>("estructura");
+  // Vista inicial desde la URL: /casillas redirige aquí con "?vista=casillas" (ver
+  // app/casillas/page.tsx) para que su destino de navegación siga funcionando sin mantener dos
+  // pantallas del mismo mapa de puntos. Se lee al crear el estado, directo de window.location:
+  // useSearchParams obligaría a un límite de Suspense. No provoca desajuste de hidratación porque
+  // nada que dependa de la vista se pinta en el servidor: el lienzo, el selector y la leyenda
+  // esperan a que lleguen los datos, que solo se piden en el navegador.
+  const [vista, setVista] = useState<VistaMapa>(() => {
+    if (typeof window === "undefined") return "estructura";
+    const parametro = new URLSearchParams(window.location.search).get("vista");
+    return esIdentificadorDeVista(parametro) ? parametro : "estructura";
+  });
   const [seleccionCruda, setSeleccion] = useState<(Seleccion & { actuanteId: string }) | null>(
     null,
   );
@@ -75,6 +88,24 @@ export function MapaPagina({
   >(null);
   const seleccionCasilla =
     seleccionCasillaCruda?.actuanteId === actuante.id ? seleccionCasillaCruda : null;
+
+  // Reportes del territorio pendientes. RLS decide cuáles: el administrador todos, los demás solo
+  // los suyos. Al marcar uno como atendido se quita de aquí sin volver a pedir la lista.
+  const [reportes, setReportes] = useState<ReporteTerritorio[]>([]);
+  const [reporteSeleccionadoId, setReporteSeleccionadoId] = useState<string | null>(null);
+  const reporteSeleccionado = reporteSeleccionadoId
+    ? (reportes.find((r) => r.id === reporteSeleccionadoId) ?? null)
+    : null;
+
+  useEffect(() => {
+    let cancelado = false;
+    reportesPendientes().then((r) => {
+      if (!cancelado) setReportes(r.datos);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [actuante.id]);
 
   useEffect(() => {
     let cancelado = false;
@@ -111,16 +142,6 @@ export function MapaPagina({
     };
   }, [actuante]);
 
-  // Vista inicial desde la URL: /casillas redirige aquí con "?vista=casillas" (ver
-  // app/casillas/page.tsx) para que su destino de navegación siga funcionando sin mantener dos
-  // pantallas del mismo mapa de puntos. Se lee una sola vez al montar, directo de
-  // window.location: usar useSearchParams obligaría a envolver esto en un límite de Suspense para
-  // no forzar el resto de la página a renderizarse en el cliente, y aquí no hace falta.
-  useEffect(() => {
-    const parametro = new URLSearchParams(window.location.search).get("vista");
-    if (esIdentificadorDeVista(parametro)) setVista(parametro);
-  }, []);
-
   const vistaEsCasillas = esVistaDeCasillas(vista);
 
   // Carga perezosa: las casillas no se piden hasta entrar a su vista, igual que el resto del mapa
@@ -141,11 +162,6 @@ export function MapaPagina({
     };
   }, [vistaEsCasillas, actuante]);
 
-  // Al salir de la vista de casillas, la casilla seleccionada se limpia: es la misma regla que ya
-  // separa la selección de sección de la de colonia.
-  useEffect(() => {
-    if (!vistaEsCasillas) setSeleccionCasilla(null);
-  }, [vistaEsCasillas]);
 
   const listo = (coleccion != null && datos != null) || errorColeccion != null;
 
@@ -222,6 +238,13 @@ export function MapaPagina({
               setSeleccion(null);
               setSeleccionCasilla({ id, origen, actuanteId: actuante.id });
             }}
+            reportes={reportes}
+            reporteSeleccionadoId={reporteSeleccionadoId}
+            onClicReporte={(id) => {
+              setSeleccion(null);
+              setSeleccionCasilla(null);
+              setReporteSeleccionadoId(id);
+            }}
           />
 
           {/* Arriba a la izquierda: municipio y territorio del actuante, y debajo el resumen que
@@ -267,7 +290,12 @@ export function MapaPagina({
           >
             <SelectorCapas
               vista={vista}
-              onCambiar={setVista}
+              onCambiar={(nueva) => {
+                setVista(nueva);
+                // Al salir de la vista de casillas, la casilla elegida se limpia: es la misma
+                // regla que ya separa la selección de sección de la de colonia.
+                if (!esVistaDeCasillas(nueva)) setSeleccionCasilla(null);
+              }}
               enMovimiento={enMovimiento}
               className="pointer-events-auto max-w-full"
             />
@@ -298,6 +326,19 @@ export function MapaPagina({
               enMovimiento={enMovimiento}
               onCerrar={() => setSeleccionCasilla(null)}
               onGuardado={alGuardarRepresentanteCasilla}
+            />
+          )}
+
+          {reporteSeleccionado && (
+            <FichaReporte
+              key={reporteSeleccionado.id}
+              reporte={reporteSeleccionado}
+              puedeAtender={esAdmin(actuante)}
+              onCerrar={() => setReporteSeleccionadoId(null)}
+              onAtendido={(id) => {
+                setReporteSeleccionadoId(null);
+                setReportes((actuales) => actuales.filter((r) => r.id !== id));
+              }}
             />
           )}
         </>

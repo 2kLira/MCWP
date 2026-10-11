@@ -460,3 +460,34 @@ export async function guardarConclusion(
   });
   return resultado(data === true, error, false);
 }
+
+/** Lo que se va a borrar (o se borró) al eliminar una actividad. Lo cuenta la base. */
+export type ResumenEliminacion = {
+  nombre: string;
+  personas_borradas: number;
+  personas_conservadas: number;
+  participaciones: number;
+  menciones: number;
+  solicitudes: number;
+  fotos: number;
+  invitaciones: number;
+  rutas: string[];
+};
+
+/**
+ * Eliminar una actividad con todo lo que se registró en ella. Solo el administrador.
+ *
+ * `public.eliminar_actividad` hace las dos cosas con la misma regla: con `soloContar` regresa el
+ * resumen sin tocar nada, que es lo que se le enseña al administrador antes de confirmar; sin él,
+ * borra y regresa el mismo resumen. Qué personas se conservan y por qué está en seguridad.sql.
+ */
+export async function eliminarActividad(
+  actividadId: string,
+  soloContar: boolean,
+): Promise<Resultado<ResumenEliminacion | null>> {
+  const { data, error } = await db().rpc("eliminar_actividad", {
+    a_id: actividadId,
+    solo_contar: soloContar,
+  });
+  return resultado((data as ResumenEliminacion | null) ?? null, error, null);
+}

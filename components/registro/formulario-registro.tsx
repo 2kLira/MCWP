@@ -75,7 +75,9 @@ type OpcionSeccion = { clave: string; demarcacion: string; conGeometria: boolean
 export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const { actuante } = useActuante();
 
-  const [nombre, setNombre] = useState("");
+  const [nombres, setNombres] = useState("");
+  const [apellidoPaterno, setApellidoPaterno] = useState("");
+  const [apellidoMaterno, setApellidoMaterno] = useState("");
   const [genero, setGenero] = useState<Genero | null>(null);
   const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -98,8 +100,13 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const [llegoPorPromotor, setLlegoPorPromotor] = useState(false);
   const [promotor, setPromotor] = useState<PersonaEnLista | null>(null);
   const [textoPromotor, setTextoPromotor] = useState("");
-  const [resultadosPromotor, setResultadosPromotor] = useState<PersonaEnLista[]>([]);
-  const [buscandoPromotor, setBuscandoPromotor] = useState(false);
+  // Los resultados se guardan junto con el texto que los produjo. Así "buscando" y qué se muestra
+  // se derivan al pintar, sin limpiar estado dentro del efecto: si el texto cambió, la respuesta
+  // guardada ya no le corresponde y simplemente no se usa.
+  const [busquedaPromotor, setBusquedaPromotor] = useState<{
+    consulta: string;
+    resultados: PersonaEnLista[];
+  } | null>(null);
 
   const [ubicacion, setUbicacion] = useState<Ubicacion | null>(null);
   const [ubicando, setUbicando] = useState(true);
@@ -205,31 +212,27 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
   // Buscador de promotor: nombre libre, con retardo para no consultar en cada tecla. Miles de
   // personas registradas hacen inusable un <select>, por eso es buscador y no desplegable.
+  const consultaPromotor = textoPromotor.trim();
+  const buscaPromotor = llegoPorPromotor && !promotor && consultaPromotor.length >= 2;
+  const buscandoPromotor = buscaPromotor && busquedaPromotor?.consulta !== consultaPromotor;
+  const resultadosPromotor =
+    buscaPromotor && busquedaPromotor?.consulta === consultaPromotor
+      ? busquedaPromotor.resultados
+      : [];
+
   useEffect(() => {
-    if (!llegoPorPromotor || promotor) {
-      setResultadosPromotor([]);
-      return;
-    }
-    const consulta = textoPromotor.trim();
-    if (consulta.length < 2) {
-      setResultadosPromotor([]);
-      setBuscandoPromotor(false);
-      return;
-    }
+    if (!buscaPromotor) return;
     let vigente = true;
-    setBuscandoPromotor(true);
     const temporizador = setTimeout(() => {
-      coincidenciasPorNombre(consulta, null).then((r) => {
-        if (!vigente) return;
-        setResultadosPromotor(r.datos);
-        setBuscandoPromotor(false);
+      coincidenciasPorNombre(consultaPromotor, null).then((r) => {
+        if (vigente) setBusquedaPromotor({ consulta: consultaPromotor, resultados: r.datos });
       });
     }, 250);
     return () => {
       vigente = false;
       clearTimeout(temporizador);
     };
-  }, [textoPromotor, llegoPorPromotor, promotor]);
+  }, [consultaPromotor, buscaPromotor]);
 
   // Deduplicación en el momento: en cuanto hay diez dígitos, se busca.
   const revisarTelefono = useCallback(
@@ -341,7 +344,8 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const requierePromotor = !llegoPorPromotor || !!promotor;
 
   const listo =
-    nombre.trim().length > 1 &&
+    nombres.trim().length > 1 &&
+    apellidoPaterno.trim().length > 0 &&
     consiente &&
     !!ubicacion &&
     requierePeticion &&
@@ -361,7 +365,15 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
     if (!agregarAExistente) {
       const r = await crearPersona({
-        nombre: nombre.trim(),
+        // La base vuelve a armar `nombre` con las tres partes; se manda igual porque la columna
+        // es obligatoria y así el renglón nunca depende de que el trigger exista.
+        nombre: [nombres, apellidoPaterno, apellidoMaterno]
+          .map((t) => t.trim())
+          .filter(Boolean)
+          .join(" "),
+        nombres: nombres.trim(),
+        apellido_paterno: apellidoPaterno.trim(),
+        apellido_materno: apellidoMaterno.trim() || null,
         // Si es otra persona distinta, se guarda sin teléfono y queda marcada para revisión.
         telefono_raw: hayDuplicado ? null : telefono.trim() || null,
         calle: calle.trim() || null,
@@ -436,7 +448,9 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   }
 
   function otraCaptura() {
-    setNombre("");
+    setNombres("");
+    setApellidoPaterno("");
+    setApellidoMaterno("");
     setGenero(null);
     setFechaNacimiento("");
     setTelefono("");
@@ -456,7 +470,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     setLlegoPorPromotor(false);
     setPromotor(null);
     setTextoPromotor("");
-    setResultadosPromotor([]);
+    setBusquedaPromotor(null);
     setEstado("capturando");
     nombreRef.current?.focus();
   }
@@ -573,16 +587,40 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
           )}
         </div>
 
-        <Campo etiqueta="Nombre">
+        <Campo etiqueta="Nombre(s)">
           <input
             ref={nombreRef}
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
+            value={nombres}
+            onChange={(e) => setNombres(e.target.value)}
             autoComplete="off"
+            autoCapitalize="words"
             required
             className="campo"
           />
         </Campo>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo etiqueta="Apellido paterno">
+            <input
+              value={apellidoPaterno}
+              onChange={(e) => setApellidoPaterno(e.target.value)}
+              autoComplete="off"
+              autoCapitalize="words"
+              required
+              className="campo"
+            />
+          </Campo>
+          {/* Opcional: hay quien solo tiene un apellido, y obligarlo haría inventar uno. */}
+          <Campo etiqueta="Apellido materno (si tiene)">
+            <input
+              value={apellidoMaterno}
+              onChange={(e) => setApellidoMaterno(e.target.value)}
+              autoComplete="off"
+              autoCapitalize="words"
+              className="campo"
+            />
+          </Campo>
+        </div>
 
         <div>
           <p className="mb-2 text-sm text-tinta-suave">Género</p>

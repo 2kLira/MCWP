@@ -6,7 +6,14 @@
 
 import { normalizarTelefono } from "@/lib/territorio";
 import type { UsuarioActuante } from "@/lib/tipos";
-import { db, esFaltaDeEsquema, lista, uno, type Resultado } from "@/lib/datos/cliente";
+import {
+  db,
+  esFaltaDeEsquema,
+  lista,
+  textoDeBusqueda,
+  uno,
+  type Resultado,
+} from "@/lib/datos/cliente";
 import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
 
 export type TipoSeguimiento = "llamada" | "whatsapp" | "invitacion" | "reunion" | "otro";
@@ -83,7 +90,7 @@ function aplicarFiltrosBandeja<
     resultado = resultado.eq("tiene_solicitud", true) as Q;
   }
 
-  const texto = filtros.texto?.trim();
+  const texto = textoDeBusqueda(filtros.texto ?? "");
   if (texto) {
     // El teléfono llega pegado, con espacios o con guiones: se normaliza igual que al capturarlo,
     // para que "951 100 4821" encuentre lo mismo que "9511004821".

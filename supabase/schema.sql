@@ -136,7 +136,11 @@ create type genero_persona as enum ('mujer','hombre','otro','no_especifica');
 
 create table personas (
   id                 uuid primary key default gen_random_uuid(),
+  -- Nombre completo. Si llegan las tres partes de abajo, lo arma privado.sellar_persona.
   nombre             text not null,
+  nombres            text,
+  apellido_paterno   text,
+  apellido_materno   text,
   telefono_norm      text unique
     check (telefono_norm is null or telefono_norm ~ '^[0-9]{10}$'),
   telefono_raw       text,
@@ -413,6 +417,43 @@ create index solicitudes_persona_idx on solicitudes (persona_id);
 create index fotos_actividad_idx     on fotos (actividad_id);
 
 -- ---------------------------------------------------------------------------
+-- Reportes del territorio
+-- ---------------------------------------------------------------------------
+-- Pedido del cliente (11 de octubre de 2026): el brigadista levanta reportes de problemas o
+-- necesidades del territorio desde cualquier lugar, sin actividad ni persona de por medio, y el
+-- reporte aparece georreferenciado en el mapa hasta que alguien lo marca como atendido.
+--
+-- Solo se le piden categoría y descripción. La coordenada, quién lo levantó, la fecha, la sección
+-- y la demarcación las pone la base (privado.sellar_reporte_territorio, en seguridad.sql).
+-- La categoría es texto con check, no catálogo: son trece fijas y sus iconos viven en el código
+-- (lib/datos/reportes-territorio.ts). Si cambian, cambian las dos cosas a la vez.
+create table reportes_territorio (
+  id              uuid primary key default gen_random_uuid(),
+  categoria       text not null check (categoria in (
+    'calles_pavimento', 'banquetas_accesibilidad', 'alumbrado_publico', 'drenaje',
+    'basura_limpieza', 'canchas_espacios_deportivos', 'parques_jardines', 'senderos_seguros',
+    'pasos_peatonales', 'senalizacion_transito', 'transporte_publico',
+    'arbolado_medio_ambiente', 'riesgos_via_publica')),
+  descripcion     text not null check (char_length(btrim(descripcion)) between 3 and 2000),
+  lat             double precision not null check (lat between -90 and 90),
+  lng             double precision not null check (lng between -180 and 180),
+  -- Radio de incertidumbre que reporta el GPS, en metros. Sirve para saber cuánto creerle al punto.
+  precision_m     real check (precision_m is null or precision_m >= 0),
+  seccion_clave   text references secciones(clave),
+  demarcacion_id  integer references demarcaciones(id),
+  levantado_por   uuid not null references usuarios(id),
+  created_at      timestamptz not null default now(),
+  atendido        boolean not null default false,
+  atendido_en     timestamptz,
+  atendido_por    uuid references usuarios(id)
+);
+
+-- El mapa solo pide los pendientes, más recientes primero.
+create index reportes_territorio_pendientes on reportes_territorio (created_at desc)
+  where not atendido;
+create index reportes_territorio_levantado_por on reportes_territorio (levantado_por);
+
+-- ---------------------------------------------------------------------------
 -- Vistas
 -- Se consultan desde la aplicación en lugar de armar agregaciones en el cliente.
 --
@@ -573,6 +614,26 @@ from personas p
 where p.fecha_nacimiento is not null
   and extract(month from p.fecha_nacimiento) = extract(month from current_date)
   and extract(day   from p.fecha_nacimiento) = extract(day   from current_date);
+
+-- Cuánto capturó cada usuario. Pedido del cliente (11 de octubre de 2026): el administrador quiere
+-- ver cuántas personas registró cada brigadista. "Hoy" es el día de Oaxaca, no el de UTC, que a
+-- partir de las seis de la tarde ya es mañana. Las asistencias van aparte porque no son gente
+-- nueva: son personas ya registradas que volvieron a otra actividad.
+-- security_invoker: el administrador ve a todos; cualquier otro rol solo alcanzaría lo que RLS ya
+-- le deja ver de usuarios y personas.
+create view v_capturas_por_usuario with (security_invoker = true) as
+select u.id as usuario_id,
+  count(p.id)::int as personas,
+  (count(p.id) filter (
+    where (p.created_at at time zone 'America/Mexico_City')::date
+        = (now() at time zone 'America/Mexico_City')::date))::int as personas_hoy,
+  (count(p.id) filter (where p.created_at >= now() - interval '7 days'))::int as personas_7_dias,
+  (select count(*) from participaciones pa
+    where pa.registrada_por = u.id and pa.tipo = 'asistencia')::int as asistencias,
+  max(p.created_at) as ultima_captura
+from usuarios u
+left join personas p on p.registrada_por = u.id
+group by u.id;
 
 -- ---------------------------------------------------------------------------
 -- Catálogo de problemáticas

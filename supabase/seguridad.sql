@@ -223,6 +223,105 @@ revoke all on function public.guardar_conclusion_actividad(uuid, text) from anon
 grant execute on function public.guardar_conclusion_actividad(uuid, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- 3d. Eliminar una actividad con todo lo que se registró en ella
+-- ---------------------------------------------------------------------------
+-- Pedido del cliente (10 de octubre de 2026). Solo el administrador. Es borrado de verdad, no
+-- baja lógica: la actividad deja de existir y con ella lo que se capturó ahí.
+--
+-- Una sola función para contar y para borrar (`solo_contar`), para que la confirmación que ve el
+-- administrador salga de la misma regla que el borrado y no pueda decir una cosa y hacer otra.
+--
+-- Qué se borra:
+--   · la actividad, sus invitaciones y sus fotos (las dos últimas en cascada);
+--   · todas las participaciones en ella, sus menciones (cascada) y sus solicitudes;
+--   · las personas que se registraron por primera vez en ella (`actividad_origen`).
+-- Qué NO se borra, aunque se haya registrado ahí: una persona que además participó en otra
+-- actividad, que tiene seguimientos o que es representante de casilla. Esa persona ya es de otro
+-- trabajo; se conserva y solo se le quita el vínculo de origen. Borrarla se llevaría datos de
+-- actividades que nadie pidió tocar.
+--
+-- Los archivos de Storage no se pueden borrar desde SQL. La función regresa sus rutas y el
+-- cliente los borra con la API de Storage, que ya le permite borrar al administrador.
+create or replace function public.eliminar_actividad(a_id uuid, solo_contar boolean default true)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_nombre text;
+  v_participaciones uuid[];
+  v_borrar uuid[];
+  v_conservar uuid[];
+  v_rutas text[];
+  v_resumen jsonb;
+begin
+  if auth.uid() is null then
+    raise exception 'Se requiere sesión';
+  end if;
+  if not privado.es_admin() then
+    raise exception 'Solo el administrador puede eliminar actividades';
+  end if;
+
+  select nombre into v_nombre from public.actividades where id = a_id;
+  if v_nombre is null then
+    return null;
+  end if;
+
+  select coalesce(array_agg(id), '{}') into v_participaciones
+    from public.participaciones where actividad_id = a_id;
+
+  select coalesce(array_agg(p.id) filter (where libre), '{}'),
+         coalesce(array_agg(p.id) filter (where not libre), '{}')
+    into v_borrar, v_conservar
+    from (
+      select p.id,
+             not exists (select 1 from public.participaciones o
+                          where o.persona_id = p.id and o.actividad_id is distinct from a_id)
+         and not exists (select 1 from public.seguimientos s where s.persona_id = p.id)
+         and not exists (select 1 from public.representantes_casilla r where r.persona_id = p.id)
+             as libre
+        from public.personas p
+       where p.actividad_origen = a_id
+    ) p;
+
+  select coalesce(array_agg(name), '{}') into v_rutas
+    from storage.objects
+   where bucket_id = 'fotos' and name like 'actividades/' || a_id::text || '/%';
+
+  v_resumen := jsonb_build_object(
+    'nombre', v_nombre,
+    'personas_borradas', cardinality(v_borrar),
+    'personas_conservadas', cardinality(v_conservar),
+    'participaciones', cardinality(v_participaciones),
+    'menciones', (select count(*) from public.menciones_problematica
+                   where participacion_id = any(v_participaciones)),
+    'solicitudes', (select count(*) from public.solicitudes
+                     where participacion_id = any(v_participaciones)
+                        or persona_id = any(v_borrar)),
+    'fotos', (select count(*) from public.fotos where actividad_id = a_id),
+    'invitaciones', (select count(*) from public.actividad_brigadistas where actividad_id = a_id),
+    'rutas', to_jsonb(v_rutas)
+  );
+
+  if solo_contar then
+    return v_resumen;
+  end if;
+
+  delete from public.solicitudes
+   where participacion_id = any(v_participaciones) or persona_id = any(v_borrar);
+  delete from public.participaciones where id = any(v_participaciones);
+  update public.personas set promotor_id = null where promotor_id = any(v_borrar);
+  perform set_config('soet.desligar_origen', 'on', true);
+  update public.personas set actividad_origen = null where id = any(v_conservar);
+  perform set_config('soet.desligar_origen', 'off', true);
+  delete from public.personas where id = any(v_borrar);
+  delete from public.actividades where id = a_id;
+
+  return v_resumen;
+end $$;
+
+revoke all on function public.eliminar_actividad(uuid, boolean) from public;
+revoke all on function public.eliminar_actividad(uuid, boolean) from anon;
+grant execute on function public.eliminar_actividad(uuid, boolean) to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- 4. RLS en todas las tablas
 -- ---------------------------------------------------------------------------
 -- Sin excepciones. Una tabla de public sin RLS es una tabla abierta.
@@ -235,7 +334,7 @@ begin
     'usuarios','asignaciones_responsable','importaciones','personas','actividades',
     'actividad_brigadistas','participaciones','problematicas','menciones_problematica',
     'solicitudes','seguimientos','fotos','casillas','representantes_casilla',
-    'resultados_historicos'
+    'resultados_historicos','reportes_territorio'
   ]
   loop
     execute format('alter table public.%I enable row level security', t);
@@ -486,10 +585,19 @@ create policy fotos_delete on fotos for delete to authenticated
 -- las imágenes se entregan con URL firmada temporal. Por eso `fotos.url` guarda la **ruta** dentro
 -- del bucket y no una URL: una firma caduca, y persistirla haría que la columna se pudriera sola.
 --
--- 512000 bytes porque components/actividades/comprimir.ts ya rechaza arriba de 400 KB: el tope del
--- bucket es el cinturón que respalda ese tirante, para que una subida que no pase por el compresor
--- tampoco entre. WebP y JPEG, que es lo único que produce el compresor: Safari de iPhone no codifica
--- WebP desde canvas y ahí el compresor cae a JPEG.
+-- 512000 bytes porque components/actividades/comprimir.ts ya rechaza arriba de 400 KB. Ese tope sí
+-- respalda al compresor: el tamaño lo mide el servidor, así que una subida que no pase por el
+-- compresor tampoco entra.
+--
+-- La lista de tipos **no** respalda nada, y hay que leerla sabiéndolo: Storage compara el
+-- `Content-Type` que **declara el cliente**, no los bytes del archivo. Así que se puede subir
+-- cualquier cosa de hasta 500 KB etiquetándola image/webp. Lo que de verdad valida la imagen es
+-- createImageBitmap() más el reencode por canvas del compresor —que además tira el EXIF, con sus
+-- coordenadas GPS—, y eso es código de navegador, o sea opcional. Está anotado en
+-- AUDITORIA-SEGURIDAD.md, hallazgo 7, con la decisión pendiente de validar bytes en el servidor.
+--
+-- WebP y JPEG son lo que produce el compresor: Safari de iPhone no codifica WebP desde canvas y
+-- ahí cae a JPEG.
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('fotos', 'fotos', false, 512000, array['image/webp', 'image/jpeg'])
@@ -525,13 +633,24 @@ create policy almacen_fotos_select on storage.objects for select to authenticate
          and ((select privado.es_admin())
               or privado.actividad_abierta_mia(privado.actividad_de_ruta(name))));
 
--- No se comprueba `owner`: cualquier invitado a esa actividad debe poder subir, y la atribución de
--- quién subió la lleva fotos.subida_por en la tabla, no el objeto de Storage. Una condición de más
--- solo agrega formas de fallar.
-create policy almacen_fotos_insert on storage.objects for insert to authenticated
-  with check (bucket_id = 'fotos'
-              and ((select privado.es_admin())
-                   or privado.actividad_abierta_mia(privado.actividad_de_ruta(name))));
+-- **Sin política de INSERT, y es a propósito.** La había, y era correcta en lo que comprobaba:
+-- quién sube y a qué carpeta. Lo que no podía comprobar era **qué** se sube, porque Storage
+-- compara el `Content-Type` que declara el cliente, no los bytes. Medido el 11 de octubre de 2026
+-- con una sesión real de brigadista: un POST directo con texto plano y la cabecera
+-- `content-type: image/webp` subió con 200.
+--
+-- Ahora la subida pasa por `app/api/fotos/route.ts`, que valida la firma de los bytes, quita los
+-- metadatos (el EXIF de una foto de celular lleva el identificador del dispositivo), nombra el
+-- archivo —para que la ruta no la elija el cliente— y escribe con la llave secreta, que se salta
+-- RLS. La autorización no se reimplementa ahí: el handler le pregunta a esta misma base, con el
+-- cliente de la petición, si alcanza esa actividad abierta.
+--
+-- Sin política de INSERT, `authenticated` no tiene segundo camino. Verificado después del cambio:
+-- la subida directa devuelve "new row violates row-level security policy" y el handler sigue
+-- subiendo.
+--
+-- Si algún día se vuelve a abrir la subida directa, hay que recordar que `almacen_fotos_select`
+-- se queda como está: el brigadista necesita leer para firmar las URL de su galería.
 
 -- Borrar, solo el admin: una foto es evidencia y el brigadista no la retira.
 create policy almacen_fotos_delete on storage.objects for delete to authenticated
@@ -539,3 +658,412 @@ create policy almacen_fotos_delete on storage.objects for delete to authenticate
 
 -- Sin política de UPDATE a propósito: los nombres llevan marca de tiempo y azar, así que nunca se
 -- sobreescribe un objeto. Sin UPDATE, un upsert de Storage rebota, que es lo que se quiere.
+
+-- ---------------------------------------------------------------------------
+-- 10. Sellado de columnas calculadas
+-- ---------------------------------------------------------------------------
+-- **RLS decide qué renglón tocas. No decide qué columna.** Y el grant es por tabla, así que
+-- `authenticated` tiene UPDATE sobre las 256 columnas de las 27 relaciones de public. Hasta el
+-- 10 de octubre de 2026 eso significaba que cualquiera con la consola del navegador abierta
+-- podía afirmar `registrada_por`, `promovido_por`, `created_at` o `telefono_norm` a su gusto: la
+-- política lo dejaba pasar porque el renglón sí era suyo. Un brigadista podía marcar a alguien
+-- como promovido por otra persona, o fechar su captura el año pasado.
+--
+-- Estos triggers son la pieza que faltaba. Son la forma en que la base cumple por fin la regla
+-- del CLAUDE.md que dice "nada de lo que el sistema puede calcular se le pide al usuario": antes
+-- esa regla la cumplía solo la aplicación, de buena voluntad, y la buena voluntad no es un
+-- control de acceso.
+--
+-- Son SECURITY DEFINER por un motivo concreto y no por costumbre: resolver la sección desde la
+-- coordenada necesita leer `secciones_geom`, y al brigadista el catálogo territorial está cerrado
+-- (`ve_catalogo` lo excluye). Con SECURITY INVOKER el trigger devolvería null justo para quien
+-- captura en la calle, que es el único que trae coordenada.
+--
+-- Todos llevan la misma guarda: si `auth.uid()` es null no hay sesión, o sea que quien escribe es
+-- la llave secreta —sembrado, respaldo, consola de Supabase—. Ahí no se impone autoría ni fecha,
+-- porque una restauración necesita conservar las originales, pero sí se normaliza el teléfono y
+-- se resuelve la sección, que son integridad del dato y no autoría. No es un hueco: quien tiene
+-- la llave secreta ya se salta RLS entera.
+--
+-- Los `raise exception` usan P0001 a propósito. La tabla de códigos de lib/datos/cliente.ts no
+-- traduce ese código, así que el mensaje en español llega entero a la pantalla; con 23514 se
+-- cambiaría por "Algún dato no cumple el formato que espera la base", que no dice nada.
+
+-- Misma regla que normalizarTelefono de lib/territorio.ts: solo dígitos, los últimos diez, null
+-- si no queda nada. Las dos rutas tienen que dar el mismo resultado o la deduplicación miente.
+create or replace function privado.normalizar_telefono(crudo text)
+returns text language sql immutable set search_path = '' as $$
+  select nullif(right(regexp_replace(coalesce(crudo, ''), '\D', '', 'g'), 10), '');
+$$;
+
+-- ---- personas ----
+create or replace function privado.sellar_persona()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  hay_sesion boolean := auth.uid() is not null;
+  desde_punto text;
+begin
+  -- Llave de deduplicación: la calcula la base siempre, con sesión o sin ella.
+  new.telefono_norm := privado.normalizar_telefono(new.telefono_raw);
+
+  -- Nombre en tres partes (11 de octubre de 2026). `nombre` queda como el nombre completo y lo
+  -- arma la base: búsquedas, listados y fichas lo siguen leyendo sin saber de las partes. Si no
+  -- vienen partes (carga masiva, renglones viejos), `nombre` se respeta tal cual llegó.
+  new.nombres          := nullif(btrim(new.nombres), '');
+  new.apellido_paterno := nullif(btrim(new.apellido_paterno), '');
+  new.apellido_materno := nullif(btrim(new.apellido_materno), '');
+  if new.nombres is not null or new.apellido_paterno is not null then
+    new.nombre := concat_ws(' ', new.nombres, new.apellido_paterno, new.apellido_materno);
+  end if;
+
+  -- "La sección electoral es la única unidad territorial exacta" y "nada de pedir la sección
+  -- cuando hay coordenada". Si hay punto, el punto manda y lo que mandó el cliente no cuenta.
+  -- Si el punto cae fuera de toda geometría se respeta lo que venga: las seis secciones
+  -- sustitutas no tienen geometría publicada y colgar ahí la captura sería peor que confiar.
+  if new.lat is not null and new.lng is not null then
+    desde_punto := public.seccion_por_punto(new.lng, new.lat);
+    if desde_punto is not null then
+      new.seccion_clave := desde_punto;
+    end if;
+  end if;
+
+  if tg_op = 'INSERT' then
+    if hay_sesion then
+      new.registrada_por := auth.uid();
+      new.created_at     := now();
+      -- El consentimiento se fecha cuando se otorga, y se otorga en el alta. aviso_version y
+      -- consentimiento_en se escriben juntos en formulario-registro.tsx y en ningún otro lado.
+      new.consentimiento_en := case when new.aviso_version is not null then now() end;
+    end if;
+    if new.es_promovido then
+      new.promovido_en  := coalesce(case when hay_sesion then now() end, new.promovido_en, now());
+      new.promovido_por := coalesce(auth.uid(), new.promovido_por);
+    else
+      new.promovido_en  := null;
+      new.promovido_por := null;
+    end if;
+    return new;
+  end if;
+
+  -- UPDATE: lo que cuenta la historia del renglón no se reescribe nunca.
+  new.id                := old.id;
+  new.created_at        := old.created_at;
+  new.registrada_por    := old.registrada_por;
+  -- Única excepción: `eliminar_actividad` puede vaciarlo (nunca cambiarlo por otro) a las personas
+  -- que conserva, porque si no, la actividad no se podría borrar. La marca es local a la
+  -- transacción de esa función; set_config no está expuesto por PostgREST, así que un cliente no
+  -- la puede poner. El coalesce no es adorno: sin marca, current_setting da NULL, el `if` no
+  -- entra y el campo quedaría desprotegido.
+  if not (new.actividad_origen is null
+          and coalesce(current_setting('soet.desligar_origen', true), '') = 'on') then
+    new.actividad_origen := old.actividad_origen;
+  end if;
+  new.importacion_id    := old.importacion_id;
+  new.consentimiento_en := old.consentimiento_en;
+  new.aviso_version     := old.aviso_version;
+
+  -- La promoción se sella en la transición, no en cada guardado: corregirle el teléfono a alguien
+  -- promovido hace tres semanas no le mueve la fecha ni le cambia quién lo promovió.
+  if new.es_promovido and not old.es_promovido then
+    new.promovido_en  := now();
+    new.promovido_por := coalesce(auth.uid(), new.promovido_por);
+  elsif not new.es_promovido then
+    new.promovido_en  := null;
+    new.promovido_por := null;
+  else
+    new.promovido_en  := old.promovido_en;
+    new.promovido_por := old.promovido_por;
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists sellar_persona on public.personas;
+create trigger sellar_persona before insert or update on public.personas
+  for each row execute function privado.sellar_persona();
+
+-- ---- participaciones ----
+-- Quién capturó a quién en qué actividad es la columna sobre la que se apoya toda la atribución
+-- del sistema. En el UPDATE del upsert se conserva la del primer captor: una recaptura de la
+-- misma persona en la misma actividad no reescribe la autoría.
+create or replace function privado.sellar_participacion()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    if auth.uid() is not null then
+      new.registrada_por := auth.uid();
+      new.created_at     := now();
+    end if;
+    return new;
+  end if;
+
+  new.id             := old.id;
+  new.persona_id     := old.persona_id;
+  new.actividad_id   := old.actividad_id;
+  new.registrada_por := old.registrada_por;
+  new.created_at     := old.created_at;
+  return new;
+end $$;
+
+drop trigger if exists sellar_participacion on public.participaciones;
+create trigger sellar_participacion before insert or update on public.participaciones
+  for each row execute function privado.sellar_participacion();
+
+-- ---- fotos ----
+-- `url` guarda la ruta dentro de la cubeta y es inmutable: si se pudiera reapuntar, una foto de
+-- evidencia podría cambiarse por otra sin que quede rastro de la sustitución.
+create or replace function privado.sellar_foto()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    if auth.uid() is not null then
+      new.subida_por := auth.uid();
+      new.created_at := now();
+    end if;
+    return new;
+  end if;
+
+  new.id           := old.id;
+  new.actividad_id := old.actividad_id;
+  new.url          := old.url;
+  new.subida_por   := old.subida_por;
+  new.created_at   := old.created_at;
+  return new;
+end $$;
+
+drop trigger if exists sellar_foto on public.fotos;
+create trigger sellar_foto before insert or update on public.fotos
+  for each row execute function privado.sellar_foto();
+
+-- ---- actividades ----
+-- El cierre se sella en la transición a `realizada`, que es el momento en que el brigadista
+-- pierde el acceso. Esa fecha es la prueba de cuándo lo perdió, así que no la escribe el cliente.
+create or replace function privado.sellar_actividad()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    if auth.uid() is not null then
+      new.created_by := auth.uid();
+      new.created_at := now();
+    end if;
+    if new.estatus <> 'realizada' then
+      new.cerrada_en  := null;
+      new.cerrada_por := null;
+    end if;
+    return new;
+  end if;
+
+  new.id         := old.id;
+  new.created_by := old.created_by;
+  new.created_at := old.created_at;
+
+  if new.estatus = 'realizada' and old.estatus <> 'realizada' then
+    new.cerrada_en  := now();
+    new.cerrada_por := coalesce(auth.uid(), new.cerrada_por);
+  elsif new.estatus <> 'realizada' then
+    new.cerrada_en  := null;
+    new.cerrada_por := null;
+  else
+    new.cerrada_en  := old.cerrada_en;
+    new.cerrada_por := old.cerrada_por;
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists sellar_actividad on public.actividades;
+create trigger sellar_actividad before insert or update on public.actividades
+  for each row execute function privado.sellar_actividad();
+
+-- ---- representantes_casilla ----
+-- Aquí no hay telefono_raw: el cliente escribe telefono_norm directo, así que se normaliza en su
+-- sitio para que lo guardado sea canónico aunque se teclee con guiones o con lada.
+create or replace function privado.sellar_representante()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  new.telefono_norm := privado.normalizar_telefono(new.telefono_norm);
+
+  if tg_op = 'INSERT' then
+    if auth.uid() is not null then
+      new.registrado_por := auth.uid();
+      new.created_at     := now();
+    end if;
+    return new;
+  end if;
+
+  new.id             := old.id;
+  new.registrado_por := old.registrado_por;
+  new.created_at     := old.created_at;
+  return new;
+end $$;
+
+drop trigger if exists sellar_representante on public.representantes_casilla;
+create trigger sellar_representante before insert or update on public.representantes_casilla
+  for each row execute function privado.sellar_representante();
+
+-- ---- importaciones ----
+-- Una carga masiva cambia el padrón de golpe; quién respondió por ella no es negociable.
+create or replace function privado.sellar_importacion()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    if auth.uid() is not null then
+      new.importada_por := auth.uid();
+      new.created_at    := now();
+    end if;
+    return new;
+  end if;
+
+  new.id            := old.id;
+  new.importada_por := old.importada_por;
+  new.created_at    := old.created_at;
+  return new;
+end $$;
+
+drop trigger if exists sellar_importacion on public.importaciones;
+create trigger sellar_importacion before insert or update on public.importaciones
+  for each row execute function privado.sellar_importacion();
+
+-- ---- seguimientos, solicitudes, casillas ----
+-- Solo la fecha de captura. El resto de sus columnas son decisiones de quien captura, no hechos
+-- que el sistema conozca.
+create or replace function privado.sellar_fecha_captura()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    if auth.uid() is not null then new.created_at := now(); end if;
+    return new;
+  end if;
+  new.created_at := old.created_at;
+  return new;
+end $$;
+
+drop trigger if exists sellar_fecha_captura on public.seguimientos;
+create trigger sellar_fecha_captura before insert or update on public.seguimientos
+  for each row execute function privado.sellar_fecha_captura();
+
+drop trigger if exists sellar_fecha_captura on public.solicitudes;
+create trigger sellar_fecha_captura before insert or update on public.solicitudes
+  for each row execute function privado.sellar_fecha_captura();
+
+drop trigger if exists sellar_fecha_captura on public.casillas;
+create trigger sellar_fecha_captura before insert or update on public.casillas
+  for each row execute function privado.sellar_fecha_captura();
+
+-- ---- usuarios ----
+-- Dos cosas: la fecha de alta, y el candado del último administrador.
+--
+-- El candado existe porque no hay servidor de correo. Un admin que se degrada o se desactiva
+-- siendo el único activo deja la plataforma sin nadie que pueda reponer una contraseña, incluida
+-- la suya, y sin forma de recuperarla. Se comprueba sobre el estado ANTERIOR del renglón para que
+-- la cuenta de un segundo admin desbloquee la operación en cuanto exista.
+create or replace function privado.sellar_usuario()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    if auth.uid() is not null then new.created_at := now(); end if;
+    return new;
+  end if;
+
+  new.id         := old.id;
+  new.created_at := old.created_at;
+
+  if old.rol = 'admin' and old.activo
+     and (new.rol <> 'admin' or not new.activo)
+     and (select count(*) from public.usuarios u where u.rol = 'admin' and u.activo) <= 1 then
+    raise exception 'Eres el único administrador activo. Da de alta a otro antes de cambiar tu rol o desactivarte.'
+      using errcode = 'P0001';
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists sellar_usuario on public.usuarios;
+create trigger sellar_usuario before insert or update on public.usuarios
+  for each row execute function privado.sellar_usuario();
+
+-- Ninguna de estas funciones se llama a mano. Postgres otorga EXECUTE a PUBLIC en toda función
+-- nueva y PUBLIC incluye a anon, así que se revoca igual que en la sección 2.
+revoke all on function privado.normalizar_telefono(text) from public;
+revoke all on function privado.sellar_persona() from public;
+revoke all on function privado.sellar_participacion() from public;
+revoke all on function privado.sellar_foto() from public;
+revoke all on function privado.sellar_actividad() from public;
+revoke all on function privado.sellar_representante() from public;
+revoke all on function privado.sellar_importacion() from public;
+revoke all on function privado.sellar_fecha_captura() from public;
+revoke all on function privado.sellar_usuario() from public;
+
+-- ---------------------------------------------------------------------------
+-- 11. Reportes del territorio
+-- ---------------------------------------------------------------------------
+-- Mismo modelo que el resto del sistema: el administrador ve todo y cualquier otro rol ve lo suyo.
+--   · Levantar: cualquier usuario activo, a nombre propio. El trigger sella el autor.
+--   · Ver: el administrador, todos; los demás, solo los que levantaron ellos.
+--   · Marcar como atendido: solo el administrador. Va por UPDATE normal porque el trigger deja
+--     tocar únicamente `atendido`: categoría, descripción, punto, autor y fecha no se reescriben.
+--   · Borrar: solo el administrador. La interfaz no lo ofrece; atendido es la salida normal.
+
+create or replace function privado.sellar_reporte_territorio()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    new.descripcion := btrim(new.descripcion);
+    -- El punto manda, igual que en personas: la sección no se le pide a nadie.
+    new.seccion_clave := public.seccion_por_punto(new.lng, new.lat);
+    new.demarcacion_id := (select s.demarcacion_id from public.secciones s
+                            where s.clave = new.seccion_clave);
+    if auth.uid() is not null then
+      new.levantado_por := auth.uid();
+      new.created_at    := now();
+    end if;
+    -- Un reporte nace pendiente, siempre.
+    new.atendido    := false;
+    new.atendido_en := null;
+    new.atendido_por := null;
+    return new;
+  end if;
+
+  new.id             := old.id;
+  new.categoria      := old.categoria;
+  new.descripcion    := old.descripcion;
+  new.lat            := old.lat;
+  new.lng            := old.lng;
+  new.precision_m    := old.precision_m;
+  new.seccion_clave  := old.seccion_clave;
+  new.demarcacion_id := old.demarcacion_id;
+  new.levantado_por  := old.levantado_por;
+  new.created_at     := old.created_at;
+
+  if new.atendido and not old.atendido then
+    new.atendido_en  := now();
+    new.atendido_por := coalesce(auth.uid(), new.atendido_por);
+  elsif not new.atendido then
+    new.atendido_en  := null;
+    new.atendido_por := null;
+  else
+    new.atendido_en  := old.atendido_en;
+    new.atendido_por := old.atendido_por;
+  end if;
+  return new;
+end $$;
+
+revoke all on function privado.sellar_reporte_territorio() from public;
+
+drop trigger if exists sellar_reporte_territorio on public.reportes_territorio;
+create trigger sellar_reporte_territorio before insert or update on public.reportes_territorio
+  for each row execute function privado.sellar_reporte_territorio();
+
+alter table public.reportes_territorio enable row level security;
+revoke all on public.reportes_territorio from anon;
+
+-- `levantado_por = (select auth.uid())`: la envoltura va alrededor de auth.uid(), que no toca
+-- columnas, y la columna queda afuera. Ver la regla 1 de la sección 8.
+create policy reportes_territorio_select on reportes_territorio for select to authenticated
+  using ((select privado.es_admin()) or levantado_por = (select auth.uid()));
+create policy reportes_territorio_insert on reportes_territorio for insert to authenticated
+  with check ((select privado.es_usuario_activo()) and levantado_por = (select auth.uid()));
+create policy reportes_territorio_update on reportes_territorio for update to authenticated
+  using ((select privado.es_admin())) with check ((select privado.es_admin()));
+create policy reportes_territorio_delete on reportes_territorio for delete to authenticated
+  using ((select privado.es_admin()));

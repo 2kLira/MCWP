@@ -510,11 +510,12 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
 
 63. **Dos cosas de configuración que no se pueden hacer por SQL.**
 
-    - La protección contra contraseñas filtradas (HaveIBeenPwned) está **apagada**. El asesor de
-      seguridad la marca. Se activa en Authentication → Policies del tablero de Supabase. Conviene
-      subir ahí mismo el mínimo de longitud de contraseña.
-    - Los cuatro brigadistas se crearon con correos inventados del dominio `soet.local`
-      (`brigadista1@soet.local` … `brigadista4@soet.local`), que no es un dominio que exista. Sirve
+    - Hay ajustes de Authentication que solo se tocan en el tablero y que quedan anotados, sin su
+      estado, en `AUDITORIA-SEGURIDAD.md`. **Este archivo está versionado en un repositorio
+      público: el estado de un control de seguridad no se escribe aquí.** Lo que sí va aquí es la
+      decisión: esos ajustes los aplica el administrador en el tablero, no se pueden automatizar
+      por SQL, y hay que revisarlos al montar cualquier instancia nueva.
+    - Los cuatro brigadistas se crearon con correos de un dominio inventado, que no existe. Sirve
       para entrar, pero **no hay recuperación de contraseña posible**: si uno la olvida, el admin se
       la tiene que reponer. Falta decidir si se les dan correos reales o si el método de acceso
       cambia a teléfono con código, que era la opción con costo de SMS.
@@ -572,11 +573,11 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     líder, dueño y administrador sea Carlos Lira. El nombre no estaba en ningún archivo del
     proyecto, solo en la base.
 
-    `Carlos Lira` (`carloslira@soet.local`) es ahora el único administrador activo. La cuenta
-    anterior se renombró a "Cuenta de respaldo" y se desactivó **en lugar de borrarla**, porque es
-    la única del sistema con correo real y por tanto la única vía de recuperación si se pierde la
-    contraseña de Carlos, que usa un dominio inexistente. Está pendiente decidir si se borra del
-    todo, aceptando quedarse sin esa red.
+    `Carlos Lira` es el administrador general. La cuenta anterior se renombró a "Cuenta de
+    respaldo" y se desactivó **en lugar de borrarla**, porque es la única del sistema con correo
+    real y por tanto la única vía de recuperación si se pierde la contraseña del admin, que usa un
+    dominio inexistente. Está pendiente decidir si se borra del todo, aceptando quedarse sin esa
+    red.
 
     **Queda un lugar sin limpiar:** la autoría de git. Los commits ya empujados llevan el nombre y
     el correo anteriores, y reescribir historia publicada no se hizo sin pedirlo. Para los commits
@@ -636,3 +637,192 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
   siendo del administrador, que ve el texto ya escrito y puede ajustarlo. Queda abierto: es un solo
   campo compartido, así que si dos brigadistas de la misma actividad escriben, gana el último
   que guarda. Si el cliente quiere una conclusión por brigadista, hace falta una tabla aparte.
+
+- **El administrador puede eliminar actividades (10 de octubre de 2026).** Pedido del cliente.
+  Es borrado real, no baja lógica: se lleva la actividad, sus invitaciones, fotos (renglón y
+  archivo), participaciones, menciones, solicitudes y las personas que se registraron por primera
+  vez en ella. Se conservan, y solo pierden el vínculo de origen, las personas que además
+  participaron en otra actividad, tienen seguimiento o son representantes de casilla. Pide dos
+  confirmaciones: ver el resumen que cuenta la base y escribir ELIMINAR. Para que se pudiera
+  vaciar `actividad_origen`, `privado.sellar_persona` tiene ahora una excepción acotada a la
+  transacción de `eliminar_actividad`; ver el comentario en seguridad.sql.
+
+- **Exportar a Excel (10 de octubre de 2026).** Pedido del cliente. Pantalla `/exportar` con un
+  archivo .xlsx de verdad: una hoja por tabla, encabezado congelado, filtros y fechas como fecha.
+  Se escribe sin librería (`lib/xlsx.ts`, un ZIP sin compresión con el XML mínimo) para no sumar
+  dependencias. La ven el administrador y los responsables de demarcación, el mismo criterio que la
+  carga masiva; RLS recorta los renglones. Seguimiento y representantes solo se ofrecen al
+  administrador porque a otros roles les saldrían vacías. Pendiente de la revisión legal: un
+  archivo descargado queda fuera de RLS y de cualquier política de retención; la pantalla lo
+  advierte, pero no hay bitácora de quién exportó qué.
+
+69. **Ronda de endurecimiento del 10 de octubre de 2026.** Salió de la auditoría de seguridad; el
+    informe con los 17 hallazgos y su estado está en `AUDITORIA-SEGURIDAD.md`, que **no se
+    versiona a propósito**: este repositorio es público y un inventario de huecos abiertos no se
+    publica.
+
+    Lo que se cambió, y las decisiones que hay detrás:
+
+    - **Sección 10 de `supabase/seguridad.sql`: nueve triggers de sellado.** Es la corrección de
+      fondo. RLS decide qué renglón tocas, **no qué columna**, y el grant es por tabla, así que
+      `authenticated` tenía UPDATE sobre todas las columnas: `registrada_por`, `promovido_por`,
+      `created_at`, `telefono_norm` y la sección los afirmaba el cliente. Ahora los calcula la
+      base. Son `SECURITY DEFINER` porque resolver la sección desde la coordenada necesita leer
+      `secciones_geom`, y al brigadista el catálogo está cerrado; con `INVOKER` devolvería null
+      justo para quien captura en la calle. Viven en `privado` y con `EXECUTE` revocado a PUBLIC.
+      Todos llevan la guarda `auth.uid() is not null`: sin sesión quien escribe es la llave
+      secreta —sembrado, respaldo, consola— y ahí no se impone autoría, porque una restauración
+      necesita conservar las originales.
+
+    - **La baja de un usuario dejó de ser un `update` desde el navegador.** Pasó a
+      `app/api/admin/usuarios/[id]/activo/route.ts`, que además suspende la cuenta de acceso con
+      `ban_duration`. Motivo medido: `activo = false` cerraba los datos en el acto pero **no la
+      sesión**, y el refresh token seguía emitiendo tokens. Se usa la suspensión y no
+      `admin.signOut` porque `signOut` recibe el JWT de esa persona, que el admin no tiene ni debe
+      tener.
+
+    - **Candado del último administrador**, en `privado.sellar_usuario` y no en el handler, para
+      que también cubra el `update` directo y la consola de Supabase. Sin servidor de correo, una
+      plataforma sin admin activo no tiene forma de reponer ninguna contraseña.
+
+    - **`lib/sesion.ts`**, con los atributos de la cookie compartidos por los tres clientes.
+      Trampa que hay que recordar: **`@supabase/ssr` ignora el `maxAge` que se le pasa** —vuelve a
+      poner sus 400 días después de aplicar los nuestros, en las dos rutas de escritura de
+      `cookies.js`—. Por eso el recorte a 30 días se impone además en `proxy.ts`, y solo hacia
+      abajo, porque un `maxAge` de 0 es el borrado al salir. `secure` solo en producción: en
+      `http://localhost` una cookie `Secure` no se guarda y el login dejaría de funcionar.
+
+    - **`textoDeBusqueda()` en `lib/datos/cliente.ts`**, aplicado en los cinco puntos de búsqueda.
+      Quita en lugar de escapar, y es deliberado: escapar exige dos pasadas que se pisan —la barra
+      de LIKE y la de las comillas de PostgREST—. Conserva acentos, ñ, apóstrofo y guion.
+
+    - **`lib/csv.ts`**: neutraliza las fórmulas, pero **no** los números negativos, que se
+      detectan con `Number.isFinite` para que la hoja siga sumándolos.
+
+    - URL firmadas de 3600 a 300 segundos. `next@16.4.0` y `eslint-config-next@16.4.0`, fijados
+      **sin caret** porque `AGENTS.md` avisa que este Next trae cambios de ruptura. Cinco
+      dependencias muertas fuera, y con ellas `components/ui/button.tsx`, su único consumidor.
+      `Cross-Origin-Resource-Policy` añadido; **sin `report-to`**, porque no hay endpoint que
+      recoja los informes y una cabecera que apunta a ningún lado es otra promesa falsa.
+
+    - `supabase/verificacion.sql` gana cuatro comprobaciones: que cada tabla con autoría tenga su
+      trigger, que las funciones de sellado estén fuera de `public` con `search_path` fijado, que
+      la normalización del teléfono en la base dé lo mismo que en TypeScript, y el candado del
+      último admin.
+
+    **Lo que sigue abierto y no es trabajo de programación:** cerrar el registro público, encender
+    la protección contra contraseñas filtradas y subir el mínimo de longitud, los tres en el
+    tablero de Supabase; y **rotar las cinco contraseñas**, que es lo único que cierra que los
+    correos de las cuentas estén en la historia de un repositorio público. Redactar el archivo no
+    borra los commits.
+
+    **Y una decisión pendiente con ventana corta:** validar los bytes de las fotos en el servidor.
+    Hoy la cubeta compara el `Content-Type` que declara el cliente, así que una subida directa por
+    API puede meter un JPEG con su EXIF intacto —coordenadas GPS e identificador de dispositivo—
+    saltándose el compresor, que es lo único que lo quita. La cubeta está vacía: hacerlo ahora no
+    cuesta migración, después sí.
+
+70. **Las fotos ya no se suben directo a Storage.** Segunda mitad de la ronda de endurecimiento,
+    11 de octubre de 2026.
+
+    El motivo, medido y no supuesto: con una sesión real de brigadista, un `POST` directo a la API
+    de Storage con texto plano y la cabecera `content-type: image/webp` **subió con 200**. La
+    cubeta compara el tipo que declara el cliente, no los bytes, y el compresor del navegador —que
+    sí valida de verdad, porque `createImageBitmap` decodifica y el reencode por canvas tira los
+    bytes originales— es código de cliente, o sea opcional.
+
+    Ahora va por `app/api/fotos/route.ts` y **se quitó la política `almacen_fotos_insert`**, así
+    que no queda un segundo camino sin validar. Decisiones que vale dejar escritas:
+
+    - **La autorización no se reimplementó en el handler.** Le pregunta a la base con el cliente de
+      la petición si alcanza esa actividad abierta; si RLS no se la entrega, no puede subirle fotos.
+      Misma fuente de verdad que `privado.actividad_abierta_mia`.
+    - **El nombre del archivo lo pone el servidor.** La ruta es lo que las políticas de lectura usan
+      para decidir quién ve la foto, así que no la elige el cliente. El prefijo se valida contra una
+      lista de tres (`inicio`, `cierre`, `galeria`); cualquier otra cosa cae en `galeria`.
+    - **Sin librería de imágenes.** `sharp` está en el árbol como transitiva de Next, pero
+      declararla exigía anotarlo aquí primero, y no hace falta: recortar segmentos de un JPEG o
+      chunks de un RIFF es caminar una lista encadenada, no decodificar la imagen. Está en
+      `lib/api/imagen.ts`.
+    - **APP0 del JPEG se conserva.** Es el JFIF, solo densidad de píxeles, y es justo lo que
+      escribe `canvas.toBlob("image/jpeg")` en Safari. Se recortan APP1 a APP15 y los comentarios,
+      que es donde viven EXIF, XMP, ICC y los bloques de Adobe.
+    - En WebP se recortan los chunks `EXIF`, `XMP ` e `ICCP` **y se apagan sus banderas en VP8X**,
+      o el archivo quedaría anunciando metadatos que ya no están. El WebP que produce `canvas` es
+      de forma simple y no tiene metadatos: ese camino sale del limpiador con los bytes intactos,
+      byte por byte, y la parte que reescribe solo corre con archivos que vienen de otro lado.
+    - `avisoDeAlmacenamiento()` y `rutaDeFoto()` se quedaron sin consumidores y se fueron con esto:
+      los rechazos ahora los traduce el handler y la ruta la nombra el servidor.
+
+    **Comprobación cruzada que estaba pendiente desde la maqueta, ya hecha:** el punto en polígono
+    del cliente (`lib/territorio.ts`) y el de la base (`seccion_por_punto`) coinciden en cinco
+    puntos, incluidos dos fuera de toda geometría. Y desde el sellado de columnas **manda el de la
+    base**: el trigger sobrescribe la sección que mande el cliente cuando hay coordenada. El del
+    cliente sigue sirviendo para pintar la sección antes de guardar, sin esperar un viaje.
+
+    **Pérdida de datos que causé y conviene que quede anotada:** al limpiar los objetos de prueba
+    borré por prefijo toda la carpeta de la actividad, y con ellos las dos fotos reales de inicio y
+    cierre que se habían subido el 9 de octubre. Los renglones de `fotos` siguen ahí apuntando a
+    objetos que ya no existen. Hay que volver a subirlas o borrar esos dos renglones. La lección es
+    la obvia: un borrado por prefijo no distingue lo que uno puso de lo que ya estaba.
+
+- **Capturas por usuario en la pantalla de Usuarios (11 de octubre de 2026).** Pedido del cliente.
+  Columna "Personas registradas" con total, hoy, últimos 7 días, asistencias y la última captura;
+  el encabezado ordena de quien más registró a quien menos. Lo cuenta la vista
+  `v_capturas_por_usuario` (security_invoker). "Hoy" es el día de America/Mexico_City. Se cuenta
+  por `personas.registrada_por`, o sea quién dio de alta a la persona; las asistencias a otras
+  actividades van aparte porque no son gente nueva. Una persona borrada al eliminar una actividad
+  deja de contar.
+
+- **Nombre en tres partes (11 de octubre de 2026).** Pedido del cliente. El registro pide
+  Nombre(s), Apellido paterno (obligatorio) y Apellido materno (opcional: hay quien tiene uno solo).
+  Se guardan en `personas.nombres`, `apellido_paterno` y `apellido_materno`; `nombre` sigue siendo
+  el nombre completo y lo arma `privado.sellar_persona`, así que búsquedas, listados, fichas y
+  vistas no cambiaron. El Excel de personas trae las tres columnas y se ordena por paterno,
+  materno y nombre con reglas del español. La única persona que existía ("Carlos Lira") se separó
+  a mano. Queda abierto: la carga masiva sigue recibiendo el nombre completo en una columna y no
+  lo parte, porque adivinar dónde empiezan los apellidos ("María del Carmen de la Cruz") metería
+  errores en datos reales; esas personas van al final del Excel. Si el cliente quiere partirlas,
+  la plantilla tendría que pedir las tres columnas.
+
+- **Levantar reporte del territorio (11 de octubre de 2026).** Pedido del cliente. Pantalla
+  `/levantar-reporte`: el usuario elige una de trece categorías y escribe la descripción; la
+  ubicación sale del GPS (se vuelve a leer al guardar) y autor, fecha, sección y demarcación los
+  sella `privado.sellar_reporte_territorio`. Sin ubicación no se guarda y se explica cómo dar el
+  permiso. Tabla `reportes_territorio`, sección 11 de seguridad.sql. Los pendientes salen en el
+  mapa como marcadores con el icono de su categoría, en neutro y no en naranja (el naranja es de
+  la escala del mapa); se esconden en la vista de casillas. "Marcar como atendido" lo hace solo
+  el administrador y el reporte deja de pedirse, así que no vuelve al recargar.
+  Decisiones que no venían en el pedido:
+  · En la barra inferior del celular aparece solo para el brigadista (le sobraban lugares). Los
+    demás roles ya tienen cinco y lo encuentran en Más y en el riel de escritorio.
+  · Quién ve qué sigue la regla del resto del sistema: el administrador todos, los demás solo los
+    suyos. Un responsable no ve los reportes de su territorio. Si el cliente lo quiere, hay que
+    decidir primero el alcance territorial de los responsables, que hoy no existe en RLS.
+  · Atender no borra: queda guardado quién lo atendió y cuándo, para un reporte futuro.
+
+- **Cierre de pendientes de código (12 de octubre de 2026).** Revisados contra el código y la base,
+  no contra este archivo:
+  · **55, resuelta.** El riel de escritorio (`components/navegacion/dock.tsx`) ya trae Registrar
+    representante, Carga masiva, Exportar y Levantar reporte. Causa de fondo: el riel se arma con
+    una lista fija y todo destino que no estuviera en ella desaparecía sin avisar. Ahora cualquier
+    destino que falte en `GRUPOS` sale al final. Con todo, el riel del administrador ya no cabe en
+    una pantalla de 720 de alto: se desplaza por dentro, y las etiquetas van en un portal para que
+    el desplazamiento no las recorte.
+  · **65, resuelta.** `personas.recibio_apoyo` se soltó de la base. Antes se comprobó que ninguna
+    rama publicada (main, soet) ni ninguna vista o función la usaba, y que ningún renglón la tenía
+    en verdadero. El Excel de personas, que la había vuelto a usar, ya no la pide.
+  · **70, resuelta.** Los dos renglones de `fotos` que apuntaban a archivos borrados (inicio y
+    cierre de "Recorrido por la colonia Reforma") se borraron. La actividad sigue en curso: se
+    pueden volver a subir desde su ficha.
+  · **52, resuelta.** `components/tablero/indicador.tsx` borrado; nadie lo importaba.
+  · **37 y 38 ya estaban resueltas** en `v_demarcacion_resumen` y `v_seccion_resumen`
+    (`tiene_geometria`), sin anotarse aquí. También 21 (el trigger sella `promovido_por`), 39 (el
+    tablero ya pasa `estatusVisibles`) y 40 (la agenda ya recorta en la consulta).
+  · **Lint en cero errores.** Cuatro buscadores limpiaban estado dentro de un efecto; ahora guardan
+    la respuesta junto con lo que la produjo y derivan "buscando" y los resultados al pintar. En
+    `formulario-representante.tsx` eso destapó un error real: la búsqueda de nombre leía la
+    sección de la casilla desde una variable declarada después y fuera de las dependencias, así
+    que al cambiar de casilla seguía buscando en la sección anterior. Queda un solo aviso,
+    informativo: el compilador de React no optimiza la lista virtual de Personas porque TanStack
+    Virtual no es compatible con él.

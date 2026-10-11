@@ -2,15 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera } from "lucide-react";
-import { clienteSupabase } from "@/lib/supabase";
 import { agregarFoto, type Foto } from "@/lib/datos/actividades";
 import { comprimirFoto } from "@/components/actividades/comprimir";
-import {
-  avisoDeAlmacenamiento,
-  CUBETA_FOTOS,
-  firmarFotos,
-  rutaDeFoto,
-} from "@/lib/datos/almacenamiento";
+import { firmarFotos, subirFoto } from "@/lib/datos/almacenamiento";
 
 
 export function FotosActividad({
@@ -69,24 +63,13 @@ export function FotosActividad({
     }
 
     try {
-      const supabase = clienteSupabase();
-      if (!supabase) {
+      const subida = await subirFoto(actividadId, comprimida.archivo, "galeria");
+      if (!subida.ok) {
         setSubiendo(false);
-        setError("Este despliegue no está conectado a la base de datos.");
+        setError(subida.aviso);
         return;
       }
-
-      const ruta = rutaDeFoto(actividadId, comprimida.archivo);
-      const { error: errorSubida } = await supabase
-        .storage.from(CUBETA_FOTOS)
-        .upload(ruta, comprimida.archivo, { contentType: comprimida.archivo.type });
-
-      if (errorSubida) {
-        setSubiendo(false);
-        console.warn("Storage rechazó la subida:", errorSubida);
-        setError(avisoDeAlmacenamiento(errorSubida.message));
-        return;
-      }
+      const ruta = subida.ruta;
 
       // Se guarda la ruta, no una URL: el bucket es privado y las firmas caducan.
       const r = await agregarFoto({

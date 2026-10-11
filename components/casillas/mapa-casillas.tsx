@@ -268,7 +268,7 @@ export function MapaCasillas({
     const mapa = mapaRef.current;
     if (!mapa || !mapa.getSource(FUENTE_ID)) return;
     aplicarSeleccion(mapa, casillaSeleccionadaId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [casillaSeleccionadaId]);
 
   // Encuadre: lo dispara el filtro de sección de la pantalla, con la misma curva y duración de
@@ -289,7 +289,7 @@ export function MapaCasillas({
       easing: crearFuncionCurva(leerCurva("--curva")),
       maxZoom: encuadre ? 17 : MUNICIPIO.zoomSugerido,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [encuadre]);
 
   return (

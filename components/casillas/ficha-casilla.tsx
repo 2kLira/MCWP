@@ -208,8 +208,13 @@ function BloqueRepresentante({
     representante?.acreditacion ?? "pendiente",
   );
 
-  const [resultados, setResultados] = useState<PersonaEnLista[]>([]);
-  const [buscando, setBuscando] = useState(false);
+  // La respuesta se guarda con el texto y la sección que la produjeron; si cualquiera cambió, ya no
+  // le corresponde y no se muestra. Así nada se limpia dentro del efecto.
+  const [busqueda, setBusqueda] = useState<{
+    consulta: string;
+    seccion: string;
+    resultados: PersonaEnLista[];
+  } | null>(null);
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
   const [guardando, setGuardando] = useState(false);
@@ -218,37 +223,31 @@ function BloqueRepresentante({
 
   // Buscador de personas ya registradas: mismo patrón (con retardo) que el promotor del registro
   // rápido. Se apaga en cuanto ya hay una persona elegida, para no seguir sugiriendo.
+  const consulta = nombre.trim();
+  const busca = !personaId && consulta.length >= 2;
+  const vigenteRespuesta = busqueda?.consulta === consulta && busqueda.seccion === seccionClave;
+  const buscando = busca && !vigenteRespuesta;
+  const resultados = busca && vigenteRespuesta ? busqueda!.resultados : [];
+
   useEffect(() => {
-    if (personaId) {
-      setResultados([]);
-      return;
-    }
-    const consulta = nombre.trim();
-    if (consulta.length < 2) {
-      setResultados([]);
-      setBuscando(false);
-      return;
-    }
+    if (!busca) return;
     let vigente = true;
-    setBuscando(true);
     const temporizador = setTimeout(() => {
       coincidenciasPorNombre(consulta, seccionClave).then((r) => {
-        if (!vigente) return;
-        setResultados(r.datos);
-        setBuscando(false);
+        if (vigente) setBusqueda({ consulta, seccion: seccionClave, resultados: r.datos });
       });
     }, 250);
     return () => {
       vigente = false;
       clearTimeout(temporizador);
     };
-  }, [nombre, personaId, seccionClave]);
+  }, [consulta, busca, seccionClave]);
 
   function alElegirPersona(persona: PersonaEnLista) {
     setNombre(persona.nombre);
     setPersonaId(persona.id);
     if (persona.telefono_norm) setTelefono(formatearTelefono(persona.telefono_norm));
-    setResultados([]);
+    setBusqueda(null);
     setMostrarResultados(false);
   }
 

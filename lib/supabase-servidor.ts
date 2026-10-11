@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { OPCIONES_COOKIE_SESION } from "@/lib/sesion";
 
 /**
  * Cliente de servidor, con la llave publicable y la sesión de la petición.
@@ -24,6 +25,7 @@ export async function clienteServidor(): Promise<SupabaseClient | null> {
   const almacen = await cookies();
 
   return createServerClient(url, publicable, {
+    cookieOptions: OPCIONES_COOKIE_SESION,
     cookies: {
       getAll() {
         return almacen.getAll();

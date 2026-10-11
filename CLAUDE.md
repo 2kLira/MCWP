@@ -63,19 +63,33 @@ calendario se arma con una rejilla propia.
 ## Estructura
 
 ```
+proxy.ts             portón de rutas y refresco de sesión. En Next 16 ya NO se llama middleware.ts
 app/                 rutas del App Router
+app/(entrada)/       /entrar y /salir, fuera del cromo y del proveedor de identidad
+app/(aplicacion)/    las pantallas, con riel, barras y proveedor
+app/api/admin/       handlers que exigen la llave secreta: alta, contraseña y baja de usuarios
+app/api/fotos/       subida de fotos: valida los bytes y quita metadatos en el servidor
 components/          componentes de interfaz
 components/mapa/     todo lo de MapLibre, aislado
-lib/territorio.ts    punto en polígono, normalización de teléfono, resolución de dirección
-lib/supabase.ts      cliente
+lib/supabase.ts            cliente de navegador
+lib/supabase-servidor.ts   cliente por petición, con la sesión de las cookies
+lib/supabase-administrador.ts  llave secreta. Lleva `import "server-only"` en la primera línea
+lib/sesion.ts        atributos de la cookie de sesión, compartidos por los tres clientes
+lib/api/             portones de los handlers y validación de imágenes
+lib/puertas-ui.ts    cosmética: qué botones se pintan. NO es seguridad, ver su encabezado
+lib/territorio.ts    punto en polígono en el cliente, normalización de teléfono, direcciones
 data/                secciones.geojson, colonias.geojson, demarcaciones.json
-supabase/schema.sql    estructura, consolidada
-supabase/seguridad.sql permisos, RLS y políticas. Único punto de verdad de permisos
+supabase/schema.sql       estructura, consolidada
+supabase/seguridad.sql    permisos, RLS, políticas y sellado de columnas. Único punto de verdad
+supabase/verificacion.sql comprobaciones. Solo lee. Se corre al tocar seguridad.sql
 supabase/migraciones-maqueta-v1/  historia de la maqueta. No aplicar, ver LEER.md
-scripts/sembrar.ts   sembrado
+scripts/sembrar.ts   sembrado. NO se vuelve a correr: inventa gente y la base ya es real
 spec/                los tres documentos de especificación
 PENDIENTES.md        decisiones que no estaban en el spec
 ```
+
+`lib/permisos.ts` ya no existe. Hacía dos cosas a la vez —recortar consultas y esconder botones— y
+competía con las políticas. Lo cosmético quedó en `lib/puertas-ui.ts`; el recorte lo hace RLS.
 
 ## Cartografía
 

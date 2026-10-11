@@ -5,9 +5,11 @@ import {
   ClipboardCheck,
   ClipboardList,
   Ellipsis,
+  FileSpreadsheet,
   LayoutDashboard,
   ListChecks,
   Map,
+  MapPinPlus,
   Upload,
   UserCog,
   UserPlus,
@@ -18,7 +20,9 @@ import type { Route } from "next";
 import {
   puedeCrear,
   puedeEncabezarActividad,
+  puedeExportar,
   puedeImportar,
+  puedeLevantarReporte,
   puedeVerListadosGenerales,
   puedeVerUsuarios,
 } from "@/lib/puertas-ui";
@@ -80,6 +84,12 @@ export const DESTINOS: readonly Destino[] = [
     visible: (usuario) => puedeCrear(usuario, "persona"),
   },
   {
+    href: "/levantar-reporte",
+    etiqueta: "Levantar reporte",
+    icono: MapPinPlus,
+    visible: puedeLevantarReporte,
+  },
+  {
     href: "/registrar-representante",
     etiqueta: "Registrar representante",
     icono: ClipboardCheck,
@@ -92,6 +102,12 @@ export const DESTINOS: readonly Destino[] = [
     etiqueta: "Carga masiva",
     icono: Upload,
     visible: puedeImportar,
+  },
+  {
+    href: "/exportar",
+    etiqueta: "Exportar a Excel",
+    icono: FileSpreadsheet,
+    visible: puedeExportar,
   },
   {
     href: "/usuarios",
@@ -129,14 +145,29 @@ export const DESTINOS_CELULAR: readonly Destino[] = [
     icono: UserPlus,
     visible: (usuario) => puedeCrear(usuario, "persona"),
   },
+  // Solo en la barra del brigadista: a él le sobran dos lugares y es su segunda acción de campo.
+  // Los demás roles ya llenan los cinco; a ellos les aparece en Más.
+  {
+    href: "/levantar-reporte",
+    etiqueta: "Reporte",
+    icono: MapPinPlus,
+    visible: (usuario) => usuario.rol === "brigadista" && puedeLevantarReporte(usuario),
+  },
   { href: "/mapa", etiqueta: "Mapa", icono: Map, visible: puedeVerListadosGenerales },
   { href: "/mas", etiqueta: "Más", icono: Ellipsis },
 ];
 
-/** Lo que queda fuera de la barra inferior y se muestra dentro de Más. */
-export const DESTINOS_EN_MAS: readonly Destino[] = DESTINOS.filter(
-  (d) => !DESTINOS_CELULAR.some((c) => c.href === d.href),
-);
+/**
+ * Lo que queda fuera de la barra inferior y se muestra dentro de Más. Se calcula por usuario,
+ * no de una vez: "Levantar reporte" está en la barra solo para el brigadista, y si se quitara
+ * de Más para todos, a los demás roles no les aparecería en ningún lado.
+ */
+export function destinosEnMas(usuario: UsuarioActuante): Destino[] {
+  const enBarra = destinosVisibles(DESTINOS_CELULAR, usuario);
+  return destinosVisibles(DESTINOS, usuario).filter(
+    (d) => !enBarra.some((c) => c.href === d.href),
+  );
+}
 
 export function destinosVisibles(
   destinos: readonly Destino[],

@@ -1,5 +1,6 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { OPCIONES_COOKIE_SESION } from "@/lib/sesion";
 
 /**
  * Cliente de navegador.
@@ -44,6 +45,8 @@ export function clienteSupabase(): SupabaseClient | null {
   const publicable = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !publicable) return null;
 
-  cliente = createBrowserClient(url, publicable);
+  cliente = createBrowserClient(url, publicable, {
+    cookieOptions: OPCIONES_COOKIE_SESION,
+  });
   return cliente;
 }
