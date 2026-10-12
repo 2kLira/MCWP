@@ -800,6 +800,11 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     suyos. Un responsable no ve los reportes de su territorio. Si el cliente lo quiere, hay que
     decidir primero el alcance territorial de los responsables, que hoy no existe en RLS.
   · Atender no borra: queda guardado quién lo atendió y cuándo, para un reporte futuro.
+  · (12 de octubre de 2026) Los reportes pasaron a su propia vista del mapa, "Reportes", la novena
+    del selector, en /mapa y en el mapa del tablero. Ya no flotan encima de las demás vistas: ahí
+    tapaban el color de las secciones, que es lo que esas vistas miden. En la vista de reportes las
+    secciones quedan atenuadas y sin clic, igual que en casillas, y la leyenda lista solo las
+    categorías con pendientes y cuántos hay de cada una.
 
 - **Cierre de pendientes de código (12 de octubre de 2026).** Revisados contra el código y la base,
   no contra este archivo:

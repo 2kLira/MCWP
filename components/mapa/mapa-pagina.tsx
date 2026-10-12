@@ -22,6 +22,7 @@ import {
   DATOS_MAPA_VACIOS,
   esIdentificadorDeVista,
   esVistaDeCasillas,
+  esVistaDeReportes,
   grupoDePrioritarias,
   type DatosMapa,
   type VistaMapa,
@@ -89,8 +90,8 @@ export function MapaPagina({
   const seleccionCasilla =
     seleccionCasillaCruda?.actuanteId === actuante.id ? seleccionCasillaCruda : null;
 
-  // Reportes del territorio pendientes. RLS decide cuáles: el administrador todos, los demás solo
-  // los suyos. Al marcar uno como atendido se quita de aquí sin volver a pedir la lista.
+  // Reportes del territorio pendientes, que pinta la vista "reportes". RLS decide cuáles: el
+  // administrador todos, los demás solo los suyos. Al marcar uno como atendido se quita de aquí sin volver a pedir la lista.
   const [reportes, setReportes] = useState<ReporteTerritorio[]>([]);
   const [reporteSeleccionadoId, setReporteSeleccionadoId] = useState<string | null>(null);
   const reporteSeleccionado = reporteSeleccionadoId
@@ -295,6 +296,8 @@ export function MapaPagina({
                 // Al salir de la vista de casillas, la casilla elegida se limpia: es la misma
                 // regla que ya separa la selección de sección de la de colonia.
                 if (!esVistaDeCasillas(nueva)) setSeleccionCasilla(null);
+                // Igual con el reporte: sus marcadores solo existen en la vista de reportes.
+                if (!esVistaDeReportes(nueva)) setReporteSeleccionadoId(null);
               }}
               enMovimiento={enMovimiento}
               className="pointer-events-auto max-w-full"
@@ -303,6 +306,7 @@ export function MapaPagina({
 
           <LeyendaMapa
             vista={vista}
+            reportes={reportes}
             enMovimiento={enMovimiento}
             sangradoIzquierdo={sangradoIzquierdo}
           />

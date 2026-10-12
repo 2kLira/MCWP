@@ -1,18 +1,19 @@
 /**
- * Datos reales de las ocho vistas del mapa.
+ * Datos reales de las nueve vistas del mapa.
  *
  * Las cifras salen de `seccionesResumen` (lib/datos/catalogos.ts), ya recortadas por RLS sobre la
  * vista. Este módulo no decide quién ve qué, solo
  * convierte lo que la base ya recortó en un paso de 0 a 4 por sección. Cinco vistas usan cortes por
  * cuantiles sobre los valores presentes; las dos de prioritarias no, ver `calcularPasosPrioritarias`.
- * La octava, casillas, no pinta polígono por dato: pinta puntos, ver `esVistaDeCasillas`.
+ * Las dos últimas, casillas y reportes, no pintan polígono por dato: pintan puntos, ver
+ * `esVistaDePuntos`.
  */
 
 import { seccionesResumen, type SeccionResumen } from "@/lib/datos/catalogos";
 import type { ColeccionSecciones } from "@/lib/territorio";
 import type { UsuarioActuante } from "@/lib/tipos";
 
-/** Las ocho vistas del mapa, en el orden en que aparecen en el selector. */
+/** Las nueve vistas del mapa, en el orden en que aparecen en el selector. */
 export type VistaMapa =
   | "estructura"
   | "personas"
@@ -21,7 +22,8 @@ export type VistaMapa =
   | "recorridos"
   | "prioritarias_a"
   | "prioritarias_b"
-  | "casillas";
+  | "casillas"
+  | "reportes";
 
 export const VISTAS_MAPA: ReadonlyArray<{ id: VistaMapa; etiqueta: string }> = [
   { id: "estructura", etiqueta: "Estructura" },
@@ -32,6 +34,7 @@ export const VISTAS_MAPA: ReadonlyArray<{ id: VistaMapa; etiqueta: string }> = [
   { id: "prioritarias_a", etiqueta: "Prioritarias A" },
   { id: "prioritarias_b", etiqueta: "Prioritarias B" },
   { id: "casillas", etiqueta: "Casillas" },
+  { id: "reportes", etiqueta: "Reportes" },
 ];
 
 /** El grupo de prioridad que pinta una vista, o null si no es una vista de prioritarias. */
@@ -49,6 +52,22 @@ export function grupoDePrioritarias(vista: VistaMapa): "A" | "B" | null {
  */
 export function esVistaDeCasillas(vista: VistaMapa): boolean {
   return vista === "casillas";
+}
+
+/**
+ * Si la vista pinta los reportes del territorio pendientes. Los marcadores solo se ven aquí: en
+ * las demás vistas competirían con el color de las secciones, que es lo que esas vistas miden.
+ */
+export function esVistaDeReportes(vista: VistaMapa): boolean {
+  return vista === "reportes";
+}
+
+/**
+ * Si la vista pinta puntos encima del territorio en vez de colorear secciones: casillas o
+ * reportes. En ambas las secciones quedan de fondo, atenuadas parejo y sin responder al clic.
+ */
+export function esVistaDePuntos(vista: VistaMapa): boolean {
+  return esVistaDeCasillas(vista) || esVistaDeReportes(vista);
 }
 
 /**
@@ -189,7 +208,8 @@ function metricaDeVista(vista: VistaMapa, dato: DatoSeccion | undefined): number
     case "prioritarias_b":
       return null; // no son de cuantiles, ver calcularPasosPrioritarias.
     case "casillas":
-      return null; // no pinta polígono por dato: cae en paso 0 parejo, ver calcularPasosDeVista.
+    case "reportes":
+      return null; // no pintan polígono por dato: caen en paso 0 parejo, ver calcularPasosDeVista.
   }
 }
 
@@ -214,9 +234,9 @@ function calcularPasosPrioritarias(datos: DatosMapa, grupo: "A" | "B"): Map<stri
  * El paso de 0 a 4 de cada sección presente en `datos` para una vista. La de estructura es
  * binaria (0 sin responsable, 4 con responsable); las de prioritarias son tres estados fijos, ver
  * `calcularPasosPrioritarias`; las demás salen de cuantiles sobre los valores presentes de esa
- * vista. La de casillas no tiene métrica propia (`metricaDeVista` le devuelve null parejo), así
- * que cae en paso 0 para todas: el color del polígono no importa ahí, mapa-lienzo.tsx la apaga con
- * `atenuada` para que los puntos de casilla se lean encima.
+ * vista. Las de casillas y reportes no tienen métrica propia (`metricaDeVista` les devuelve null
+ * parejo), así que caen en paso 0 para todas: el color del polígono no importa ahí, mapa-lienzo.tsx
+ * las apaga con `atenuada` para que los puntos se lean encima.
  */
 export function calcularPasosDeVista(
   vista: VistaMapa,

@@ -1,9 +1,17 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { CATEGORIAS_REPORTE } from "@/components/reportes/categorias";
+import type { ReporteTerritorio } from "@/lib/datos/reportes-territorio";
 import { cn } from "@/lib/utils";
-import { esVistaDeCasillas, grupoDePrioritarias, VISTAS_MAPA, type VistaMapa } from "./datos-mapa";
+import {
+  esVistaDeCasillas,
+  esVistaDeReportes,
+  grupoDePrioritarias,
+  VISTAS_MAPA,
+  type VistaMapa,
+} from "./datos-mapa";
 
 /** Las cinco vistas que se pintan con la escala de cinco pasos, por cuantiles. */
 const VISTAS_DE_ESCALA = new Set<VistaMapa>(["personas", "promovidos", "actividad", "recorridos"]);
@@ -63,6 +71,49 @@ function MuestraCasilla({
 }
 
 /**
+ * Las categorías que de verdad tienen reportes pendientes, en el orden del catálogo, con su
+ * conteo. Las que están en cero no se listan: trece renglones taparían medio mapa en un celular y
+ * la mayoría no diría nada. El icono va en el mismo círculo oscuro que el marcador del mapa
+ * (marcadores-reportes.tsx), para que la leyenda se lea como el mapa.
+ */
+function LeyendaReportes({ reportes }: { reportes: readonly ReporteTerritorio[] }) {
+  const presentes = useMemo(() => {
+    const conteo = new Map<string, number>();
+    for (const r of reportes) conteo.set(r.categoria, (conteo.get(r.categoria) ?? 0) + 1);
+    return CATEGORIAS_REPORTE.filter((c) => conteo.has(c.valor)).map((c) => ({
+      ...c,
+      cuantos: conteo.get(c.valor) ?? 0,
+    }));
+  }, [reportes]);
+
+  if (presentes.length === 0) {
+    return <p className="text-xs text-tinta-suave">No hay reportes pendientes.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-[11px] text-tinta-suave">
+        {reportes.length === 1 ? "1 pendiente" : `${reportes.length} pendientes`}
+      </p>
+      <ul className="flex max-h-56 flex-col gap-1.5 overflow-y-auto">
+        {presentes.map(({ valor, etiqueta, Icono, cuantos }) => (
+          <li key={valor} className="flex items-center gap-2 text-xs text-tinta">
+            <span
+              aria-hidden
+              className="grid size-5 shrink-0 place-items-center rounded-full bg-tinta text-fondo"
+            >
+              <Icono className="size-3" />
+            </span>
+            <span className="flex-1">{etiqueta}</span>
+            <span className="tabular-nums text-tinta-suave">{cuantos}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
  * Leyenda de la vista activa. Flota en vidrio sobre el mapa, esquina inferior izquierda: ahí no
  * choca con la barra superior, el resumen de prioritarias ni el selector de capas (los tres viven
  * arriba), ni con la ficha de sección (a la derecha en escritorio, hoja de abajo en celular) ni con
@@ -72,11 +123,13 @@ function MuestraCasilla({
  */
 export function LeyendaMapa({
   vista,
+  reportes,
   enMovimiento,
   sangradoIzquierdo = false,
   className,
 }: {
   vista: VistaMapa;
+  reportes: readonly ReporteTerritorio[];
   enMovimiento: boolean;
   sangradoIzquierdo?: boolean;
   className?: string;
@@ -145,6 +198,8 @@ export function LeyendaMapa({
             <MuestraCasilla tipo="vacia" etiqueta="Ninguno todavía" />
           </div>
         )}
+
+        {esVistaDeReportes(vista) && <LeyendaReportes reportes={reportes} />}
 
         {VISTAS_DE_ESCALA.has(vista) && (
           <div className="flex flex-col gap-1">

@@ -16,6 +16,8 @@ import { bboxDeRasgo, rasgoPorClave, type ColeccionSecciones, type RasgoSeccion 
 import {
   calcularPasosDeVista,
   esVistaDeCasillas,
+  esVistaDePuntos,
+  esVistaDeReportes,
   grupoDePrioritarias,
   type DatosMapa,
   type VistaMapa,
@@ -225,7 +227,7 @@ export type MapaLienzoProps = {
   casillas: readonly CasillaConRepresentantes[] | null;
   casillaSeleccionadaId: number | null;
   onClicCasilla: (id: number, puntoPantalla: { x: number; y: number }) => void;
-  /** Reportes del territorio pendientes. Se pintan en todas las vistas menos la de casillas. */
+  /** Reportes del territorio pendientes. Solo se pintan en la vista de reportes. */
   reportes: readonly ReporteTerritorio[];
   reporteSeleccionadoId: string | null;
   onClicReporte: (id: string) => void;
@@ -291,7 +293,6 @@ export function MapaLienzo({
     const pasos = calcularPasosDeVista(vistaActual, datosActuales);
     const esEstructura = vistaActual === "estructura";
     const grupoPrioritario = grupoDePrioritarias(vistaActual);
-    const esCasillas = esVistaDeCasillas(vistaActual);
     for (const rasgo of coleccionRef.current.features) {
       const clave = rasgo.properties.clave;
       const dato = datosActuales.porClave.get(clave);
@@ -301,7 +302,7 @@ export function MapaLienzo({
           valor: pasos.get(clave) ?? 0,
           seleccionada: clave === claveActual,
           hueco: esEstructura && dato != null && !dato.tieneResponsable,
-          atenuada: esCasillas || (grupoPrioritario != null && dato?.prioridad !== grupoPrioritario),
+          atenuada: esVistaDePuntos(vistaActual) || (grupoPrioritario != null && dato?.prioridad !== grupoPrioritario),
           prioritariaPendiente:
             grupoPrioritario != null && dato != null && dato.prioridad === grupoPrioritario && !dato.recorrida,
         },
@@ -590,17 +591,17 @@ export function MapaLienzo({
       });
 
       const capasSeccion = idsCapasRelleno();
-      // En la vista de casillas las secciones quedan de fondo, atenuadas: no responden al clic ni
-      // cambian el cursor, para que lo único "tocable" del mapa sean los puntos de casilla.
+      // En las vistas de casillas y de reportes las secciones quedan de fondo, atenuadas: no
+      // responden al clic ni cambian el cursor, para que lo único "tocable" sean los puntos.
       mapa.on("mouseenter", capasSeccion, () => {
-        if (esVistaDeCasillas(estadoRef.current.vista)) return;
+        if (esVistaDePuntos(estadoRef.current.vista)) return;
         mapa.getCanvas().style.cursor = "pointer";
       });
       mapa.on("mouseleave", capasSeccion, () => {
         mapa.getCanvas().style.cursor = "";
       });
       mapa.on("click", capasSeccion, (evento) => {
-        if (esVistaDeCasillas(estadoRef.current.vista)) return;
+        if (esVistaDePuntos(estadoRef.current.vista)) return;
         const clave = evento.features?.[0]?.properties?.clave as string | undefined;
         if (!clave) return;
         const rasgo = rasgoPorClave(clave, coleccionRef.current);
@@ -706,7 +707,7 @@ export function MapaLienzo({
         {
           valor: pasos.get(clave) ?? 0,
           hueco: esEstructura && dato != null && !dato.tieneResponsable,
-          atenuada: esCasillas || (grupoPrioritario != null && dato?.prioridad !== grupoPrioritario),
+          atenuada: esVistaDePuntos(vista) || (grupoPrioritario != null && dato?.prioridad !== grupoPrioritario),
           prioritariaPendiente:
             grupoPrioritario != null && dato != null && dato.prioridad === grupoPrioritario && !dato.recorrida,
         },
@@ -811,13 +812,15 @@ export function MapaLienzo({
       aria-label={
         esVistaDeCasillas(vista)
           ? "Mapa de casillas de Oaxaca de Juárez"
-          : "Mapa de secciones electorales de Oaxaca de Juárez"
+          : esVistaDeReportes(vista)
+            ? "Mapa de reportes del territorio de Oaxaca de Juárez"
+            : "Mapa de secciones electorales de Oaxaca de Juárez"
       }
     />
     <MarcadoresReportes
       mapa={mapaCargado}
       reportes={reportes}
-      visible={!esVistaDeCasillas(vista)}
+      visible={esVistaDeReportes(vista)}
       seleccionadoId={reporteSeleccionadoId}
       onClic={onClicReporte}
     />
