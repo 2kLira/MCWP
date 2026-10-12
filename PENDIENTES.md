@@ -805,6 +805,13 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     tapaban el color de las secciones, que es lo que esas vistas miden. En la vista de reportes las
     secciones quedan atenuadas y sin clic, igual que en casillas, y la leyenda lista solo las
     categorías con pendientes y cuántos hay de cada una.
+  · (12 de octubre de 2026) Foto opcional, una por reporte. Se comprime igual que la de
+    actividades (`comprimirFoto`) y sube por `/api/fotos` con `destino=reporte` a
+    `reportes/<id de quien lo levanta>/`. Se sube al guardar, antes del reporte, y la columna
+    `reportes_territorio.foto_ruta` guarda la ruta. El trigger rechaza rutas fuera de la carpeta
+    propia o que no existan en la cubeta, y la lectura de la cubeta sigue la regla de la tabla
+    (admin todas, cada quien las suyas). Hueco conocido: si la subida pasa y el insert del reporte
+    falla, la foto queda suelta en la cubeta sin nadie que la enlace; solo el admin la alcanza.
 
 - **Cierre de pendientes de código (12 de octubre de 2026).** Revisados contra el código y la base,
   no contra este archivo:

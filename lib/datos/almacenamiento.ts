@@ -88,7 +88,21 @@ export async function subirFoto(
   cuerpo.set("actividadId", actividadId);
   cuerpo.set("archivo", archivo);
   if (prefijo) cuerpo.set("prefijo", prefijo);
+  return enviarFoto(cuerpo);
+}
 
+/**
+ * Sube la foto de un reporte del territorio, antes de insertar el reporte. La carpeta la pone el
+ * servidor con el id de la sesión; aquí no se manda ningún id.
+ */
+export async function subirFotoReporte(archivo: File): Promise<SubidaFoto> {
+  const cuerpo = new FormData();
+  cuerpo.set("destino", "reporte");
+  cuerpo.set("archivo", archivo);
+  return enviarFoto(cuerpo);
+}
+
+async function enviarFoto(cuerpo: FormData): Promise<SubidaFoto> {
   try {
     const respuesta = await fetch("/api/fotos", { method: "POST", body: cuerpo });
     const datos = (await respuesta.json().catch(() => null)) as

@@ -30,6 +30,8 @@ export type ReporteTerritorio = {
   lat: number;
   lng: number;
   created_at: string;
+  /** Ruta de la foto en la cubeta `fotos`, o null si se levantó sin foto. Se firma al mostrarla. */
+  foto_ruta: string | null;
   /** El nombre de quien lo levantó. Null si RLS no deja leer a ese usuario. */
   autor: { nombre: string } | null;
 };
@@ -44,6 +46,8 @@ export type ReporteNuevo = {
   lat: number;
   lng: number;
   precision_m: number | null;
+  /** La ruta que devolvió `subirFotoReporte`. El trigger exige que sea de la carpeta propia. */
+  foto_ruta: string | null;
 };
 
 export function levantarReporte(reporte: ReporteNuevo): Promise<Resultado<{ id: string } | null>> {
@@ -57,7 +61,7 @@ export async function reportesPendientes(): Promise<Resultado<ReporteTerritorio[
   const { data, error } = await db()
     .from("reportes_territorio")
     .select(
-      "id, categoria, descripcion, lat, lng, created_at, autor:usuarios!reportes_territorio_levantado_por_fkey(nombre)",
+      "id, categoria, descripcion, lat, lng, created_at, foto_ruta, autor:usuarios!reportes_territorio_levantado_por_fkey(nombre)",
     )
     .eq("atendido", false)
     .order("created_at", { ascending: false })

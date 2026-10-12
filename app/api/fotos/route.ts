@@ -26,6 +26,12 @@ import { CUBETA_FOTOS } from "@/lib/datos/almacenamiento";
  *
  * La inserción en la tabla `fotos` sigue haciéndola el cliente con `agregarFoto`, bajo RLS. No se
  * movió a propósito: aquí solo se cierra el agujero de los bytes.
+ *
+ * Con `destino=reporte` sube la foto de un reporte del territorio. Ahí no hay actividad contra la
+ * cual preguntar: el reporte todavía no existe, se inserta después con la ruta que devuelve este
+ * handler. Basta la cuenta activa que ya exige el portón, y la carpeta es el id de la sesión
+ * (`reportes/<usuario>/`), nunca uno del cuerpo. El trigger `privado.sellar_reporte_territorio`
+ * rechaza cualquier ruta fuera de esa carpeta, y la lectura de la cubeta usa la misma regla.
  */
 
 /** Los mismos prefijos que usaba rutaDeFoto. Nada más, para que la ruta no la elija el cliente. */
@@ -45,6 +51,13 @@ export async function POST(peticion: Request) {
   const actividadId = formulario.get("actividadId");
   const prefijoCrudo = formulario.get("prefijo");
   const archivo = formulario.get("archivo");
+
+  if (formulario.get("destino") === "reporte") {
+    if (!(archivo instanceof File)) {
+      return json({ mensaje: "Falta la foto." }, 400);
+    }
+    return subirAlmacen(archivo, `reportes/${porton.usuarioId}`, "reporte");
+  }
 
   if (typeof actividadId !== "string" || !actividadId) {
     return json({ mensaje: "Falta la actividad." }, 400);
@@ -76,6 +89,11 @@ export async function POST(peticion: Request) {
     );
   }
 
+  return subirAlmacen(archivo, `actividades/${actividadId}`, prefijo);
+}
+
+/** Valida los bytes, quita metadatos y escribe con la llave secreta en `carpeta`. */
+async function subirAlmacen(archivo: File, carpeta: string, prefijo: string) {
   const limpia = validarYLimpiar(new Uint8Array(await archivo.arrayBuffer()));
   if (!limpia.ok) return json({ mensaje: limpia.error }, 400);
 
@@ -87,7 +105,7 @@ export async function POST(peticion: Request) {
   // El nombre lo pone el servidor, con marca de tiempo y azar: nunca se sobreescribe un objeto, y
   // por eso la cubeta tampoco necesita política de UPDATE.
   const azar = crypto.randomUUID().slice(0, 8);
-  const ruta = `actividades/${actividadId}/${prefijo}-${Date.now()}-${azar}.${limpia.extension}`;
+  const ruta = `${carpeta}/${prefijo}-${Date.now()}-${azar}.${limpia.extension}`;
 
   const { error } = await admin.storage
     .from(CUBETA_FOTOS)

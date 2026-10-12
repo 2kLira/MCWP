@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CircleCheck } from "lucide-react";
 import { Hoja } from "@/components/actividades/hoja";
 import { categoriaReporte } from "@/components/reportes/categorias";
+import { firmarFotos } from "@/lib/datos/almacenamiento";
 import { marcarReporteAtendido, type ReporteTerritorio } from "@/lib/datos/reportes-territorio";
 
 function fechaYHora(iso: string): string {
@@ -38,6 +39,21 @@ export function FichaReporte({
   const [marcando, setMarcando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // La cubeta es privada: la foto se firma al abrir la ficha y la firma caduca sola. Si no se
+  // puede firmar, se queda el esqueleto en vez de una imagen rota.
+  const [fotoFirmada, setFotoFirmada] = useState<string | null>(null);
+  useEffect(() => {
+    const ruta = reporte.foto_ruta;
+    if (!ruta) return;
+    let vivo = true;
+    void firmarFotos([ruta]).then((mapa) => {
+      if (vivo) setFotoFirmada(mapa.get(ruta) ?? null);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [reporte.foto_ruta]);
+
   async function atender() {
     if (marcando) return;
     setMarcando(true);
@@ -62,6 +78,20 @@ export function FichaReporte({
         </p>
 
         <p className="whitespace-pre-line text-sm text-tinta">{reporte.descripcion}</p>
+
+        {reporte.foto_ruta &&
+          (fotoFirmada ? (
+            <a href={fotoFirmada} target="_blank" rel="noreferrer" className="self-start">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={fotoFirmada}
+                alt={`Foto del reporte: ${etiqueta}`}
+                className="max-h-72 w-auto max-w-full rounded-tarjeta border border-borde object-cover"
+              />
+            </a>
+          ) : (
+            <div className="aspect-[4/3] w-full max-w-sm animate-pulse rounded-tarjeta bg-superficie-hundida" />
+          ))}
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           <dt className="text-tinta-tenue">Lo levantó</dt>

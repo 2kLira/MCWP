@@ -5,6 +5,7 @@ import { Camera } from "lucide-react";
 import { agregarFoto, type Foto } from "@/lib/datos/actividades";
 import { comprimirFoto } from "@/components/actividades/comprimir";
 import { firmarFotos, subirFoto } from "@/lib/datos/almacenamiento";
+import { VisorFoto } from "@/components/actividades/visor-foto";
 
 
 export function FotosActividad({
@@ -24,6 +25,7 @@ export function FotosActividad({
 }) {
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [abierta, setAbierta] = useState<string | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
 
   /**
@@ -105,15 +107,23 @@ export function FotosActividad({
             const firmada = firmadas.get(foto.url);
             // Mientras se firma —y si una foto concreta no se pudo firmar— se queda el mismo
             // esqueleto que ya usa el estado de carga, en lugar de una imagen rota.
+            // Se toca para verla en grande, sin salir de la actividad.
             return firmada ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <button
                 key={foto.id}
-                src={firmada}
-                alt=""
-                className="aspect-square w-full rounded-tarjeta border border-borde object-cover"
-                loading="lazy"
-              />
+                type="button"
+                onClick={() => setAbierta(foto.url)}
+                aria-label="Ver foto en grande"
+                className="transicion-ui overflow-hidden rounded-tarjeta border border-borde hover:opacity-90"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={firmada}
+                  alt=""
+                  className="aspect-square w-full object-cover"
+                  loading="lazy"
+                />
+              </button>
             ) : (
               <div
                 key={foto.id}
@@ -122,6 +132,10 @@ export function FotosActividad({
             );
           })}
         </div>
+      )}
+
+      {abierta && (
+        <VisorFoto ruta={abierta} titulo="Foto de la actividad" alCerrar={() => setAbierta(null)} />
       )}
 
       {puedeSubir && (

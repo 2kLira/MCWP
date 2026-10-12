@@ -445,7 +445,10 @@ create table reportes_territorio (
   created_at      timestamptz not null default now(),
   atendido        boolean not null default false,
   atendido_en     timestamptz,
-  atendido_por    uuid references usuarios(id)
+  atendido_por    uuid references usuarios(id),
+  -- Foto opcional que acompaña al reporte. Guarda la RUTA dentro de la cubeta `fotos`, nunca una
+  -- URL (las firmas caducan). Siempre bajo reportes/<levantado_por>/, lo exige el trigger.
+  foto_ruta       text
 );
 
 -- El mapa solo pide los pendientes, más recientes primero.

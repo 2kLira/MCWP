@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, LoaderCircle, MapPin } from "lucide-react";
 import {
   agregarFoto,
@@ -9,8 +9,8 @@ import {
   type MomentoFoto,
 } from "@/lib/datos/actividades";
 import { comprimirFoto } from "@/components/actividades/comprimir";
-import { subirFoto } from "@/lib/datos/almacenamiento";
-
+import { firmarFotos, subirFoto } from "@/lib/datos/almacenamiento";
+import { VisorFoto } from "@/components/actividades/visor-foto";
 
 const ETIQUETA_MOMENTO: Record<MomentoFoto, string> = {
   inicio: "foto de inicio",
@@ -193,7 +193,11 @@ function horaDe(iso: string): string {
   return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
-/** Una línea de evidencia ya subida, con su hora y, si la hubo, un enlace a la coordenada. */
+/**
+ * Una línea de evidencia ya subida: la miniatura de la foto, que se toca para verla en grande, su
+ * hora y, si la hubo, un enlace a la coordenada. Si la foto no se puede firmar —quien mira ya no
+ * alcanza esa actividad, por ejemplo— la línea se queda sin miniatura y el texto sigue igual.
+ */
 export function LineaEvidencia({
   etiqueta,
   foto,
@@ -212,24 +216,61 @@ export function LineaEvidencia({
       </p>
     );
   }
+  return <LineaConFoto etiqueta={etiqueta} foto={foto} />;
+}
+
+function LineaConFoto({ etiqueta, foto }: { etiqueta: string; foto: Foto }) {
+  const [firmada, setFirmada] = useState<string | null>(null);
+  const [abierta, setAbierta] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    void firmarFotos([foto.url]).then((mapa) => {
+      if (vivo) setFirmada(mapa.get(foto.url) ?? null);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [foto.url]);
+
   return (
-    <p className="text-sm text-tinta">
-      {etiqueta}: <span className="cifras">{horaDe(foto.created_at)}</span>
-      {foto.lat != null && foto.lng != null ? (
-        <>
-          {" · "}
-          <a
-            href={enlaceMapa(foto.lat, foto.lng)}
-            target="_blank"
-            rel="noreferrer"
-            className="underline underline-offset-2"
-          >
-            Ver ubicación
-          </a>
-        </>
-      ) : (
-        <span className="text-tinta-tenue"> · sin coordenada</span>
+    <div className="flex items-center gap-3">
+      {firmada && (
+        <button
+          type="button"
+          onClick={() => setAbierta(true)}
+          aria-label={`Ver foto de ${etiqueta.toLowerCase()} en grande`}
+          className="transicion-ui size-14 shrink-0 overflow-hidden rounded-control border border-borde hover:opacity-90"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={firmada} alt="" className="size-full object-cover" />
+        </button>
       )}
-    </p>
+      {abierta && (
+        <VisorFoto
+          ruta={foto.url}
+          titulo={`Evidencia: ${etiqueta.toLowerCase()}`}
+          alCerrar={() => setAbierta(false)}
+        />
+      )}
+      <p className="text-sm text-tinta">
+        {etiqueta}: <span className="cifras">{horaDe(foto.created_at)}</span>
+        {foto.lat != null && foto.lng != null ? (
+          <>
+            {" · "}
+            <a
+              href={enlaceMapa(foto.lat, foto.lng)}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2"
+            >
+              Ver ubicación
+            </a>
+          </>
+        ) : (
+          <span className="text-tinta-tenue"> · sin coordenada</span>
+        )}
+      </p>
+    </div>
   );
 }

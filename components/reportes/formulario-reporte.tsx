@@ -1,15 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CircleCheck, MapPin, MapPinOff } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, CircleCheck, LoaderCircle, MapPin, MapPinOff, X } from "lucide-react";
 import { Campo } from "@/components/campo";
+import { comprimirFoto } from "@/components/actividades/comprimir";
 import { CATEGORIAS_REPORTE } from "@/components/reportes/categorias";
+import { subirFotoReporte } from "@/lib/datos/almacenamiento";
 import { levantarReporte, type CategoriaReporte } from "@/lib/datos/reportes-territorio";
 import { cn } from "@/lib/utils";
 
 /**
  * Levantar un reporte del territorio. Al brigadista se le piden dos cosas: categoría y
- * descripción. La ubicación sale del GPS y el nombre y la hora los pone la base.
+ * descripción, y puede acompañarlas de una foto. La ubicación sale del GPS y el nombre y la hora
+ * los pone la base.
+ *
+ * La foto se comprime al elegirla, con el mismo `comprimirFoto` de las actividades (1600 px de
+ * lado, WebP o JPEG, máximo 400 KB), para que el brigadista vea de una vez si sirve. Se sube hasta
+ * guardar, y antes del reporte: el reporte guarda la ruta que devuelve /api/fotos. Si la subida
+ * falla no se guarda nada y se puede reintentar; subirla al elegirla dejaría archivos sueltos
+ * cada vez que alguien cambia de foto o se arrepiente.
  *
  * La ubicación se pide dos veces a propósito:
  *  - Al abrir, para que el permiso del navegador salga de una vez y el brigadista vea si su
@@ -69,6 +78,34 @@ export function FormularioReporte() {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
+  const [foto, setFoto] = useState<{ archivo: File; vistaPrevia: string } | null>(null);
+  const [comprimiendo, setComprimiendo] = useState(false);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+  const entradaFoto = useRef<HTMLInputElement>(null);
+
+  // La vista previa es un object URL: se libera al cambiar de foto y al salir de la pantalla.
+  useEffect(() => {
+    if (!foto) return;
+    return () => URL.revokeObjectURL(foto.vistaPrevia);
+  }, [foto]);
+
+  async function elegirFoto(evento: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = evento.target.files?.[0];
+    evento.target.value = "";
+    if (!archivo) return;
+    setErrorFoto(null);
+    setComprimiendo(true);
+    const comprimida = await comprimirFoto(archivo);
+    setComprimiendo(false);
+    if (!comprimida.ok) {
+      setErrorFoto(comprimida.error);
+      return;
+    }
+    setFoto({
+      archivo: comprimida.archivo,
+      vistaPrevia: URL.createObjectURL(comprimida.archivo),
+    });
+  }
 
   useEffect(() => {
     let vigente = true;
@@ -92,7 +129,7 @@ export function FormularioReporte() {
 
   async function guardar(evento: React.FormEvent) {
     evento.preventDefault();
-    if (guardando || !categoria || faltan.length > 0) return;
+    if (guardando || comprimiendo || !categoria || faltan.length > 0) return;
     setGuardando(true);
     setError(null);
 
@@ -108,12 +145,24 @@ export function FormularioReporte() {
       return;
     }
 
+    let fotoRuta: string | null = null;
+    if (foto) {
+      const subida = await subirFotoReporte(foto.archivo);
+      if (!subida.ok) {
+        setGuardando(false);
+        setError(`No se guardó el reporte: ${subida.aviso}`);
+        return;
+      }
+      fotoRuta = subida.ruta;
+    }
+
     const r = await levantarReporte({
       categoria,
       descripcion: descripcion.trim(),
       lat: fresca.lat,
       lng: fresca.lng,
       precision_m: fresca.precision,
+      foto_ruta: fotoRuta,
     });
     setGuardando(false);
     if (!r.datos) {
@@ -126,6 +175,8 @@ export function FormularioReporte() {
   function otro() {
     setCategoria(null);
     setDescripcion("");
+    setFoto(null);
+    setErrorFoto(null);
     setError(null);
     setGuardado(false);
     void reintentarUbicacion();
@@ -192,6 +243,62 @@ export function FormularioReporte() {
         />
       </Campo>
 
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-tinta-suave">
+          Foto <span className="text-tinta-tenue">(opcional)</span>
+        </p>
+        {foto ? (
+          <div className="relative self-start">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={foto.vistaPrevia}
+              alt="Foto que acompaña el reporte"
+              className="max-h-56 w-auto max-w-full rounded-tarjeta border border-borde object-cover"
+            />
+            <button
+              type="button"
+              onClick={() => setFoto(null)}
+              disabled={guardando}
+              aria-label="Quitar la foto"
+              className="transicion-ui absolute top-2 right-2 grid size-11 place-items-center rounded-full bg-tinta/80 text-fondo disabled:opacity-50"
+            >
+              <X className="size-5" aria-hidden />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={comprimiendo || guardando}
+            onClick={() => entradaFoto.current?.click()}
+            className="transicion-ui flex items-center justify-center gap-2 self-stretch rounded-control border border-borde bg-superficie px-4 text-sm font-medium text-tinta toque-actividad hover:bg-superficie-hundida disabled:opacity-50 sm:self-start"
+          >
+            {comprimiendo ? (
+              <>
+                <LoaderCircle className="size-4 animate-spin" aria-hidden />
+                Comprimiendo…
+              </>
+            ) : (
+              <>
+                <Camera className="size-4" aria-hidden />
+                Agregar foto
+              </>
+            )}
+          </button>
+        )}
+        {/* Sin `capture`: así el celular ofrece la cámara o la galería, porque la foto del bache
+            pudo tomarse antes de abrir la pantalla. */}
+        <input ref={entradaFoto} type="file" accept="image/*" hidden onChange={elegirFoto} />
+        {errorFoto ? (
+          <p className="text-sm text-alerta">{errorFoto}</p>
+        ) : (
+          !foto && (
+            <p className="text-xs text-tinta-tenue">
+              Se comprime en el celular antes de subir: máximo 1600 px de lado y 400 KB.
+            </p>
+          )
+        )}
+      </div>
+
       <EstadoUbicacion ubicacion={ubicacion} alReintentar={reintentarUbicacion} />
 
       {error && (
@@ -203,7 +310,7 @@ export function FormularioReporte() {
       <div className="flex flex-col gap-1.5">
         <button
           type="submit"
-          disabled={guardando || faltan.length > 0}
+          disabled={guardando || comprimiendo || faltan.length > 0}
           className="transicion-ui rounded-control bg-naranja px-4 text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
         >
           {guardando ? "Guardando…" : "Guardar reporte"}

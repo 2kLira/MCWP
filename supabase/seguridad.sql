@@ -604,6 +604,10 @@ values ('fotos', 'fotos', false, 512000, array['image/webp', 'image/jpeg'])
 on conflict (id) do update set allowed_mime_types = excluded.allowed_mime_types;
 
 -- Convención de ruta: actividades/<actividad_id>/<archivo>.webp (o .jpg)
+--                     reportes/<usuario_id>/<archivo>.webp (o .jpg), la foto de un reporte del
+--                     territorio. La carpeta es el id de quien lo levantó, así que la lectura
+--                     sigue la misma regla que la tabla: el administrador todas, cada quien las
+--                     suyas.
 --
 -- Este envoltorio existe porque `(storage.foldername(name))[2]::uuid` **lanza** 22P02 si ese
 -- segmento no es un uuid, y una excepción dentro de una política no es un "no": es un error 500
@@ -628,10 +632,15 @@ grant execute on function privado.actividad_de_ruta(text) to authenticated;
 -- Nota operativa: el rol del servidor MCP puede crear y borrar políticas en storage.objects pero
 -- no renombrarlas, porque no es dueño de esa tabla. Si hay que cambiarles el nombre, se borran y
 -- se recrean.
+-- La rama de reportes compara texto: storage.foldername no lanza con rutas raras, a lo más
+-- devuelve null y la comparación da falso. `(select auth.uid())` va envuelto solo porque no toca
+-- columnas; `name` queda afuera (regla 1 de la sección 8).
 create policy almacen_fotos_select on storage.objects for select to authenticated
   using (bucket_id = 'fotos'
          and ((select privado.es_admin())
-              or privado.actividad_abierta_mia(privado.actividad_de_ruta(name))));
+              or privado.actividad_abierta_mia(privado.actividad_de_ruta(name))
+              or ((storage.foldername(name))[1] = 'reportes'
+                  and (storage.foldername(name))[2] = (select auth.uid())::text)));
 
 -- **Sin política de INSERT, y es a propósito.** La había, y era correcta en lo que comprobaba:
 -- quién sube y a qué carpeta. Lo que no podía comprobar era **qué** se sube, porque Storage
@@ -1017,6 +1026,18 @@ begin
       new.levantado_por := auth.uid();
       new.created_at    := now();
     end if;
+    -- La foto tiene que estar ya subida, y en la carpeta de quien levanta el reporte. Sin esto
+    -- un usuario podría colgarle a su reporte la ruta de una foto ajena (de una actividad o de
+    -- otro reporte) y leerla por la ficha. El handler /api/fotos nombra la carpeta con el id de
+    -- la sesión, así que una ruta legítima siempre pasa.
+    if new.foto_ruta is not null then
+      if new.foto_ruta not like 'reportes/' || new.levantado_por::text || '/%'
+         or not exists (select 1 from storage.objects o
+                         where o.bucket_id = 'fotos' and o.name = new.foto_ruta) then
+        -- Sin errcode propio (P0001): cliente.ts no lo traduce y el texto llega tal cual.
+        raise exception 'La foto del reporte no es válida. Vuelve a adjuntarla.';
+      end if;
+    end if;
     -- Un reporte nace pendiente, siempre.
     new.atendido    := false;
     new.atendido_en := null;
@@ -1034,6 +1055,7 @@ begin
   new.demarcacion_id := old.demarcacion_id;
   new.levantado_por  := old.levantado_por;
   new.created_at     := old.created_at;
+  new.foto_ruta      := old.foto_ruta;
 
   if new.atendido and not old.atendido then
     new.atendido_en  := now();
