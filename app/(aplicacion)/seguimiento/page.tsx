@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { PortonAgenda } from "@/components/porton-agenda";
+import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
 import { useActuante } from "@/components/proveedor-actuante";
 import { DEMARCACIONES } from "@/lib/demarcaciones";
 import { alcanceDe, puedeCrear, puedeVerListadosGenerales } from "@/lib/puertas-ui";
@@ -19,9 +20,8 @@ import {
   ETIQUETA_ESTADO_SEGUIMIENTO,
   ETIQUETA_TIPO_SEGUIMIENTO,
 } from "@/components/seguimiento/utilidades";
-import { RenglonBandeja } from "@/components/seguimiento/renglon-bandeja";
+import { EncabezadoBandeja, RenglonBandeja } from "@/components/seguimiento/renglon-bandeja";
 import { HojaSeguimiento } from "@/components/seguimiento/hoja-seguimiento";
-import { cn } from "@/lib/utils";
 
 const TIPOS: TipoSeguimiento[] = ["llamada", "whatsapp", "invitacion", "reunion", "otro"];
 /**
@@ -116,36 +116,38 @@ export default function Seguimiento() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-xl">Seguimiento</h1>
-        <p className="cifras text-sm text-tinta-suave">
-          {consulta.cargando
-            ? "Contando…"
-            : `${consulta.datos.length.toLocaleString("es-MX")} personas por atender`}
-        </p>
-      </header>
+    <div className="flex flex-col gap-5">
+      <EncabezadoPagina
+        titulo="Seguimiento"
+        apoyo={
+          <span className="cifras">
+            {consulta.cargando
+              ? "Contando…"
+              : `${consulta.datos.length.toLocaleString("es-MX")} personas por atender`}
+          </span>
+        }
+      />
 
-      <div className="flex flex-col gap-2">
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tinta-tenue"
-            aria-hidden
-          />
-          <input
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder="Nombre o teléfono"
-            className="campo pl-9"
-          />
-        </div>
+      <div className="flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative min-w-0 flex-1 basis-full lg:basis-64">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tinta-tenue"
+              aria-hidden
+            />
+            <input
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              placeholder="Nombre o teléfono"
+              className="campo pl-9"
+            />
+          </div>
 
-        <div className="flex flex-wrap gap-2">
           {demarcacionesVisibles.length > 1 && (
             <select
               value={demarcacionId ?? ""}
               onChange={(e) => setDemarcacionId(e.target.value ? Number(e.target.value) : null)}
-              className="campo w-auto"
+              className="campo w-auto max-w-full"
             >
               <option value="">Todas las demarcaciones</option>
               {demarcacionesVisibles.map((d) => (
@@ -189,7 +191,9 @@ export default function Seguimiento() {
               </option>
             ))}
           </select>
+        </div>
 
+        <div className="flex flex-wrap items-center gap-2.5">
           {(Object.keys(ETIQUETA_MOTIVO) as MotivoBandeja[]).map((m) => (
             <FiltroMotivo
               key={m}
@@ -202,9 +206,11 @@ export default function Seguimiento() {
       </div>
 
       {consulta.cargando ? (
-        <ul className="flex flex-col gap-2">
+        <ul className="tarjeta overflow-hidden">
           {Array.from({ length: 6 }).map((_, i) => (
-            <li key={i} className="h-24 animate-pulse rounded-tarjeta bg-superficie-hundida" />
+            <li key={i} className="border-t border-separador px-4 py-3 first:border-t-0">
+              <div className="h-10 animate-pulse rounded-control bg-superficie-hundida" />
+            </li>
           ))}
         </ul>
       ) : consulta.datos.length === 0 ? (
@@ -214,17 +220,23 @@ export default function Seguimiento() {
             : "Sin personas pendientes de atender en tu territorio."}
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {consulta.datos.map((fila) => (
-            <li key={fila.persona_id}>
-              <RenglonBandeja
-                fila={fila}
-                puedeRegistrar={puedeRegistrar}
-                alRegistrar={() => setFilaAbierta(fila)}
-              />
-            </li>
-          ))}
-        </ul>
+        <div className="tarjeta overflow-hidden">
+          <EncabezadoBandeja />
+          <ul>
+            {consulta.datos.map((fila) => (
+              <li
+                key={fila.persona_id}
+                className="border-t border-separador max-lg:first:border-t-0"
+              >
+                <RenglonBandeja
+                  fila={fila}
+                  puedeRegistrar={puedeRegistrar}
+                  alRegistrar={() => setFilaAbierta(fila)}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {filaAbierta && (
@@ -239,7 +251,7 @@ export default function Seguimiento() {
   );
 }
 
-/** Píldora de filtro exclusiva: el mismo trazo que las de Personas, pero de una sola a la vez. */
+/** Filtro de motivo exclusivo: se enciende uno a la vez, y volver a tocarlo lo apaga. */
 function FiltroMotivo({
   etiqueta,
   activo,
@@ -250,17 +262,7 @@ function FiltroMotivo({
   alCambiar: () => void;
 }) {
   return (
-    <button
-      type="button"
-      aria-pressed={activo}
-      onClick={alCambiar}
-      className={cn(
-        "transicion-ui rounded-control border px-3 text-sm transition-colors toque-actividad",
-        activo
-          ? "border-tinta bg-tinta text-superficie"
-          : "border-borde bg-superficie text-tinta-suave",
-      )}
-    >
+    <button type="button" aria-pressed={activo} onClick={alCambiar} className="chip">
       {etiqueta}
     </button>
   );

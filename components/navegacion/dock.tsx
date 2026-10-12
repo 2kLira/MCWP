@@ -56,7 +56,7 @@ export function Dock() {
       // En una pantalla baja el riel completo del administrador no cabe: se desplaza por dentro en
       // lugar de salirse por abajo. Por eso las etiquetas van en un portal (ver Boton): el
       // overflow las recortaría.
-      className="dock fixed left-5 top-1/2 z-40 hidden max-h-[calc(100dvh-2.5rem)] w-14 -translate-y-1/2 flex-col items-center gap-1 overflow-y-auto overscroll-contain rounded-hoja p-1.5 [scrollbar-width:none] md:flex"
+      className="tarjeta fixed left-5 top-6 z-40 hidden max-h-[calc(100dvh-3rem)] w-14 flex-col items-center gap-0.5 overflow-y-auto overscroll-contain p-1.5 [scrollbar-width:none] md:flex"
     >
       {puedeCrear(actuante, "persona") && (
         <>
@@ -124,8 +124,8 @@ function Boton({
   primaria?: boolean;
 }) {
   // Dónde pintar la etiqueta, en coordenadas de pantalla; null si no hay que pintarla. Va en un
-  // portal a <body> porque el riel tiene transform (que vuelve relativo a él un position: fixed)
-  // y overflow (que la recortaría).
+  // portal a <body> porque el riel tiene desenfoque de fondo (que vuelve relativo a él un
+  // position: fixed) y overflow (que la recortaría).
   const [cerca, setCerca] = useState<{ x: number; y: number } | null>(null);
   const mostrar = (evento: React.SyntheticEvent<HTMLElement>) => {
     const caja = evento.currentTarget.getBoundingClientRect();
@@ -147,22 +147,22 @@ function Boton({
         }}
         onBlur={() => setCerca(null)}
         className={cn(
-          "transicion-ui grid size-11 place-items-center rounded-control transition-colors",
+          "transicion-ui grid size-11 place-items-center rounded-[11px] transition-colors",
           primaria
             ? "bg-naranja text-sobre-naranja"
             : activo
-              ? "text-naranja-texto"
-              : "text-tinta-suave hover:text-tinta",
+              ? "bg-tinta text-fondo"
+              : "text-tinta-suave hover:bg-superficie-hundida hover:text-tinta",
         )}
       >
         <Icono className="size-[1.15rem]" />
       </Link>
 
-      {/* El destino activo se marca con un punto, no con un bloque de color. */}
+      {/* El destino activo es una ficha en tinta; el naranja queda en un punto, como señal. */}
       {activo && !primaria && (
         <span
           aria-hidden
-          className="pointer-events-none absolute -left-1 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-naranja"
+          className="pointer-events-none absolute right-1.5 top-1.5 size-[5px] rounded-full bg-naranja"
         />
       )}
 
@@ -171,7 +171,7 @@ function Boton({
           <span
             role="tooltip"
             style={{ left: cerca.x, top: cerca.y }}
-            className="vidrio filo pointer-events-none fixed z-50 -translate-y-1/2 whitespace-nowrap rounded-control px-2.5 py-1.5 text-xs font-medium"
+            className="tarjeta pointer-events-none fixed z-50 -translate-y-1/2 whitespace-nowrap rounded-control px-2.5 py-1.5 text-xs font-medium"
           >
             {etiqueta}
           </span>,

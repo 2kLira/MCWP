@@ -18,9 +18,9 @@ export function rangoDeCalendario(mes: Date): { desde: string; hasta: string } {
 }
 
 /**
- * Calendario mensual con rejilla propia de CSS grid, sin librería. Un punto por actividad en cada
- * día, cifras tabulares en el número del día, y el marcador de hoy en naranja: uno de los pocos
- * lugares donde vive ese color en la pantalla.
+ * Calendario mensual con rejilla propia de CSS grid, sin librería. Bajo el número de cada día va
+ * el conteo de sus actividades, el día elegido se pinta como ficha en tinta y hoy lleva un punto
+ * naranja: uno de los pocos lugares donde vive ese color en la pantalla.
  */
 export function CalendarioMensual({
   mes,
@@ -51,33 +51,31 @@ export function CalendarioMensual({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium capitalize text-tinta">
+      <div className="flex items-center gap-2">
+        <p className="min-w-0 flex-1 text-sm font-semibold text-tinta first-letter:uppercase">
           {format(mes, "MMMM yyyy", { locale: es })}
         </p>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            aria-label="Mes anterior"
-            onClick={() => alCambiarMes(subMonths(mes, 1))}
-            className="transicion-ui grid size-11 place-items-center rounded-control text-tinta-suave transition-colors hover:bg-superficie-hundida hover:text-tinta"
-          >
-            <ChevronLeft className="size-4" aria-hidden />
-          </button>
-          <button
-            type="button"
-            aria-label="Mes siguiente"
-            onClick={() => alCambiarMes(addMonths(mes, 1))}
-            className="transicion-ui grid size-11 place-items-center rounded-control text-tinta-suave transition-colors hover:bg-superficie-hundida hover:text-tinta"
-          >
-            <ChevronRight className="size-4" aria-hidden />
-          </button>
-        </div>
+        <button
+          type="button"
+          aria-label="Mes anterior"
+          onClick={() => alCambiarMes(subMonths(mes, 1))}
+          className="boton"
+        >
+          <ChevronLeft className="size-4" aria-hidden />
+        </button>
+        <button
+          type="button"
+          aria-label="Mes siguiente"
+          onClick={() => alCambiarMes(addMonths(mes, 1))}
+          className="boton"
+        >
+          <ChevronRight className="size-4" aria-hidden />
+        </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
         {ABREVIATURAS.map((abrev) => (
-          <p key={abrev} className="py-1 text-center text-xs text-tinta-tenue">
+          <p key={abrev} className="pb-1 text-center text-xs text-tinta-suave first-letter:uppercase">
             {abrev}
           </p>
         ))}
@@ -97,28 +95,27 @@ export function CalendarioMensual({
               aria-pressed={seleccionado}
               aria-label={`${format(dia, "d 'de' MMMM", { locale: es })}${conteo > 0 ? `, ${conteo} actividades` : ""}`}
               className={cn(
-                "transicion-ui flex min-h-11 flex-col items-center gap-1 rounded-control border py-1.5 transition-colors",
-                seleccionado
-                  ? "border-tinta bg-superficie-hundida"
-                  : "border-transparent hover:bg-superficie-hundida",
+                "transicion-ui relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-control py-1.5 leading-tight transition-colors",
+                // El día elegido es una ficha en tinta; el naranja se queda para el punto de hoy.
+                seleccionado ? "bg-tinta text-fondo" : "text-tinta hover:bg-superficie-hundida",
                 !enMes && "opacity-40",
               )}
             >
+              <span className="cifras text-sm font-semibold">{format(dia, "d")}</span>
               <span
                 className={cn(
-                  "cifras grid size-6 place-items-center rounded-full text-sm",
-                  esHoy ? "bg-naranja text-sobre-naranja" : "text-tinta",
+                  "cifras min-h-[1.2em] text-[0.6875rem]",
+                  seleccionado ? "text-fondo" : "text-tinta-suave",
                 )}
               >
-                {format(dia, "d")}
+                {cargando || conteo === 0 ? null : conteo}
               </span>
-              <span className="flex h-1.5 flex-wrap items-center justify-center gap-0.5">
-                {cargando
-                  ? null
-                  : Array.from({ length: Math.min(conteo, 4) }).map((_, i) => (
-                      <span key={i} className="size-1.5 rounded-full bg-tinta-tenue" aria-hidden />
-                    ))}
-              </span>
+              {esHoy && (
+                <span
+                  className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-naranja"
+                  aria-hidden
+                />
+              )}
             </button>
           );
         })}

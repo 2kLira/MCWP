@@ -23,7 +23,7 @@ export default function Pagina() {
   }
 
   return (
-    <div className="fixed inset-0 z-[5] md:left-24">
+    <div className="mapa-intacto fixed inset-0 z-[5] md:left-24">
       <MapaPagina cromoDesplazado />
     </div>
   );

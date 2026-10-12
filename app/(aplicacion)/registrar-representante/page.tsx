@@ -3,6 +3,7 @@
 import { useActuante } from "@/components/proveedor-actuante";
 import { FormularioRepresentante } from "@/components/casillas/formulario-representante";
 import { PortonAgenda } from "@/components/porton-agenda";
+import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
 import { puedeEncabezarActividad, puedeVerListadosGenerales } from "@/lib/puertas-ui";
 
 /**
@@ -22,8 +23,8 @@ export default function Pagina() {
 
   if (!puedeEncabezarActividad(actuante)) {
     return (
-      <section className="flex flex-col gap-3">
-        <h1 className="text-xl">Registrar representante</h1>
+      <section className="flex flex-col gap-5">
+        <EncabezadoPagina titulo="Registrar representante" />
         <p className="medida text-sm text-tinta-suave">
           Esta pantalla es para quien coordina estructura territorial. Cambia de rol en el
           conmutador para verla.
@@ -33,13 +34,11 @@ export default function Pagina() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-lg flex-col gap-4">
-      <header>
-        <h1 className="text-xl">Registrar representante</h1>
-        <p className="text-sm text-tinta-suave">
-          Primero la casilla, luego el cargo, luego la persona.
-        </p>
-      </header>
+    <section className="flex flex-col gap-5">
+      <EncabezadoPagina
+        titulo="Registrar representante"
+        apoyo="Primero la casilla, luego el cargo, luego la persona."
+      />
       <FormularioRepresentante />
     </section>
   );

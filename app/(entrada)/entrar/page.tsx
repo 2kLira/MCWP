@@ -12,13 +12,17 @@ export default async function PaginaEntrar({ searchParams }: PageProps<"/entrar"
   const siguiente = typeof params.siguiente === "string" ? params.siguiente : undefined;
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-5 px-4 py-10">
-      <header>
-        <h1 className="text-xl">Estructura territorial</h1>
-        <p className="text-sm text-tinta-suave">Oaxaca de Juárez</p>
-      </header>
+    <main className="flex min-h-dvh w-full items-center justify-center px-4 py-10">
+      {/* Una sola tarjeta: el título y el formulario comparten superficie. */}
+      <div className="tarjeta flex w-full max-w-[24rem] flex-col gap-5 p-7">
+        <h1 className="text-[1.375rem] font-semibold leading-[1.15] tracking-[-0.02em] text-tinta">
+          Estructura territorial
+          <br />
+          Oaxaca de Juárez
+        </h1>
 
-      <FormularioEntrada siguiente={siguiente} />
+        <FormularioEntrada siguiente={siguiente} />
+      </div>
     </main>
   );
 }

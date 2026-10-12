@@ -8,12 +8,12 @@ export function Tarjeta({
   children: React.ReactNode;
 }) {
   return (
-    <section className="vidrio filo rounded-tarjeta">
-      <header className="flex items-center justify-between gap-3 border-b border-[var(--vidrio-borde-bajo)] px-4 py-3">
+    <section className="tarjeta">
+      <header className="flex min-h-12 items-center justify-between gap-3 px-[1.125rem] pt-3">
         <h2 className="text-sm font-semibold text-tinta">{titulo}</h2>
         {accion}
       </header>
-      <div className="p-4">{children}</div>
+      <div className="px-[1.125rem] pb-[1.125rem] pt-2">{children}</div>
     </section>
   );
 }

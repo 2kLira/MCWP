@@ -5,6 +5,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { format } from "date-fns";
 import { Download, Search, Star } from "lucide-react";
 import { PortonAgenda } from "@/components/porton-agenda";
+import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
+import { Estado } from "@/components/sistema/estado";
 import { useActuante } from "@/components/proveedor-actuante";
 import { DEMARCACIONES, demarcacionPorId } from "@/lib/demarcaciones";
 import { alcanceDe, puedeVerListadosGenerales } from "@/lib/puertas-ui";
@@ -22,6 +24,16 @@ import { ETIQUETA_GENERO, GENEROS, type Genero } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
 
 const PAGINA = 300;
+
+/** Alto de cada renglón de la lista virtualizada, en píxeles. */
+const ALTO_RENGLON = 56;
+
+/**
+ * Columnas de la lista desde 1024 px: nombre, teléfono, sección, demarcación, (edad) y estatus.
+ * La comparten el encabezado y cada renglón para que no se desalineen.
+ */
+const REJILLA =
+  "gap-x-4 lg:grid-cols-[minmax(0,1.5fr)_7.5rem_4.5rem_minmax(0,1.2fr)_14.5rem] xl:grid-cols-[minmax(0,1.5fr)_7.5rem_4.5rem_minmax(0,1.2fr)_4.5rem_14.5rem]";
 
 /** Columnas del CSV de promovidos, en el orden que pidió el cliente. */
 const COLUMNAS_PROMOVIDOS = [
@@ -114,7 +126,7 @@ export default function Personas() {
   const virtual = useVirtualizer({
     count: filas.length,
     getScrollElement: () => contenedor.current,
-    estimateSize: () => 68,
+    estimateSize: () => ALTO_RENGLON,
     overscan: 8,
   });
 
@@ -145,46 +157,50 @@ export default function Personas() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-8rem)] flex-col gap-4 md:h-[calc(100dvh-9rem)]">
-      <header className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-xl">Personas alcanzadas</h1>
-          <p className="cifras text-sm text-tinta-suave">
+    // En escritorio la pantalla ocupa el alto visible (el relleno de <main> suma 4.5rem) y la lista
+    // se desplaza por dentro. En celular los filtros se apilan y se comerían la lista, así que ahí
+    // la tarjeta lleva su propio alto y la página se desplaza.
+    <div className="flex flex-col gap-5 md:h-[calc(100dvh-4.5rem)]">
+      <EncabezadoPagina
+        titulo="Personas alcanzadas"
+        apoyo={
+          <span className="cifras">
             {cargando ? "Contando…" : `${total.toLocaleString("es-MX")} alcanzadas`}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={exportarPromovidos}
-          disabled={exportando}
-          className="transicion-ui inline-flex items-center gap-1.5 rounded-control border border-borde px-3 text-sm text-tinta-suave transition-colors hover:text-tinta disabled:opacity-50"
-          style={{ minHeight: 40 }}
-        >
-          <Download className="size-4" aria-hidden />
-          {exportando ? "Exportando…" : "Exportar promovidos"}
-        </button>
-      </header>
+          </span>
+        }
+      />
 
-      <div className="flex flex-col gap-2">
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tinta-tenue"
-            aria-hidden
-          />
-          <input
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder="Nombre o teléfono"
-            className="campo pl-9"
-          />
+      <div className="flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative min-w-0 flex-1 basis-60">
+            <Search
+              className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-tinta-tenue"
+              aria-hidden
+            />
+            <input
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              placeholder="Nombre o teléfono"
+              className="campo pl-10"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={exportarPromovidos}
+            disabled={exportando}
+            className="boton"
+          >
+            <Download className="size-4" aria-hidden />
+            {exportando ? "Exportando…" : "Exportar promovidos"}
+          </button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2.5">
           {demarcacionesVisibles.length > 1 && (
             <select
               value={demarcacionId ?? ""}
               onChange={(e) => setDemarcacionId(e.target.value ? Number(e.target.value) : null)}
-              className="campo w-auto"
+              className="campo w-auto max-w-full"
             >
               <option value="">Todas las demarcaciones</option>
               {demarcacionesVisibles.map((d) => (
@@ -206,7 +222,7 @@ export default function Personas() {
           <select
             value={genero ?? ""}
             onChange={(e) => setGenero((e.target.value || null) as Genero | null)}
-            className="campo w-auto"
+            className="campo w-auto max-w-full"
           >
             <option value="">Todos los géneros</option>
             {GENEROS.map((g) => (
@@ -226,86 +242,135 @@ export default function Personas() {
         </div>
       </div>
 
-      <div
-        ref={contenedor}
-        className="min-h-0 flex-1 overflow-y-auto vidrio filo rounded-tarjeta"
-      >
-        {cargando ? (
-          <ul className="divide-y divide-borde">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <li key={i} className="h-[68px] animate-pulse bg-superficie-hundida/50" />
-            ))}
-          </ul>
-        ) : filas.length === 0 ? (
-          <p className="p-6 text-sm text-tinta-suave">
-            No hay personas que coincidan con estos filtros.
-          </p>
-        ) : (
-          <div style={{ height: virtual.getTotalSize(), position: "relative" }}>
-            {virtual.getVirtualItems().map((item) => {
-              const persona = filas[item.index];
-              const demarcacion = demarcacionPorId(persona.demarcacion_id)?.nombre;
-              const edad = etiquetaEdad(persona.fecha_nacimiento);
-              return (
-                <button
-                  key={persona.id}
-                  type="button"
-                  onClick={() => navegar(`/personas/${persona.id}` as never)}
-                  className="transicion-ui absolute left-0 flex w-full items-center justify-between gap-3 border-b border-borde px-4 text-left transition-colors hover:bg-superficie-hundida"
-                  style={{
-                    top: item.start,
-                    height: item.size,
-                  }}
-                >
-                  <span className="min-w-0">
-                    <span
-                      className="block truncate text-sm font-medium text-tinta"
-                      style={{ viewTransitionName: nombreCompartido(persona.id) }}
-                    >
-                      {persona.nombre}
-                    </span>
-                    <span className="flex min-w-0 items-center gap-1 text-xs text-tinta-suave">
-                      <span className="truncate">
-                        {persona.seccion_clave && (
-                          <span className="cifras">Sección {persona.seccion_clave}</span>
-                        )}
-                        {demarcacion && ` · ${demarcacion}`}
-                        {/* La edad ocupa espacio que a 390px ya no sobra; se reserva para 1280+. */}
-                        {edad && <span className="cifras hidden xl:inline"> · {edad}</span>}
-                      </span>
-                      {persona.quiere_ser_representante && (
+      <div className="tarjeta flex h-[70dvh] flex-col overflow-hidden md:h-auto md:min-h-64 md:flex-1">
+        {/* Encabezado de columnas: solo donde los renglones se acomodan en rejilla. Queda fuera
+            del contenedor que se desplaza para no tener que fijarlo sobre el vidrio. */}
+        <div
+          aria-hidden
+          className={cn(
+            "hidden px-4 pb-[0.6875rem] pt-[0.8125rem] text-xs font-medium text-tinta-suave lg:grid",
+            REJILLA,
+          )}
+        >
+          <span>Nombre</span>
+          <span>Teléfono</span>
+          <span>Sección</span>
+          <span>Demarcación</span>
+          <span className="hidden text-right xl:block">Edad</span>
+          <span>Estatus</span>
+        </div>
+
+        <div ref={contenedor} className="min-h-0 flex-1 overflow-y-auto">
+          {cargando ? (
+            <ul>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <li
+                  key={i}
+                  className={cn(
+                    "animate-pulse border-separador bg-superficie-hundida/50 lg:border-t",
+                    i > 0 && "border-t",
+                  )}
+                  style={{ height: ALTO_RENGLON }}
+                />
+              ))}
+            </ul>
+          ) : filas.length === 0 ? (
+            <p className="p-6 text-sm text-tinta-suave">
+              No hay personas que coincidan con estos filtros.
+            </p>
+          ) : (
+            <div style={{ height: virtual.getTotalSize(), position: "relative" }}>
+              {virtual.getVirtualItems().map((item) => {
+                const persona = filas[item.index];
+                const demarcacion = demarcacionPorId(persona.demarcacion_id)?.nombre;
+                const edad = etiquetaEdad(persona.fecha_nacimiento);
+                const estatus = (
+                  <>
+                    {persona.es_promovido && <Estado vivo>Promovido</Estado>}
+                    {persona.quiere_participar && <Estado>Participa</Estado>}
+                    {persona.quiere_info && <Estado>Info</Estado>}
+                  </>
+                );
+                return (
+                  <button
+                    key={persona.id}
+                    type="button"
+                    onClick={() => navegar(`/personas/${persona.id}` as never)}
+                    className={cn(
+                      "renglon-activo absolute left-0 grid w-full grid-cols-[minmax(0,1fr)_auto] items-center border-separador px-4 text-left text-sm lg:border-t",
+                      item.index > 0 && "border-t",
+                      REJILLA,
+                    )}
+                    style={{
+                      top: item.start,
+                      height: item.size,
+                    }}
+                  >
+                    <span className="min-w-0">
+                      <span className="flex min-w-0 items-center gap-1.5">
                         <span
-                          title="Quiere ser representante"
-                          className="shrink-0 text-tinta-tenue"
+                          className="block truncate font-semibold text-tinta"
+                          style={{ viewTransitionName: nombreCompartido(persona.id) }}
                         >
-                          <Star className="size-3" aria-hidden />
+                          {persona.nombre}
                         </span>
-                      )}
+                        {persona.quiere_ser_representante && (
+                          <span
+                            title="Quiere ser representante"
+                            className="hidden shrink-0 text-tinta-tenue lg:inline-flex"
+                          >
+                            <Star className="size-3" aria-hidden />
+                          </span>
+                        )}
+                      </span>
+                      {/* En celular y tableta la sección y la demarcación van bajo el nombre. */}
+                      <span className="flex min-w-0 items-center gap-1 text-xs text-tinta-suave lg:hidden">
+                        <span className="truncate">
+                          {persona.seccion_clave && (
+                            <span className="cifras">Sección {persona.seccion_clave}</span>
+                          )}
+                          {demarcacion && ` · ${demarcacion}`}
+                        </span>
+                        {persona.quiere_ser_representante && (
+                          <span
+                            title="Quiere ser representante"
+                            className="shrink-0 text-tinta-tenue"
+                          >
+                            <Star className="size-3" aria-hidden />
+                          </span>
+                        )}
+                      </span>
                     </span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="cifras block text-xs text-tinta-suave">
+
+                    <span className="shrink-0 text-right lg:hidden">
+                      <span className="cifras block text-xs text-tinta-suave">
+                        {formatearTelefono(persona.telefono_norm)}
+                      </span>
+                      <span className="mt-1 flex justify-end gap-2.5">{estatus}</span>
+                    </span>
+
+                    <span className="cifras hidden truncate text-tinta lg:block">
                       {formatearTelefono(persona.telefono_norm)}
                     </span>
-                    <span className="mt-1 flex justify-end gap-1">
-                      {persona.es_promovido && (
-                        <span className="rounded-pildora bg-naranja px-2.5 py-0.5 text-xs font-medium text-sobre-naranja">
-                          Promovido
-                        </span>
-                      )}
-                      {persona.quiere_participar && <span className="pildora">Participa</span>}
-                      {persona.quiere_info && <span className="pildora">Info</span>}
+                    <span className="cifras hidden text-tinta lg:block">
+                      {persona.seccion_clave}
                     </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+                    <span className="hidden truncate text-tinta lg:block">{demarcacion}</span>
+                    {/* La edad ocupa espacio que antes de 1280 ya no sobra. */}
+                    <span className="cifras hidden text-right text-tinta xl:block">{edad}</span>
+                    <span className="hidden min-w-0 items-center gap-3 overflow-hidden lg:flex">
+                      {estatus}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {total > filas.length && (
-        <p className="text-center text-xs text-tinta-tenue">
+        <p className="text-xs text-tinta-tenue">
           Mostrando las primeras {filas.length.toLocaleString("es-MX")} de{" "}
           {total.toLocaleString("es-MX")}. Afina la búsqueda para acercarte.
         </p>
@@ -328,12 +393,7 @@ function Filtro({
       type="button"
       aria-pressed={activo}
       onClick={() => alCambiar(!activo)}
-      className={cn(
-        "transicion-ui rounded-control border px-3 text-sm transition-colors toque-actividad",
-        activo
-          ? "border-tinta bg-tinta text-superficie"
-          : "border-borde bg-superficie text-tinta-suave",
-      )}
+      className="chip"
     >
       {etiqueta}
     </button>

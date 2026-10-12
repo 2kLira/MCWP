@@ -42,7 +42,7 @@ export function VisorFoto({
           <img
             src={firmada}
             alt={titulo}
-            className="max-h-[70dvh] w-full rounded-tarjeta border border-borde bg-superficie-hundida object-contain"
+            className="max-h-[70dvh] w-full rounded-control border border-borde bg-superficie-hundida object-contain"
           />
         ) : fallo ? (
           <p className="flex items-center gap-2 text-sm text-tinta-suave">
@@ -50,7 +50,7 @@ export function VisorFoto({
             No se pudo cargar esta foto.
           </p>
         ) : (
-          <div className="aspect-[4/3] w-full animate-pulse rounded-tarjeta bg-superficie-hundida" />
+          <div className="aspect-[4/3] w-full animate-pulse rounded-control bg-superficie-hundida" />
         )}
 
         {firmada && (
@@ -58,7 +58,7 @@ export function VisorFoto({
             href={firmada}
             target="_blank"
             rel="noreferrer"
-            className="transicion-ui flex items-center justify-center gap-2 self-start rounded-control border border-borde bg-superficie px-4 text-sm font-medium text-tinta toque-actividad hover:bg-superficie-hundida"
+            className="boton self-start"
           >
             <ExternalLink className="size-4" aria-hidden />
             Abrir en tamaño original

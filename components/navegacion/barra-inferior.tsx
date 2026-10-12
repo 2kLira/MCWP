@@ -43,7 +43,7 @@ export function BarraInferior() {
     >
       <ul
         className={cn(
-          "dock grid items-center rounded-hoja p-1.5",
+          "tarjeta grid items-center rounded-[22px] p-1.5",
           COLUMNAS[destinos.length] ?? "grid-cols-5",
         )}
       >
@@ -75,13 +75,13 @@ export function BarraInferior() {
                 aria-current={activo ? "page" : undefined}
                 className={cn(
                   "transicion-ui relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-control px-1 transition-colors",
-                  activo ? "text-tinta" : "text-tinta-suave",
+                  activo ? "font-semibold text-tinta" : "text-tinta-suave",
                 )}
               >
                 {activo && (
                   <span
                     aria-hidden
-                    className="absolute inset-0 -z-10 rounded-control bg-[oklch(0.78_0.16_55_/_0.16)]"
+                    className="absolute right-[calc(50%-1rem)] top-2 size-[5px] rounded-full bg-naranja"
                   />
                 )}
                 <Icono className="size-5" aria-hidden />

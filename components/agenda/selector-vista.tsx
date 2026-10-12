@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils";
-
 export type Vista = "hoy" | "semana" | "mes" | "calendario";
 
 const VISTAS: { clave: Vista; etiqueta: string }[] = [
@@ -9,7 +7,10 @@ const VISTAS: { clave: Vista; etiqueta: string }[] = [
   { clave: "calendario", etiqueta: "Calendario" },
 ];
 
-/** Selector de las cuatro vistas de la agenda. Estado activo en neutros, nunca en naranja. */
+/**
+ * Selector de las cuatro vistas de la agenda. Estado activo en neutros, nunca en naranja: lo pinta
+ * la utilidad `segmento` a partir de `aria-selected`.
+ */
 export function SelectorVista({
   vista,
   alCambiar,
@@ -21,7 +22,7 @@ export function SelectorVista({
     <div
       role="tablist"
       aria-label="Vista de la agenda"
-      className="flex gap-1 overflow-x-auto rounded-control border border-borde bg-superficie-hundida p-1"
+      className="segmento max-w-full overflow-x-auto"
     >
       {VISTAS.map((v) => (
         <button
@@ -30,13 +31,8 @@ export function SelectorVista({
           role="tab"
           aria-selected={vista === v.clave}
           onClick={() => alCambiar(v.clave)}
-          className={cn(
-            // Más alto en celular: la agenda se cambia de vista con el pulgar y de pie.
-            "transicion-ui min-h-11 shrink-0 rounded-control px-3 text-sm font-medium transition-colors sm:min-h-9",
-            vista === v.clave
-              ? "bg-superficie text-tinta elevacion-apoyo"
-              : "text-tinta-suave hover:text-tinta",
-          )}
+          // Más alto en celular: la agenda se cambia de vista con el pulgar y de pie.
+          className="shrink-0 max-sm:min-h-11"
         >
           {v.etiqueta}
         </button>

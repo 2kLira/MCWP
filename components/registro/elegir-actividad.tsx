@@ -26,7 +26,7 @@ export function ElegirActividad() {
 
   if (actividades.cargando) {
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex max-w-[47.5rem] flex-col gap-2">
         <div className="h-16 animate-pulse rounded-tarjeta bg-superficie-hundida" />
         <div className="h-16 animate-pulse rounded-tarjeta bg-superficie-hundida" />
       </div>
@@ -37,7 +37,7 @@ export function ElegirActividad() {
     return (
       <div
         role="status"
-        className="flex flex-col gap-2 rounded-tarjeta border border-borde bg-superficie p-4"
+        className="tarjeta flex max-w-[47.5rem] flex-col gap-2 p-[1.125rem]"
       >
         <p className="flex items-center gap-2 text-sm font-medium text-alerta">
           <TriangleAlert className="size-4 shrink-0" aria-hidden />
@@ -55,23 +55,23 @@ export function ElegirActividad() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex max-w-[47.5rem] flex-col gap-3">
       <p className="medida text-sm text-tinta-suave">
         Elige la actividad en la que estás capturando. La persona queda ligada a ella.
       </p>
 
-      <ul className="vidrio filo overflow-hidden rounded-tarjeta">
+      <ul className="tarjeta overflow-hidden">
         {actividades.datos.map((a, i) => (
           <li key={a.id}>
             <Link
               href={{ pathname: "/registrar", query: { actividad: a.id } }}
-              className={`transicion-ui flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-superficie-hundida ${
-                i > 0 ? "border-t border-borde" : ""
+              className={`renglon-activo flex min-h-14 items-center gap-3 px-[1.125rem] py-3 text-sm ${
+                i > 0 ? "border-t border-separador" : ""
               }`}
             >
               <CalendarDays className="size-5 shrink-0 text-tinta-suave" aria-hidden />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-tinta">{a.nombre}</span>
+                <span className="block truncate font-medium text-tinta">{a.nombre}</span>
                 <span className="cifras block text-xs text-tinta-tenue">
                   {ETIQUETA_TIPO_ACTIVIDAD[a.tipo]} · {a.fecha}
                   {a.seccion_clave ? ` · sección ${a.seccion_clave}` : ""}

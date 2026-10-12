@@ -94,15 +94,15 @@ export function FotosActividad({
   return (
     <div className="flex flex-col gap-3">
       {cargando ? (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 xl:grid-cols-6">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="aspect-square animate-pulse rounded-tarjeta bg-superficie-hundida" />
+            <div key={i} className="aspect-square animate-pulse rounded-control bg-superficie-hundida" />
           ))}
         </div>
       ) : fotos.length === 0 ? (
         <p className="text-sm text-tinta-suave">Todavía no hay fotos de esta actividad.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 xl:grid-cols-6">
           {fotos.map((foto) => {
             const firmada = firmadas.get(foto.url);
             // Mientras se firma —y si una foto concreta no se pudo firmar— se queda el mismo
@@ -114,7 +114,7 @@ export function FotosActividad({
                 type="button"
                 onClick={() => setAbierta(foto.url)}
                 aria-label="Ver foto en grande"
-                className="transicion-ui overflow-hidden rounded-tarjeta border border-borde hover:opacity-90"
+                className="transicion-ui overflow-hidden rounded-control border border-borde transition-opacity hover:opacity-90"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -127,7 +127,7 @@ export function FotosActividad({
             ) : (
               <div
                 key={foto.id}
-                className="aspect-square animate-pulse rounded-tarjeta bg-superficie-hundida"
+                className="aspect-square animate-pulse rounded-control bg-superficie-hundida"
               />
             );
           })}
@@ -144,7 +144,7 @@ export function FotosActividad({
             type="button"
             disabled={subiendo}
             onClick={() => entrada.current?.click()}
-            className="transicion-ui flex items-center justify-center gap-2 rounded-control border border-borde bg-superficie text-sm font-medium text-tinta toque-actividad disabled:opacity-50"
+            className="boton sm:self-start"
           >
             <Camera className="size-4" aria-hidden />
             {subiendo ? "Comprimiendo y subiendo…" : "Agregar foto"}

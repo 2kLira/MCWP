@@ -71,6 +71,7 @@ app/api/admin/       handlers que exigen la llave secreta: alta, contraseña y b
 app/api/fotos/       subida de fotos: valida los bytes y quita metadatos en el servidor
 components/          componentes de interfaz
 components/mapa/     todo lo de MapLibre, aislado
+components/sistema/  piezas del rediseño: encabezado de página, caja, tarjeta de cifra, estado, avance
 lib/supabase.ts            cliente de navegador
 lib/supabase-servidor.ts   cliente por petición, con la sesión de las cookies
 lib/supabase-administrador.ts  llave secreta. Lleva `import "server-only"` en la primera línea

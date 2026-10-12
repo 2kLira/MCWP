@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Download, Upload, UserCheck, UserPlus, UserX } from "lucide-react";
+import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
+import { TarjetaCifra } from "@/components/sistema/tarjeta-cifra";
+import { cn } from "@/lib/utils";
 import { useActuante } from "@/components/proveedor-actuante";
 import { descargarCsv } from "@/lib/csv";
 import {
@@ -61,8 +65,8 @@ export default function Importar() {
 
   if (!puedeImportar(actuante)) {
     return (
-      <section className="flex flex-col gap-3">
-        <h1 className="text-xl">Carga masiva</h1>
+      <section className="flex flex-col gap-5">
+        <EncabezadoPagina titulo="Carga masiva" />
         <p className="medida text-sm text-tinta-suave">
           La carga masiva de promovidos la hacen el administrador general y los responsables de
           demarcación. Cambia de rol en el conmutador para verla.
@@ -128,14 +132,11 @@ export default function Importar() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-      <header>
-        <h1 className="text-xl">Carga masiva de promovidos</h1>
-        <p className="medida text-sm text-tinta-suave">
-          Sube un csv con varios promovidos a la vez. Antes de guardar nada, el sistema revisa el
-          archivo completo y muestra qué se va a crear, qué ya existe y qué se rechaza.
-        </p>
-      </header>
+    <section className="flex flex-col gap-5">
+      <EncabezadoPagina
+        titulo="Carga masiva de promovidos"
+        apoyo="Sube un csv con varios promovidos a la vez. Antes de guardar nada, el sistema revisa el archivo completo y muestra qué se va a crear, qué ya existe y qué se rechaza."
+      />
 
       {momento === "elegir" && (
         <MomentoElegir
@@ -177,48 +178,32 @@ function MomentoElegir({
   onElegir: (evento: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
-    <div className="flex flex-col gap-4">
-      <button
-        type="button"
-        onClick={descargarPlantilla}
-        className="transicion-ui w-fit rounded-control border border-borde bg-superficie px-4 text-sm font-medium text-tinta toque-actividad"
-      >
-        Descargar plantilla
-      </button>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <button type="button" onClick={descargarPlantilla} className="boton">
+          <Download className="size-4" aria-hidden />
+          Descargar plantilla
+        </button>
 
-      <div className="vidrio filo overflow-hidden rounded-tarjeta">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[28rem] text-sm">
-            <thead>
-              <tr className="text-left text-xs text-tinta-tenue">
-                <th className="px-4 py-3 font-medium">Columna</th>
-                <th className="px-4 py-3 font-medium">Obligatoria</th>
-                <th className="px-4 py-3 font-medium">Para qué sirve</th>
-              </tr>
-            </thead>
-            <tbody>
-              {PLANTILLA_PROMOVIDOS.map((c) => (
-                <tr key={c.llave} className="border-t border-borde">
-                  <td className="px-4 py-2 text-tinta">{c.etiqueta}</td>
-                  <td className="px-4 py-2 text-tinta-suave">{c.obligatoria ? "Sí" : "No"}</td>
-                  <td className="px-4 py-2 text-tinta-suave">{c.ayuda}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* El control sigue siendo el input de archivo: la etiqueta lo envuelve y lo viste de
+            botón. Se esconde a la vista, no al teclado ni al lector de pantalla. */}
+        <label
+          className={cn(
+            "boton-primario cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-tinta",
+            revisando && "pointer-events-none opacity-50",
+          )}
+        >
+          <Upload className="size-4" aria-hidden />
+          Subir archivo
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={onElegir}
+            disabled={revisando}
+            className="sr-only"
+          />
+        </label>
       </div>
-
-      <label className="flex flex-col gap-2 rounded-control border border-borde bg-superficie p-3 text-sm">
-        <span className="font-medium text-tinta">Subir archivo</span>
-        <input
-          type="file"
-          accept=".csv,text/csv"
-          onChange={onElegir}
-          disabled={revisando}
-          className="text-sm text-tinta-suave file:mr-3 file:rounded-control file:border-0 file:bg-naranja file:px-3 file:py-2 file:text-sm file:font-medium file:text-sobre-naranja disabled:opacity-50"
-        />
-      </label>
 
       {revisando && <p className="text-sm text-tinta-suave">Revisando el archivo…</p>}
 
@@ -230,6 +215,27 @@ function MomentoElegir({
       )}
 
       {aviso && <p className="text-sm text-alerta">{aviso}</p>}
+
+      <div className="tarjeta overflow-x-auto">
+        <table className="tabla min-w-[28rem]">
+          <thead>
+            <tr>
+              <th>Columna</th>
+              <th>Obligatoria</th>
+              <th>Para qué sirve</th>
+            </tr>
+          </thead>
+          <tbody>
+            {PLANTILLA_PROMOVIDOS.map((c) => (
+              <tr key={c.llave}>
+                <td className="text-tinta">{c.etiqueta}</td>
+                <td className="text-tinta-suave">{c.obligatoria ? "Sí" : "No"}</td>
+                <td className="text-tinta-suave">{c.ayuda}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -254,47 +260,62 @@ function MomentoPrevisualizar({
   const totalImportar = revision.nuevas.length + revision.actualizar.length;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <p className="text-sm text-tinta-suave">
         Archivo <span className="text-tinta">{revision.archivo}</span>. Nada se ha guardado
         todavía.
       </p>
 
-      <MontonPersonas
-        titulo="Nuevas"
-        descripcion="Se van a crear como promovidos nuevos."
-        renglones={revision.nuevas}
-      />
+      {/* Los tres conteos arriba, con lo que le va a pasar a cada grupo; el detalle renglón por
+          renglón va abajo, en el mismo orden. */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <TarjetaCifra
+          icono={UserPlus}
+          etiqueta="Nuevas"
+          valor={revision.nuevas.length}
+          pie="Se van a crear como promovidos nuevos."
+        />
+        <TarjetaCifra
+          icono={UserCheck}
+          etiqueta="Ya existen"
+          valor={revision.actualizar.length}
+          pie="Ya están en el padrón: se les va a marcar promovido, sin tocarles ningún otro dato."
+        />
+        <TarjetaCifra
+          icono={UserX}
+          etiqueta="Rechazadas"
+          valor={revision.rechazadas.length}
+          pie="No se van a importar. Corrígelas en el archivo."
+        />
+      </div>
 
-      <MontonPersonas
-        titulo="Ya existen"
-        descripcion="Ya están en el padrón: se les va a marcar promovido, sin tocarles ningún otro dato."
-        renglones={revision.actualizar}
-      />
+      <MontonPersonas titulo="Nuevas" renglones={revision.nuevas} />
+
+      <MontonPersonas titulo="Ya existen" renglones={revision.actualizar} />
 
       <MontonRechazadas renglones={revision.rechazadas} />
 
       {aviso && <p className="text-sm text-alerta">{aviso}</p>}
 
-      <div className="flex flex-col-reverse gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={onCancelar}
-          disabled={importando}
-          className="transicion-ui flex-1 rounded-control border border-borde bg-superficie text-sm font-medium text-tinta toque-actividad disabled:opacity-50"
-        >
-          Cancelar
-        </button>
+      <div className="flex flex-wrap items-center gap-2.5">
         {totalImportar > 0 && (
           <button
             type="button"
             onClick={onImportar}
             disabled={importando}
-            className="transicion-ui flex-1 rounded-control bg-naranja text-sm font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
+            className="boton-primario max-sm:w-full"
           >
             {importando ? "Importando…" : `Importar ${totalImportar} promovidos`}
           </button>
         )}
+        <button
+          type="button"
+          onClick={onCancelar}
+          disabled={importando}
+          className="boton max-sm:w-full"
+        >
+          Cancelar
+        </button>
       </div>
     </div>
   );
@@ -302,56 +323,51 @@ function MomentoPrevisualizar({
 
 function MontonPersonas({
   titulo,
-  descripcion,
   renglones,
 }: {
   titulo: string;
-  descripcion: string;
   renglones: readonly RenglonRevisado[];
 }) {
   const visibles = renglones.slice(0, MAX_VISIBLES);
   const restantes = renglones.length - visibles.length;
 
   return (
-    <div className="vidrio filo overflow-hidden rounded-tarjeta">
-      <div className="flex flex-col gap-1 border-b border-borde px-4 py-3">
-        <h2 className="text-sm font-medium text-tinta">
-          {titulo} <span className="cifras text-tinta-suave">({renglones.length})</span>
-        </h2>
-        <p className="text-xs text-tinta-suave">{descripcion}</p>
-      </div>
+    <div className="flex flex-col gap-2.5">
+      <h2 className="text-sm font-semibold text-tinta">{titulo}</h2>
 
-      {renglones.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-tinta-tenue">Ninguno.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[28rem] text-sm">
-            <thead>
-              <tr className="text-left text-xs text-tinta-tenue">
-                <th className="px-4 py-2 font-medium">Renglón</th>
-                <th className="px-4 py-2 font-medium">Nombre</th>
-                <th className="px-4 py-2 font-medium">Teléfono</th>
-                <th className="px-4 py-2 font-medium">Sección</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibles.map((r) => (
-                <tr key={r.numero} className="border-t border-borde">
-                  <td className="cifras px-4 py-2 text-tinta-suave">{r.numero}</td>
-                  <td className="px-4 py-2 text-tinta">{r.nombre}</td>
-                  <td className="cifras px-4 py-2 text-tinta-suave">{r.telefonoNorm ?? "—"}</td>
-                  <td className="cifras px-4 py-2 text-tinta-suave">{r.seccionClave ?? "—"}</td>
+      <div className="tarjeta overflow-hidden">
+        {renglones.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-tinta-tenue">Ninguno.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="tabla min-w-[28rem]">
+              <thead>
+                <tr>
+                  <th className="num">Renglón</th>
+                  <th>Nombre</th>
+                  <th>Teléfono</th>
+                  <th>Sección</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {restantes > 0 && (
-        <p className="cifras border-t border-borde px-4 py-2 text-xs text-tinta-tenue">
-          Y {restantes} más.
-        </p>
-      )}
+              </thead>
+              <tbody>
+                {visibles.map((r) => (
+                  <tr key={r.numero}>
+                    <td className="num text-tinta-suave">{r.numero}</td>
+                    <td className="text-tinta">{r.nombre}</td>
+                    <td className="cifras text-tinta-suave">{r.telefonoNorm ?? "—"}</td>
+                    <td className="cifras text-tinta-suave">{r.seccionClave ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {restantes > 0 && (
+          <p className="cifras border-t border-separador px-4 py-2.5 text-xs text-tinta-tenue">
+            Y {restantes} más.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -361,14 +377,9 @@ function MontonRechazadas({ renglones }: { renglones: readonly RenglonRevisado[]
   const restantes = renglones.length - visibles.length;
 
   return (
-    <div className="vidrio filo overflow-hidden rounded-tarjeta">
-      <div className="flex items-center justify-between gap-3 border-b border-borde px-4 py-3">
-        <div>
-          <h2 className="text-sm font-medium text-tinta">
-            Rechazadas <span className="cifras text-tinta-suave">({renglones.length})</span>
-          </h2>
-          <p className="text-xs text-tinta-suave">No se van a importar. Corrígelas en el archivo.</p>
-        </div>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <h2 className="text-sm font-semibold text-tinta">Rechazadas</h2>
         {renglones.length > 0 && (
           <button
             type="button"
@@ -387,42 +398,45 @@ function MontonRechazadas({ renglones }: { renglones: readonly RenglonRevisado[]
                 })),
               )
             }
-            className="transicion-ui shrink-0 rounded-control border border-borde bg-superficie px-3 text-xs font-medium text-tinta toque-actividad"
+            className="boton"
           >
+            <Download className="size-4" aria-hidden />
             Descargar rechazados
           </button>
         )}
       </div>
 
-      {renglones.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-tinta-tenue">Ninguna.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[28rem] text-sm">
-            <thead>
-              <tr className="text-left text-xs text-tinta-tenue">
-                <th className="px-4 py-2 font-medium">Renglón</th>
-                <th className="px-4 py-2 font-medium">Nombre</th>
-                <th className="px-4 py-2 font-medium">Motivo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibles.map((r) => (
-                <tr key={r.numero} className="border-t border-borde">
-                  <td className="cifras px-4 py-2 text-tinta-suave">{r.numero}</td>
-                  <td className="px-4 py-2 text-tinta">{r.nombre}</td>
-                  <td className="px-4 py-2 text-alerta">{r.motivo}</td>
+      <div className="tarjeta overflow-hidden">
+        {renglones.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-tinta-tenue">Ninguna.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="tabla min-w-[28rem]">
+              <thead>
+                <tr>
+                  <th className="num">Renglón</th>
+                  <th>Nombre</th>
+                  <th>Motivo</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {restantes > 0 && (
-        <p className="cifras border-t border-borde px-4 py-2 text-xs text-tinta-tenue">
-          Y {restantes} más.
-        </p>
-      )}
+              </thead>
+              <tbody>
+                {visibles.map((r) => (
+                  <tr key={r.numero}>
+                    <td className="num text-tinta-suave">{r.numero}</td>
+                    <td className="text-tinta">{r.nombre}</td>
+                    <td className="text-alerta">{r.motivo}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {restantes > 0 && (
+          <p className="cifras border-t border-separador px-4 py-2.5 text-xs text-tinta-tenue">
+            Y {restantes} más.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -439,27 +453,14 @@ function MomentoSaldo({
   onCargarOtro: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="vidrio filo grid grid-cols-3 divide-x divide-borde overflow-hidden rounded-tarjeta text-center">
-        <div className="flex flex-col gap-1 px-3 py-4">
-          <span className="cifras text-2xl font-medium text-tinta">{saldo.nuevas}</span>
-          <span className="text-xs text-tinta-suave">Nuevas</span>
-        </div>
-        <div className="flex flex-col gap-1 px-3 py-4">
-          <span className="cifras text-2xl font-medium text-tinta">{saldo.actualizadas}</span>
-          <span className="text-xs text-tinta-suave">Actualizadas</span>
-        </div>
-        <div className="flex flex-col gap-1 px-3 py-4">
-          <span className="cifras text-2xl font-medium text-tinta">{saldo.rechazadas}</span>
-          <span className="text-xs text-tinta-suave">Rechazadas</span>
-        </div>
+    <div className="flex flex-col gap-5">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <TarjetaCifra icono={UserPlus} etiqueta="Nuevas" valor={saldo.nuevas} />
+        <TarjetaCifra icono={UserCheck} etiqueta="Actualizadas" valor={saldo.actualizadas} />
+        <TarjetaCifra icono={UserX} etiqueta="Rechazadas" valor={saldo.rechazadas} />
       </div>
 
-      <button
-        type="button"
-        onClick={onCargarOtro}
-        className="transicion-ui w-fit rounded-control border border-borde bg-superficie px-4 text-sm font-medium text-tinta toque-actividad"
-      >
+      <button type="button" onClick={onCargarOtro} className="boton w-fit">
         Cargar otro archivo
       </button>
     </div>

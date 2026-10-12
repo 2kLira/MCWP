@@ -1,5 +1,23 @@
 # Sistema de diseño
 
+> **Nota del 12 de octubre de 2026.** El rediseño general aprobado ese día cambió varias reglas de
+> este documento. Donde choquen, manda lo de abajo; el detalle y el porqué están en
+> `PENDIENTES.md`, entradas 71 a 73. Lo que no se menciona aquí sigue vigente tal cual.
+>
+> - **Vidrio:** va en todas las tarjetas (utilidad `tarjeta`), no solo sobre el mapa.
+> - **Naranja:** además de la escala del mapa, la acción primaria y el foco, lo llevan las fichas
+>   de icono de las cifras, sus flechas, las barras de avance, los filtros encendidos y el estado
+>   vivo de una lista. Títulos, cuerpo, bordes e iconos de navegación siguen en neutros. El
+>   destino activo del riel es una ficha en tinta con un punto naranja.
+> - **Neutros:** fondo `#F1EFEC`. La regla de "nada de fondo crema" sigue: es greige, no crema.
+> - **Tipografía:** texto base de 14 (`0.875rem`) fijo; título de página de 28 a 32; cifras de 28.
+>   En celular los campos de formulario se quedan en 16.
+> - **Forma:** radio de control 10, tarjeta 16. La sombra de tarjeta es
+>   `0 1px 2px rgba(50,35,20,.04), 0 10px 28px rgba(50,35,20,.05)`.
+> - **Estructura:** el buscador y la cuenta flotan a la derecha del título en todas las pantallas.
+>   El contenedor tope es 1360. El riel de escritorio es fijo, angosto y no colapsa.
+> - **El mapa no cambió.** Todo lo que este documento dice del mapa y de su vidrio sigue igual.
+
 El producto es una herramienta de operación territorial que se usa caminando en la calle y se
 presenta en una sala de juntas. Tiene que verse serio como software de gobierno y sentirse rápido
 como una app de campo. El mapa es el protagonista, no un adorno del tablero.

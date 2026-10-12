@@ -838,3 +838,45 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     que al cambiar de casilla seguía buscando en la sección anterior. Queda un solo aviso,
     informativo: el compilador de React no optimiza la lista virtual de Personas porque TanStack
     Virtual no es compatible con él.
+
+## Rediseño general (12 de octubre de 2026)
+
+71. **Rediseño de todas las pantallas, aprobado sobre maqueta. Contradice el sistema de diseño en
+    varios puntos y se anota aquí en lugar de reescribir la historia.** El cliente trajo tres
+    referencias (tablero, estructura territorial, personas) y aprobó una maqueta estática antes de
+    tocar código. Lo que cambió respecto a `spec/sistema-diseno.md`, que ya se actualizó con una
+    nota al inicio:
+    · **El vidrio va en todas las tarjetas**, no solo en lo que flota sobre el mapa. Utilidad
+      nueva `tarjeta` en `app/globals.css`; las de antes (`vidrio`, `capsula`, `dock`…) no se
+      tocaron porque el mapa las usa.
+    · **El naranja ya no vive solo en tres lugares.** Lo pidió el cliente viendo la maqueta: las
+      fichas de icono de las cifras, sus flechas, la barra de cobertura y los filtros encendidos
+      son naranjas. La jerarquía sigue en tinta: el destino activo del riel es una ficha en tinta
+      con un punto naranja, ya no texto naranja.
+    · **Fondo greige (`#f1efec`) y texto base de 14.** El spec pedía 15 a 16 fluido. En celular
+      los campos se quedan en 16 para que iOS no acerque la página al enfocarlos.
+    · **Radio de control de 10**, antes 6.
+    · **Buscador y cuenta flotan a la derecha del título en todas las pantallas**, no solo en el
+      tablero, y ya no son pegajosos. Cada pantalla arma su encabezado con
+      `components/sistema/encabezado-pagina.tsx`, que reserva ese hueco.
+    · **La cápsula de sesión es ahora un menú de cuenta** (`<details>`, sigue cerrando sesión sin
+      JavaScript). En celular, dentro de Más, sigue siendo la caja de antes.
+    · **El mapa no se rediseñó, por instrucción expresa.** `components/mapa/` no se tocó. Su
+      contenedor lleva la clase `mapa-intacto`, que devuelve adentro los dos tokens que cambiaron
+      (texto base y radio de control). Lo que el mapa pinta en un portal fuera de ese contenedor
+      sí toma los valores nuevos; la diferencia es de un punto de letra y cuatro de radio.
+
+72. **Tres cosas nuevas que entraron con el rediseño, todas de presentación.**
+    · Las cinco cifras del tablero ahora son enlaces a `/personas`, sin filtro. Antes no llevaban
+      a ningún lado. Si se quiere que cada una filtre (promovidos, quieren participar…), falta
+      que `/personas` lea sus filtros de la URL: no se hizo.
+    · En el tablero, "Hoy" y "Esta semana" son una sola tarjeta con un conmutador. Mismas dos
+      listas, mismas consultas.
+    · `⌘K` o `Ctrl+K` enfoca el buscador de la barra.
+
+73. **Lo que traían las referencias y no se construyó porque no existe en el sistema.** Campana de
+    avisos; selector de alcance ("Todo el municipio": el alcance sale de la sesión); conmutador
+    mapa/lista en la tarjeta del mapa; "última actualización"; en Personas, paginación numerada,
+    casillas de selección y menú por renglón; en Estructura territorial, pestañas
+    Demarcaciones/Secciones/Responsables, minimapa de demarcaciones, dona y conmutador
+    lista/rejilla. Cada una es una función nueva y se decide aparte.

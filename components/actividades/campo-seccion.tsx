@@ -48,9 +48,9 @@ export function CampoSeccion({
 
   if (elegida) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-control border border-borde bg-superficie p-3">
+      <div className="flex items-center justify-between gap-3 rounded-control border border-borde bg-superficie-hundida py-2 pl-3 pr-2">
         <p className="text-sm">
-          <span className="cifras block text-base font-medium text-tinta">
+          <span className="cifras block font-semibold text-tinta">
             Sección {elegida.properties.clave}
           </span>
           <span className="block text-tinta-suave">{elegida.properties.demarcacion}</span>
@@ -61,7 +61,7 @@ export function CampoSeccion({
             onCambiar("");
             setTexto("");
           }}
-          className="transicion-ui shrink-0 rounded-control border border-borde px-3 text-sm text-tinta-suave toque-actividad"
+          className="boton shrink-0"
         >
           Cambiar
         </button>
@@ -102,7 +102,7 @@ export function CampoSeccion({
                     onCambiar(s.clave);
                     setTexto("");
                   }}
-                  className="transicion-ui flex w-full items-center justify-between gap-2 rounded-control border border-borde bg-superficie px-3 py-2 text-left text-sm toque-actividad"
+                  className="renglon-activo flex min-h-11 w-full items-center justify-between gap-2 rounded-control border border-borde px-3 text-left text-sm"
                 >
                   <span className="cifras text-tinta">Sección {s.clave}</span>
                   <span className="text-xs text-tinta-suave">{s.demarcacion}</span>

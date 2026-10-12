@@ -75,9 +75,9 @@ export function EliminarActividad({ actividadId }: { actividadId: string }) {
       <button
         type="button"
         onClick={abrir}
-        className="transicion-ui flex items-center justify-center gap-2 rounded-control border border-alerta/40 px-4 text-base font-medium text-alerta toque-actividad hover:bg-alerta/10"
+        className="transicion-ui inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-3 text-sm font-medium text-alerta transition-colors hover:bg-alerta/10"
       >
-        <Trash2 className="size-5" aria-hidden />
+        <Trash2 className="size-4" aria-hidden />
         Eliminar actividad
       </button>
 
@@ -93,7 +93,7 @@ export function EliminarActividad({ actividadId }: { actividadId: string }) {
           </div>
         ) : paso === "resumen" ? (
           <div className="flex flex-col gap-4">
-            <p className="text-base text-tinta">
+            <p className="text-sm text-tinta">
               Vas a eliminar <strong className="font-semibold">{resumen.nombre}</strong>.
             </p>
 
@@ -127,7 +127,7 @@ export function EliminarActividad({ actividadId }: { actividadId: string }) {
               <button
                 type="button"
                 onClick={() => setPaso("confirmar")}
-                className="transicion-ui flex-1 rounded-control border border-alerta/40 text-base font-medium text-alerta toque-actividad hover:bg-alerta/10"
+                className="boton flex-1 text-alerta!"
               >
                 Continuar
               </button>
@@ -135,7 +135,7 @@ export function EliminarActividad({ actividadId }: { actividadId: string }) {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <p className="text-base text-tinta">
+            <p className="text-sm text-tinta">
               Último paso. Para eliminar{" "}
               <strong className="font-semibold">{resumen.nombre}</strong> escribe{" "}
               <strong className="font-semibold tracking-wide">{PALABRA}</strong>.
@@ -167,7 +167,7 @@ export function EliminarActividad({ actividadId }: { actividadId: string }) {
                 type="button"
                 onClick={eliminar}
                 disabled={!coincide || paso === "borrando"}
-                className="transicion-ui flex flex-1 items-center justify-center gap-2 rounded-control bg-alerta/15 text-base font-semibold text-alerta ring-1 ring-alerta toque-actividad disabled:opacity-40"
+                className="transicion-ui toque-actividad flex flex-1 items-center justify-center gap-2 rounded-control bg-alerta px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-40 dark:text-fondo"
               >
                 {paso === "borrando" ? (
                   <>
@@ -175,7 +175,7 @@ export function EliminarActividad({ actividadId }: { actividadId: string }) {
                   </>
                 ) : (
                   <>
-                    <Trash2 className="size-5" aria-hidden />
+                    <Trash2 className="size-4" aria-hidden />
                     Eliminar para siempre
                   </>
                 )}
@@ -212,7 +212,7 @@ function BotonCancelar({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="transicion-ui flex-1 rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad"
+      className="boton-primario flex-1"
     >
       Cancelar
     </button>

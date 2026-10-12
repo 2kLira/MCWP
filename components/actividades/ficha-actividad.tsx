@@ -2,11 +2,24 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ClipboardList, UserPlus } from "lucide-react";
+import {
+  ArrowLeft,
+  Camera,
+  Flag,
+  Images,
+  Info,
+  MessageSquareWarning,
+  Play,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { InvitarBrigadistas } from "@/components/actividades/invitar-brigadistas";
 import { EliminarActividad } from "@/components/actividades/eliminar-actividad";
-import { Tarjeta } from "@/components/tablero/tarjeta";
+import { Caja } from "@/components/sistema/caja";
+import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
+import { Estado } from "@/components/sistema/estado";
+import { BarraAvance } from "@/components/sistema/barra-avance";
 import { FotosActividad } from "@/components/actividades/fotos-actividad";
 import { BotonEvidencia, LineaEvidencia } from "@/components/actividades/evidencia";
 import { demarcacionPorId } from "@/lib/demarcaciones";
@@ -95,8 +108,8 @@ export function FichaActividad({ id }: { id: string }) {
 
   if (actividad.cargando) {
     return (
-      <div className="flex flex-col gap-4">
-        <div className="h-6 w-32 animate-pulse rounded-control bg-superficie-hundida" />
+      <div className="flex flex-col gap-5">
+        <div className="h-9 w-56 animate-pulse rounded-control bg-superficie-hundida" />
         <div className="h-40 animate-pulse rounded-tarjeta bg-superficie-hundida" />
         <div className="h-40 animate-pulse rounded-tarjeta bg-superficie-hundida" />
       </div>
@@ -142,72 +155,47 @@ export function FichaActividad({ id }: { id: string }) {
   const demarcacion = demarcacionPorId(a.demarcacion_id)?.nombre;
   const enCierre = puedeEditarActividad && actividadAbierta;
 
+  // Las acciones de estatus conservan sus condiciones de siempre; aquí solo se les pone nombre
+  // para poder acomodarlas en el renglón de acciones.
+  const conAccionesDeEstatus = puedeEditarActividad && a.estatus !== "realizada";
+  const puedeMarcarEnCurso = conAccionesDeEstatus && a.estatus === "programada" && !!fotoInicio;
+  const faltaFotoDeInicio = conAccionesDeEstatus && a.estatus === "programada" && !fotoInicio;
+  const conConsolidado = enCierre || a.estatus === "realizada";
+
   return (
     <div className="flex flex-col gap-5">
-      <Volver />
+      <EncabezadoPagina
+        titulo={a.nombre}
+        apoyo={
+          <>
+            {ETIQUETA_TIPO_ACTIVIDAD[a.tipo]}
+            {a.seccion_clave && (
+              <>
+                {" · "}
+                <span className="cifras">Sección {a.seccion_clave}</span>
+              </>
+            )}
+          </>
+        }
+        volver={{ href: "/actividades", etiqueta: "Actividades" }}
+      />
 
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-xl">{a.nombre}</h1>
-          <p className="text-sm text-tinta-suave">{ETIQUETA_TIPO_ACTIVIDAD[a.tipo]}</p>
-        </div>
-        <span className="pildora shrink-0">{ETIQUETA_ESTATUS[a.estatus]}</span>
-      </header>
-
-      <section className="grid gap-3 sm:grid-cols-2">
-        <Dato
-          etiqueta="Fecha"
-          valor={`${fechaLarga(a.fecha)}${a.hora ? ` · ${horaCorta(a.hora)}` : ""}`}
-        />
-        <Dato
-          etiqueta="Ubicación"
-          valor={
-            [a.direccion, a.seccion_clave ? `Sección ${a.seccion_clave}` : null, demarcacion]
-              .filter(Boolean)
-              .join(" · ") || "Sin dato"
-          }
-        />
-        <Dato etiqueta="Responsable" valor={responsable.datos?.nombre ?? "Sin asignar"} />
-        {a.objetivo && <Dato etiqueta="Objetivo" valor={a.objetivo} ancho />}
-        {a.notas && <Dato etiqueta="Notas" valor={a.notas} ancho />}
-      </section>
-
-      {/* Nota discreta, no un error: encabezar una actividad de otra sección pasa todo el
-          tiempo en campo y no se marca como falla. */}
-      {responsable.datos?.seccion_clave &&
-        a.seccion_clave &&
-        responsable.datos.seccion_clave !== a.seccion_clave && (
-          <p className="text-xs text-tinta-tenue">
-            {responsable.datos.nombre} no es responsable de la sección {a.seccion_clave}.
-          </p>
-        )}
-
-      {puedeEditarActividad && a.estatus !== "realizada" && (
-        <div className="flex flex-col gap-3">
-          {a.estatus === "programada" &&
-            (fotoInicio ? (
-              <div className="flex flex-wrap gap-2">
-                <BotonEstatus
-                  etiqueta="Marcar en curso"
-                  onClick={() => moverA("en_curso")}
-                  deshabilitado={moviendo}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2 rounded-control border border-borde bg-superficie p-3">
-                <p className="text-sm text-tinta-suave">
-                  Sube la foto de inicio para poder marcarla en curso.
-                </p>
-                <BotonEvidencia
-                  actividadId={id}
-                  momento="inicio"
-                  usuarioId={actuante.id}
-                  alSubir={() => setRecargar((v) => v + 1)}
-                />
-              </div>
-            ))}
-
-          <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Estado vivo={a.estatus === "en_curso"}>{ETIQUETA_ESTATUS[a.estatus]}</Estado>
+        {conAccionesDeEstatus && (
+          <div className="ml-auto flex flex-wrap items-center gap-2.5">
+            {/* La única naranja de la ficha mientras exista: el cierre baja a secundario. */}
+            {puedeMarcarEnCurso && (
+              <button
+                type="button"
+                onClick={() => moverA("en_curso")}
+                disabled={moviendo}
+                className="boton-primario"
+              >
+                <Play className="size-4" aria-hidden />
+                Marcar en curso
+              </button>
+            )}
             {(a.estatus === "programada" || a.estatus === "en_curso") && (
               <BotonEstatus etiqueta="Cancelar" onClick={() => moverA("cancelada")} deshabilitado={moviendo} />
             )}
@@ -215,154 +203,216 @@ export function FichaActividad({ id }: { id: string }) {
               <BotonEstatus etiqueta="Reprogramar" onClick={() => moverA("programada")} deshabilitado={moviendo} />
             )}
           </div>
-          {avisoEstatus && <p className="text-sm text-alerta">{avisoEstatus}</p>}
+        )}
+      </div>
+
+      {faltaFotoDeInicio && (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-tinta-suave">
+            Sube la foto de inicio para poder marcarla en curso.
+          </p>
+          <BotonEvidencia
+            actividadId={id}
+            momento="inicio"
+            usuarioId={actuante.id}
+            alSubir={() => setRecargar((v) => v + 1)}
+          />
         </div>
       )}
+      {conAccionesDeEstatus && avisoEstatus && (
+        <p className="text-sm text-alerta">{avisoEstatus}</p>
+      )}
 
-      <Link
-        href={`/registrar?actividad=${id}` as never}
-        className="transicion-ui flex items-center justify-center gap-2 vidrio filo rounded-tarjeta px-4 text-base font-medium text-tinta toque-actividad elevacion-apoyo"
-        style={{ minHeight: "var(--toque-actividad)" }}
-      >
-        <UserPlus className="size-5" aria-hidden />
-        Registrar personas en esta actividad
-      </Link>
-
-      <InvitarBrigadistas
-        actividadId={id}
-        estatus={a.estatus}
-        puedeInvitar={esAdmin(actuante)}
-      />
-
-      <Tarjeta titulo="Participaciones">
-        {participaciones.cargando ? (
-          <div className="h-16 animate-pulse rounded-control bg-superficie-hundida" />
-        ) : participaciones.datos.length === 0 ? (
-          <p className="text-sm text-tinta-suave">Todavía nadie se ha registrado aquí.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {participaciones.datos.map((p) => (
-              <li key={p.id} className="flex items-center justify-between gap-3">
-                <span className="min-w-0 truncate text-sm text-tinta">
-                  {p.personas?.nombre ?? "Persona sin nombre"}
-                </span>
-                <span className="pildora shrink-0">
-                  {p.tipo === "registro" ? "Nueva" : "Asistencia"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Tarjeta>
-
-      <Tarjeta titulo="Evidencia de inicio y cierre">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-2">
-            <LineaEvidencia
-              etiqueta="Inicio"
-              foto={fotoInicio}
-              faltaAviso={
-                !fotoInicio && (a.estatus === "en_curso" || a.estatus === "realizada")
-                  ? "Esta actividad ya arrancó y no tiene foto de inicio."
-                  : undefined
-              }
-            />
-            {!fotoInicio && subirDesdeTarjeta && (
-              <BotonEvidencia
-                actividadId={id}
-                momento="inicio"
-                usuarioId={actuante.id}
-                alSubir={() => setRecargar((v) => v + 1)}
+      <div className="grid items-start gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <Caja icono={Info} titulo="Datos">
+            <div className="grid gap-x-5 gap-y-3.5 sm:grid-cols-2 xl:grid-cols-3">
+              <Dato
+                etiqueta="Fecha"
+                valor={`${fechaLarga(a.fecha)}${a.hora ? ` · ${horaCorta(a.hora)}` : ""}`}
               />
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <LineaEvidencia etiqueta="Cierre" foto={fotoCierre} />
-            {!fotoCierre && subirDesdeTarjeta && (
-              <BotonEvidencia
-                actividadId={id}
-                momento="cierre"
-                usuarioId={actuante.id}
-                alSubir={() => setRecargar((v) => v + 1)}
+              <Dato
+                etiqueta="Ubicación"
+                valor={
+                  [a.direccion, a.seccion_clave ? `Sección ${a.seccion_clave}` : null, demarcacion]
+                    .filter(Boolean)
+                    .join(" · ") || "Sin dato"
+                }
               />
+              <Dato etiqueta="Responsable" valor={responsable.datos?.nombre ?? "Sin asignar"} />
+              {a.objetivo && <Dato etiqueta="Objetivo" valor={a.objetivo} ancho />}
+              {a.notas && <Dato etiqueta="Notas" valor={a.notas} ancho />}
+            </div>
+
+            {/* Nota discreta, no un error: encabezar una actividad de otra sección pasa todo el
+                tiempo en campo y no se marca como falla. */}
+            {responsable.datos?.seccion_clave &&
+              a.seccion_clave &&
+              responsable.datos.seccion_clave !== a.seccion_clave && (
+                <p className="mt-3 text-xs text-tinta-tenue">
+                  {responsable.datos.nombre} no es responsable de la sección {a.seccion_clave}.
+                </p>
+              )}
+          </Caja>
+
+          <Caja
+            icono={Users}
+            titulo="Participaciones"
+            accion={
+              <Link
+                href={`/registrar?actividad=${id}` as never}
+                className="boton max-sm:w-full"
+              >
+                <UserPlus className="size-4" aria-hidden />
+                Registrar personas en esta actividad
+              </Link>
+            }
+          >
+            {participaciones.cargando ? (
+              <div className="h-16 animate-pulse rounded-control bg-superficie-hundida" />
+            ) : participaciones.datos.length === 0 ? (
+              <p className="text-sm text-tinta-suave">Todavía nadie se ha registrado aquí.</p>
+            ) : (
+              <ul className="flex flex-col divide-y divide-separador">
+                {participaciones.datos.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+                    <span className="min-w-0 truncate text-sm text-tinta">
+                      {p.personas?.nombre ?? "Persona sin nombre"}
+                    </span>
+                    <span className="shrink-0 text-xs text-tinta-suave">
+                      {p.tipo === "registro" ? "Nueva" : "Asistencia"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
-          </div>
+          </Caja>
+
+          <Caja icono={Camera} titulo="Evidencia de inicio y cierre">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
+                <LineaEvidencia
+                  etiqueta="Inicio"
+                  foto={fotoInicio}
+                  faltaAviso={
+                    !fotoInicio && (a.estatus === "en_curso" || a.estatus === "realizada")
+                      ? "Esta actividad ya arrancó y no tiene foto de inicio."
+                      : undefined
+                  }
+                />
+                {!fotoInicio && subirDesdeTarjeta && (
+                  <BotonEvidencia
+                    actividadId={id}
+                    momento="inicio"
+                    usuarioId={actuante.id}
+                    alSubir={() => setRecargar((v) => v + 1)}
+                  />
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 border-t border-separador pt-3">
+                <LineaEvidencia etiqueta="Cierre" foto={fotoCierre} />
+                {!fotoCierre && subirDesdeTarjeta && (
+                  <BotonEvidencia
+                    actividadId={id}
+                    momento="cierre"
+                    usuarioId={actuante.id}
+                    alSubir={() => setRecargar((v) => v + 1)}
+                  />
+                )}
+              </div>
+
+              {subirDesdeTarjeta && (
+                <p className="text-xs text-tinta-tenue">
+                  Tú subes la foto de inicio y la de cierre. Cerrar la actividad lo hace el
+                  administrador.
+                </p>
+              )}
+            </div>
+          </Caja>
 
           {subirDesdeTarjeta && (
-            <p className="text-xs text-tinta-tenue">
-              Tú subes la foto de inicio y la de cierre. Cerrar la actividad lo hace el
-              administrador.
-            </p>
+            <ConclusionBrigadista
+              key={a.conclusion ?? ""}
+              id={id}
+              inicial={a.conclusion ?? ""}
+              alGuardar={() => setRecargar((v) => v + 1)}
+            />
+          )}
+
+          <Caja icono={Images} titulo="Fotos">
+            {/* Decisión: el brigadista también sube a la galería general, no solo la evidencia de
+                inicio y cierre.
+                A favor pesan tres cosas. Una, la política `fotos_insert` ya se lo permite, y este
+                proyecto tiene documentado en lib/puertas-ui.ts que una puerta de interfaz más
+                estricta que la política es un error, no una precaución: es el mismo bug que se
+                arregló con el botón de corregir personas. Dos, `CREA.foto` ya lista al brigadista,
+                o sea que la intención estaba escrita y nada más no se usaba. Tres, una foto de más
+                en la galería no cambia ningún número: el consolidado del cierre se calcula de
+                participaciones, no de fotos.
+                Lo que el cliente pidió —inicio y fin— se trata distinto de todos modos: tiene su
+                propia tarjeta, su propia etiqueta, y es lo único que bloquea marcar en curso y
+                cerrar. La galería queda como evidencia adicional.
+                Ojo con el estatus: aquí no se usa `actividadAbierta` a secas porque el administrador
+                sí puede seguir agregando fotos a una actividad ya realizada, igual que la política. */}
+            <FotosActividad
+              actividadId={id}
+              fotos={galeria}
+              cargando={fotos.cargando}
+              puedeSubir={puedeSubirEvidencia}
+              usuarioId={actuante.id}
+              alSubir={() => setRecargar((v) => v + 1)}
+            />
+          </Caja>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-4">
+          <InvitarBrigadistas
+            actividadId={id}
+            estatus={a.estatus}
+            puedeInvitar={esAdmin(actuante)}
+          />
+
+          {enCierre ? (
+            <BloqueCierre
+              key={a.conclusion ?? ""}
+              id={id}
+              conclusionInicial={a.conclusion ?? ""}
+              consolidado={consolidado.datos}
+              cargandoConsolidado={consolidado.cargando}
+              fotoCierre={fotoCierre}
+              primaria={!puedeMarcarEnCurso}
+              alSubirFoto={() => setRecargar((v) => v + 1)}
+              alCerrar={() => setRecargar((v) => v + 1)}
+            />
+          ) : a.estatus === "realizada" ? (
+            <Caja icono={Flag} titulo="Cierre">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <p className="text-xs text-tinta-suave">Conclusión</p>
+                  <p className="mt-1 text-sm text-tinta">
+                    {a.conclusion || "Sin conclusión registrada."}
+                  </p>
+                </div>
+                <ConsolidadoCifras consolidado={consolidado.datos} cargando={consolidado.cargando} />
+              </div>
+            </Caja>
+          ) : null}
+
+          {/* Antes vivía dentro del mismo recuadro que las cifras; sale con la misma condición:
+              donde se ve el consolidado, ya cargado y con al menos una mención. */}
+          {conConsolidado && !consolidado.cargando && consolidado.datos.menciones.length > 0 && (
+            <Menciones menciones={consolidado.datos.menciones} />
+          )}
+
+          {/* Al final de la ficha y separado, para que nadie lo toque buscando otra cosa. */}
+          {esAdmin(actuante) && (
+            <div className="flex justify-center pt-1">
+              <EliminarActividad actividadId={id} />
+            </div>
           )}
         </div>
-      </Tarjeta>
-
-      {subirDesdeTarjeta && (
-        <ConclusionBrigadista
-          key={a.conclusion ?? ""}
-          id={id}
-          inicial={a.conclusion ?? ""}
-          alGuardar={() => setRecargar((v) => v + 1)}
-        />
-      )}
-
-      <Tarjeta titulo="Fotos">
-        {/* Decisión: el brigadista también sube a la galería general, no solo la evidencia de
-            inicio y cierre.
-            A favor pesan tres cosas. Una, la política `fotos_insert` ya se lo permite, y este
-            proyecto tiene documentado en lib/puertas-ui.ts que una puerta de interfaz más
-            estricta que la política es un error, no una precaución: es el mismo bug que se
-            arregló con el botón de corregir personas. Dos, `CREA.foto` ya lista al brigadista,
-            o sea que la intención estaba escrita y nada más no se usaba. Tres, una foto de más
-            en la galería no cambia ningún número: el consolidado del cierre se calcula de
-            participaciones, no de fotos.
-            Lo que el cliente pidió —inicio y fin— se trata distinto de todos modos: tiene su
-            propia tarjeta, su propia etiqueta, y es lo único que bloquea marcar en curso y
-            cerrar. La galería queda como evidencia adicional.
-            Ojo con el estatus: aquí no se usa `actividadAbierta` a secas porque el administrador
-            sí puede seguir agregando fotos a una actividad ya realizada, igual que la política. */}
-        <FotosActividad
-          actividadId={id}
-          fotos={galeria}
-          cargando={fotos.cargando}
-          puedeSubir={puedeSubirEvidencia}
-          usuarioId={actuante.id}
-          alSubir={() => setRecargar((v) => v + 1)}
-        />
-      </Tarjeta>
-
-      {enCierre ? (
-        <BloqueCierre
-          key={a.conclusion ?? ""}
-          id={id}
-          conclusionInicial={a.conclusion ?? ""}
-          consolidado={consolidado.datos}
-          cargandoConsolidado={consolidado.cargando}
-          fotoCierre={fotoCierre}
-          alSubirFoto={() => setRecargar((v) => v + 1)}
-          alCerrar={() => setRecargar((v) => v + 1)}
-        />
-      ) : a.estatus === "realizada" ? (
-        <Tarjeta titulo="Cierre">
-          <div className="flex flex-col gap-4">
-            <div>
-              <p className="text-xs text-tinta-tenue">Conclusión</p>
-              <p className="mt-1 text-sm text-tinta">
-                {a.conclusion || "Sin conclusión registrada."}
-              </p>
-            </div>
-            <ConsolidadoTabla consolidado={consolidado.datos} cargando={consolidado.cargando} />
-          </div>
-        </Tarjeta>
-      ) : null}
-
-      {/* Al final de la ficha y separado, para que nadie lo toque buscando otra cosa. */}
-      {esAdmin(actuante) && (
-        <div className="mt-4 flex flex-col border-t border-borde pt-5">
-          <EliminarActividad actividadId={id} />
-        </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -373,6 +423,7 @@ function BloqueCierre({
   consolidado,
   cargandoConsolidado,
   fotoCierre,
+  primaria,
   alSubirFoto,
   alCerrar,
 }: {
@@ -381,6 +432,8 @@ function BloqueCierre({
   consolidado: Consolidado;
   cargandoConsolidado: boolean;
   fotoCierre: Foto | null;
+  /** Naranja solo si en la ficha no hay otra acción primaria a la vista. */
+  primaria: boolean;
   alSubirFoto: () => void;
   alCerrar: () => void;
 }) {
@@ -404,19 +457,12 @@ function BloqueCierre({
   }
 
   return (
-    <Tarjeta
-      titulo="Cerrar actividad"
-      accion={<ClipboardList className="size-4 text-tinta-tenue" aria-hidden />}
-    >
+    <Caja icono={Flag} titulo="Cerrar actividad">
       <div className="flex flex-col gap-4">
-        <div>
-          <p className="text-sm text-tinta">
-            Esto lo calcula el sistema. Lo único que se escribe abajo es la conclusión.
-          </p>
-          <div className="mt-2">
-            <ConsolidadoTabla consolidado={consolidado} cargando={cargandoConsolidado} />
-          </div>
-        </div>
+        <ConsolidadoCifras consolidado={consolidado} cargando={cargandoConsolidado} />
+        <p className="text-sm text-tinta-suave">
+          Esto lo calcula el sistema. Lo único que se escribe abajo es la conclusión.
+        </p>
 
         <label className="flex flex-col gap-1.5">
           <span className="text-sm text-tinta-suave">Conclusión general</span>
@@ -449,12 +495,12 @@ function BloqueCierre({
           type="button"
           disabled={!conclusion.trim() || !fotoCierre || cerrando}
           onClick={confirmar}
-          className="transicion-ui rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
+          className={`${primaria ? "boton-primario" : "boton"} sm:self-start`}
         >
           {cerrando ? "Cerrando…" : "Confirmar cierre"}
         </button>
       </div>
-    </Tarjeta>
+    </Caja>
   );
 }
 
@@ -498,7 +544,7 @@ function ConclusionBrigadista({
   }
 
   return (
-    <Tarjeta titulo="Conclusión general">
+    <Caja icono={Flag} titulo="Conclusión general">
       <div className="flex flex-col gap-3">
         <textarea
           value={texto}
@@ -521,7 +567,7 @@ function ConclusionBrigadista({
           type="button"
           disabled={guardando || sinCambios}
           onClick={guardar}
-          className="transicion-ui rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
+          className="boton-primario sm:self-start"
         >
           {guardando ? "Guardando…" : "Guardar conclusión"}
         </button>
@@ -529,11 +575,12 @@ function ConclusionBrigadista({
           El administrador la ve al cerrar la actividad y puede ajustarla.
         </p>
       </div>
-    </Tarjeta>
+    </Caja>
   );
 }
 
-function ConsolidadoTabla({
+/** Los cuatro conteos que calcula el sistema. Nunca se teclean. */
+function ConsolidadoCifras({
   consolidado,
   cargando,
 }: {
@@ -544,35 +591,43 @@ function ConsolidadoTabla({
     return <div className="h-24 animate-pulse rounded-control bg-superficie-hundida" />;
   }
   return (
-    <div className="flex flex-col gap-3 rounded-control border border-borde bg-superficie-hundida p-3">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Cifra etiqueta="Asistentes" valor={consolidado.asistentes} />
-        <Cifra etiqueta="Personas nuevas" valor={consolidado.nuevas} />
-        <Cifra etiqueta="Quieren participar" valor={consolidado.quierenParticipar} />
-        <Cifra etiqueta="Quieren información" valor={consolidado.quierenInfo} />
-      </div>
-      {consolidado.menciones.length > 0 && (
-        <div>
-          <p className="text-xs text-tinta-tenue">Menciones por problemática</p>
-          <ul className="mt-1 flex flex-col gap-1">
-            {consolidado.menciones.map((m) => (
-              <li key={m.problematica} className="flex items-center justify-between text-sm">
-                <span className="text-tinta">{m.problematica}</span>
-                <span className="cifras text-tinta-suave">{m.menciones}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+    <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
+      <Cifra etiqueta="Asistentes" valor={consolidado.asistentes} />
+      <Cifra etiqueta="Personas nuevas" valor={consolidado.nuevas} />
+      <Cifra etiqueta="Quieren participar" valor={consolidado.quierenParticipar} />
+      <Cifra etiqueta="Quieren información" valor={consolidado.quierenInfo} />
     </div>
+  );
+}
+
+/** Las menciones del consolidado, cada una con su barra proporcional a la más mencionada. */
+function Menciones({ menciones }: { menciones: Consolidado["menciones"] }) {
+  const mayor = Math.max(...menciones.map((m) => m.menciones), 1);
+  return (
+    <Caja icono={MessageSquareWarning} titulo="Menciones por problemática">
+      <ul className="flex flex-col gap-3.5">
+        {menciones.map((m) => (
+          <li key={m.problematica} className="flex flex-col gap-1.5">
+            <span className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="min-w-0 text-tinta">{m.problematica}</span>
+              <span className="cifras font-semibold text-tinta">{m.menciones}</span>
+            </span>
+            <BarraAvance
+              valor={m.menciones / mayor}
+              descripcion={`${m.problematica}: ${m.menciones} ${m.menciones === 1 ? "mención" : "menciones"}`}
+            />
+          </li>
+        ))}
+      </ul>
+    </Caja>
   );
 }
 
 function Cifra({ etiqueta, valor }: { etiqueta: string; valor: number }) {
   return (
     <div>
-      <p className="cifras text-lg font-semibold text-tinta">{valor.toLocaleString("es-MX")}</p>
-      <p className="text-xs text-tinta-tenue">{etiqueta}</p>
+      <p className="text-xs text-tinta-suave">{etiqueta}</p>
+      <p className="cifras mt-0.5 text-sm font-semibold text-tinta">{valor.toLocaleString("es-MX")}</p>
     </div>
   );
 }
@@ -591,20 +646,21 @@ function BotonEstatus({
       type="button"
       onClick={onClick}
       disabled={deshabilitado}
-      className="transicion-ui rounded-control border border-borde bg-superficie px-4 text-sm font-medium text-tinta toque-actividad disabled:opacity-50"
+      className="boton"
     >
       {etiqueta}
     </button>
   );
 }
 
+/** El regreso de la vista sin actividad, que no tiene nombre que poner de título. */
 function Volver() {
   return (
     <Link
       href="/actividades"
-      className="transicion-ui inline-flex w-fit items-center gap-2 text-sm text-tinta-suave hover:text-tinta"
+      className="transicion-ui inline-flex min-h-7 w-fit items-center gap-1.5 text-sm text-tinta-suave transition-colors hover:text-tinta"
     >
-      <ArrowLeft className="size-4" aria-hidden />
+      <ArrowLeft className="size-[0.9375rem]" aria-hidden />
       Actividades
     </Link>
   );
@@ -620,10 +676,8 @@ function Dato({
   ancho?: boolean;
 }) {
   return (
-    <div
-      className={`rounded-control border border-borde bg-superficie p-3 ${ancho ? "sm:col-span-2" : ""}`}
-    >
-      <p className="text-xs text-tinta-tenue">{etiqueta}</p>
+    <div className={ancho ? "min-w-0 sm:col-span-full" : "min-w-0"}>
+      <p className="text-xs text-tinta-suave">{etiqueta}</p>
       <p className="mt-0.5 text-sm text-tinta">{valor}</p>
     </div>
   );

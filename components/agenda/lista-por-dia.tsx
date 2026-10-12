@@ -16,9 +16,9 @@ export function ListaPorDia({
 }) {
   if (cargando) {
     return (
-      <ul className="flex flex-col gap-2">
+      <ul className="tarjeta flex flex-col gap-2 p-[1.125rem]">
         {Array.from({ length: 5 }).map((_, i) => (
-          <li key={i} className="h-14 animate-pulse rounded-control bg-superficie-hundida" />
+          <li key={i} className="h-12 animate-pulse rounded-control bg-superficie-hundida" />
         ))}
       </ul>
     );
@@ -35,13 +35,13 @@ export function ListaPorDia({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="tarjeta flex flex-col gap-3.5 p-[1.125rem]">
       {grupos.map(([fecha, filas]) => (
-        <div key={fecha}>
-          <p className="mb-1 text-xs font-medium capitalize text-tinta-tenue">
+        <section key={fecha}>
+          <h2 className="mb-0.5 text-[0.78125rem] font-semibold text-tinta-suave first-letter:uppercase">
             {tituloDia(fecha)}
-          </p>
-          <div className="flex flex-col divide-y divide-borde vidrio filo rounded-tarjeta">
+          </h2>
+          <div className="flex flex-col divide-y divide-separador">
             {filas.map((actividad) => (
               <RenglonActividad
                 key={actividad.id}
@@ -50,7 +50,7 @@ export function ListaPorDia({
               />
             ))}
           </div>
-        </div>
+        </section>
       ))}
     </div>
   );

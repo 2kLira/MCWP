@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { PortonAgenda } from "@/components/porton-agenda";
+import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
 import { Tarjeta } from "@/components/tablero/tarjeta";
 import { useActuante } from "@/components/proveedor-actuante";
 import { descargarCsv } from "@/lib/csv";
@@ -66,121 +67,134 @@ export default function Reportes() {
 
   return (
     <div className="flex flex-col gap-5">
-      <header>
-        <h1 className="text-xl">Reportes</h1>
-        <p className="text-sm text-tinta-suave">Calculados en vivo sobre lo capturado.</p>
-      </header>
+      <EncabezadoPagina titulo="Reportes" apoyo="Calculados en vivo sobre lo capturado." />
 
-      <Tarjeta
-        titulo="Semanal: personas nuevas y actividades realizadas"
-        accion={
-          <BotonCsv
-            nombre="reporte-semanal"
-            columnas={[
-              { llave: "inicio", etiqueta: "Semana del" },
-              { llave: "personas", etiqueta: "Personas nuevas" },
-              { llave: "actividades", etiqueta: "Actividades realizadas" },
-            ]}
-            filas={semanal.datos}
-          />
-        }
-      >
-        {semanal.cargando ? (
-          <div className="h-64 animate-pulse rounded-control bg-superficie-hundida" />
-        ) : (
-          <GraficaSemanal datos={semanal.datos} />
-        )}
-      </Tarjeta>
-
-      <Tarjeta
-        titulo="Personas alcanzadas por demarcación"
-        accion={
-          <BotonCsv
-            nombre="personas-por-demarcacion"
-            columnas={[
-              { llave: "demarcacion", etiqueta: "Demarcación" },
-              { llave: "personas", etiqueta: "Personas alcanzadas" },
-              { llave: "quieren_participar", etiqueta: "Quieren participar" },
-              { llave: "quieren_info", etiqueta: "Quieren información" },
-              { llave: "secciones", etiqueta: "Secciones" },
-              { llave: "secciones_sin_responsable", etiqueta: "Sin responsable" },
-            ]}
-            filas={demarcaciones.datos}
-          />
-        }
-      >
-        {demarcaciones.cargando ? (
-          <div className="h-64 animate-pulse rounded-control bg-superficie-hundida" />
-        ) : (
-          <Grafica
-            datos={conDatos.map((d) => ({ nombre: d.demarcacion, valor: d.personas }))}
-          />
-        )}
-      </Tarjeta>
-
-      <Tarjeta
-        titulo="Menciones por problemática"
-        accion={
-          <BotonCsv
-            nombre="menciones-por-problematica"
-            columnas={[
-              { llave: "problematica", etiqueta: "Problemática" },
-              { llave: "total", etiqueta: "Menciones" },
-            ]}
-            filas={porProblematica}
-          />
-        }
-      >
-        {menciones.cargando ? (
-          <div className="h-64 animate-pulse rounded-control bg-superficie-hundida" />
-        ) : (
-          <Grafica datos={porProblematica.map((p) => ({ nombre: p.problematica, valor: p.total }))} />
-        )}
-      </Tarjeta>
-
-      <Tarjeta
-        titulo="Resumen por demarcación"
-        accion={
-          <BotonCsv
-            nombre="resumen-por-demarcacion"
-            columnas={[
-              { llave: "demarcacion", etiqueta: "Demarcación" },
-              { llave: "personas", etiqueta: "Personas alcanzadas" },
-              { llave: "reuniones", etiqueta: "Reuniones" },
-              { llave: "activismo", etiqueta: "Activismo" },
-              { llave: "recorridos", etiqueta: "Recorridos" },
-            ]}
-            filas={demarcaciones.datos}
-          />
-        }
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[34rem] text-sm">
-            <thead>
-              <tr className="text-left text-xs text-tinta-tenue">
-                <th className="py-2 font-medium">Demarcación</th>
-                <th className="py-2 font-medium">Personas alcanzadas</th>
-                <th className="py-2 font-medium">Participan</th>
-                <th className="py-2 font-medium">Reuniones</th>
-                <th className="py-2 font-medium">Activismo</th>
-                <th className="py-2 font-medium">Recorridos</th>
-              </tr>
-            </thead>
-            <tbody>
-              {demarcaciones.datos.map((d) => (
-                <tr key={d.demarcacion_id} className="border-t border-borde">
-                  <td className="py-2 text-tinta">{d.demarcacion}</td>
-                  <td className="py-2">{d.personas}</td>
-                  <td className="py-2 text-tinta-suave">{d.quieren_participar}</td>
-                  <td className="py-2 text-tinta-suave">{d.reuniones}</td>
-                  <td className="py-2 text-tinta-suave">{d.activismo}</td>
-                  <td className="py-2 text-tinta-suave">{d.recorridos}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Semanal y menciones lado a lado en escritorio; los dos de demarcación a todo el ancho.
+          El min-w-0 deja que las gráficas se encojan dentro de la rejilla. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="min-w-0">
+          <Tarjeta
+            titulo="Semanal: personas nuevas y actividades realizadas"
+            accion={
+              <BotonCsv
+                nombre="reporte-semanal"
+                columnas={[
+                  { llave: "inicio", etiqueta: "Semana del" },
+                  { llave: "personas", etiqueta: "Personas nuevas" },
+                  { llave: "actividades", etiqueta: "Actividades realizadas" },
+                ]}
+                filas={semanal.datos}
+              />
+            }
+          >
+            {semanal.cargando ? (
+              <div className="h-64 animate-pulse rounded-control bg-superficie-hundida" />
+            ) : (
+              <GraficaSemanal datos={semanal.datos} />
+            )}
+          </Tarjeta>
         </div>
-      </Tarjeta>
+
+        <div className="min-w-0">
+          <Tarjeta
+            titulo="Menciones por problemática"
+            accion={
+              <BotonCsv
+                nombre="menciones-por-problematica"
+                columnas={[
+                  { llave: "problematica", etiqueta: "Problemática" },
+                  { llave: "total", etiqueta: "Menciones" },
+                ]}
+                filas={porProblematica}
+              />
+            }
+          >
+            {menciones.cargando ? (
+              <div className="h-64 animate-pulse rounded-control bg-superficie-hundida" />
+            ) : (
+              <Grafica
+                datos={porProblematica.map((p) => ({ nombre: p.problematica, valor: p.total }))}
+              />
+            )}
+          </Tarjeta>
+        </div>
+
+        <div className="min-w-0 lg:col-span-2">
+          <Tarjeta
+            titulo="Personas alcanzadas por demarcación"
+            accion={
+              <BotonCsv
+                nombre="personas-por-demarcacion"
+                columnas={[
+                  { llave: "demarcacion", etiqueta: "Demarcación" },
+                  { llave: "personas", etiqueta: "Personas alcanzadas" },
+                  { llave: "quieren_participar", etiqueta: "Quieren participar" },
+                  { llave: "quieren_info", etiqueta: "Quieren información" },
+                  { llave: "secciones", etiqueta: "Secciones" },
+                  { llave: "secciones_sin_responsable", etiqueta: "Sin responsable" },
+                ]}
+                filas={demarcaciones.datos}
+              />
+            }
+          >
+            {demarcaciones.cargando ? (
+              <div className="h-64 animate-pulse rounded-control bg-superficie-hundida" />
+            ) : (
+              <Grafica
+                datos={conDatos.map((d) => ({ nombre: d.demarcacion, valor: d.personas }))}
+              />
+            )}
+          </Tarjeta>
+        </div>
+
+        <div className="min-w-0 lg:col-span-2">
+          <Tarjeta
+            titulo="Resumen por demarcación"
+            accion={
+              <BotonCsv
+                nombre="resumen-por-demarcacion"
+                columnas={[
+                  { llave: "demarcacion", etiqueta: "Demarcación" },
+                  { llave: "personas", etiqueta: "Personas alcanzadas" },
+                  { llave: "reuniones", etiqueta: "Reuniones" },
+                  { llave: "activismo", etiqueta: "Activismo" },
+                  { llave: "recorridos", etiqueta: "Recorridos" },
+                ]}
+                filas={demarcaciones.datos}
+              />
+            }
+          >
+            {/* La tabla llega a los bordes de la tarjeta: se come el relleno del cuerpo y alinea
+                su primera y última columna con el título. */}
+            <div className="-mx-[1.125rem] -mb-[1.125rem] overflow-x-auto">
+              <table className="tabla min-w-[34rem] [&_td:first-child]:pl-[1.125rem] [&_td:last-child]:pr-[1.125rem] [&_th:first-child]:pl-[1.125rem] [&_th:last-child]:pr-[1.125rem]">
+                <thead>
+                  <tr>
+                    <th>Demarcación</th>
+                    <th className="num">Personas alcanzadas</th>
+                    <th className="num">Participan</th>
+                    <th className="num">Reuniones</th>
+                    <th className="num">Activismo</th>
+                    <th className="num">Recorridos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {demarcaciones.datos.map((d) => (
+                    <tr key={d.demarcacion_id}>
+                      <td className="text-tinta">{d.demarcacion}</td>
+                      <td className="num">{d.personas}</td>
+                      <td className="num text-tinta-suave">{d.quieren_participar}</td>
+                      <td className="num text-tinta-suave">{d.reuniones}</td>
+                      <td className="num text-tinta-suave">{d.activismo}</td>
+                      <td className="num text-tinta-suave">{d.recorridos}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Tarjeta>
+        </div>
+      </div>
     </div>
   );
 }
@@ -296,10 +310,9 @@ function BotonCsv({
     <button
       type="button"
       onClick={() => descargarCsv(nombre, columnas, filas)}
-      className="transicion-ui inline-flex items-center gap-1.5 rounded-control border border-borde px-2.5 text-xs text-tinta-suave transition-colors hover:text-tinta"
-      style={{ minHeight: 36 }}
+      className="boton shrink-0"
     >
-      <Download className="size-3.5" aria-hidden />
+      <Download className="size-4" aria-hidden />
       CSV
     </button>
   );

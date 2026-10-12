@@ -33,6 +33,20 @@ export function Buscador({
   const [resultados, setResultados] = useState<Resultado[]>([]);
   const [abierto, setAbierto] = useState(false);
   const contenedor = useRef<HTMLDivElement>(null);
+  const campo = useRef<HTMLInputElement>(null);
+
+  // ⌘K o Ctrl+K enfoca el buscador de la barra. Solo ese: en celular no hay teclado que lo pida.
+  useEffect(() => {
+    if (!comoCapsula) return;
+    function alTeclear(evento: KeyboardEvent) {
+      if ((evento.metaKey || evento.ctrlKey) && evento.key.toLowerCase() === "k") {
+        evento.preventDefault();
+        campo.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", alTeclear);
+    return () => document.removeEventListener("keydown", alTeclear);
+  }, [comoCapsula]);
 
   useEffect(() => {
     const consulta = texto.trim();
@@ -131,6 +145,7 @@ export function Buscador({
         aria-hidden
       />
       <input
+        ref={campo}
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         onFocus={() => resultados.length > 0 && setAbierto(true)}
@@ -139,14 +154,27 @@ export function Buscador({
         className={cn(
           "campo",
           comoCapsula
-            ? "capsula filo rounded-pildora border-transparent pl-11 placeholder:text-tinta-tenue"
+            ? "tarjeta pl-11 placeholder:text-tinta-tenue lg:pr-14"
             : "pl-9",
         )}
-        style={{ minHeight: 44 }}
+        // El radio va en línea: .campo y .tarjeta traen cada una el suyo y aquí manda la píldora.
+        style={comoCapsula ? { minHeight: 44, borderRadius: 999 } : { minHeight: 44 }}
       />
+      {comoCapsula && (
+        <kbd
+          aria-hidden
+          className="pointer-events-none absolute right-3.5 top-1/2 hidden -translate-y-1/2 rounded-md bg-superficie-hundida px-1.5 py-0.5 font-sans text-xs font-medium text-tinta-suave lg:block"
+        >
+          ⌘ K
+        </kbd>
+      )}
 
       {abierto && resultados.length > 0 && (
-        <ul className="vidrio filo absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-tarjeta py-1">
+        <ul
+          className="tarjeta absolute left-0 right-0 z-50 mt-2 min-w-72 overflow-hidden py-1"
+          // Opaca: una lista translúcida encima de una tabla no se lee.
+          style={{ background: "var(--superficie)" }}
+        >
           {resultados.map((r) => (
             <li key={`${r.tipo}-${"id" in r ? r.id : r.clave}`}>
               <button

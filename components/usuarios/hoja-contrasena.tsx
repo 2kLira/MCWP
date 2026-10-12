@@ -50,7 +50,7 @@ export function HojaContrasena({
               vuelve a mostrar y este sistema no manda correos.
             </p>
 
-            <div className="flex flex-col gap-1 rounded-control border border-borde bg-superficie-hundida p-3">
+            <div className="flex flex-col gap-1 rounded-control bg-superficie-hundida p-3.5">
               <span className="text-xs text-tinta-tenue">Contraseña</span>
               <span className="cifras text-base text-tinta">{contrasena}</span>
             </div>
@@ -65,7 +65,7 @@ export function HojaContrasena({
                   setError("No se pudo copiar. Selecciónala y cópiala a mano.");
                 }
               }}
-              className="transicion-ui toque-actividad flex items-center justify-center gap-2 rounded-control border border-borde bg-superficie text-sm text-tinta hover:bg-superficie-hundida"
+              className="boton min-h-12 w-full"
             >
               {copiada ? (
                 <>
@@ -81,7 +81,7 @@ export function HojaContrasena({
             <button
               type="button"
               onClick={alCerrar}
-              className="transicion-ui toque-actividad rounded-control bg-naranja text-base font-medium text-sobre-naranja"
+              className="boton-primario min-h-12 w-full"
             >
               Listo
             </button>
@@ -96,7 +96,7 @@ export function HojaContrasena({
               type="button"
               onClick={reponer}
               disabled={trabajando}
-              className="transicion-ui toque-actividad rounded-control bg-naranja text-base font-medium text-sobre-naranja disabled:opacity-50"
+              className="boton-primario min-h-12 w-full"
             >
               {trabajando ? "Generando…" : "Generar contraseña nueva"}
             </button>

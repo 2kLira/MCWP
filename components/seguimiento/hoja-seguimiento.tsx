@@ -61,8 +61,11 @@ export function HojaSeguimiento({
         onClick={alCerrar}
         className="absolute inset-0 bg-tinta/40"
       />
-      <div className="transicion-panel relative w-full max-w-md vidrio filo rounded-hoja p-4 elevacion-flotante">
-        <div className="mb-3 flex items-start justify-between gap-3">
+      <div
+        className="tarjeta transicion-panel relative w-full max-w-md p-[1.125rem]"
+        style={{ background: "var(--superficie)" }}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-tinta-tenue">Registrar seguimiento</p>
             <h2 className="truncate text-lg font-semibold text-tinta">{fila.nombre}</h2>
@@ -77,8 +80,8 @@ export function HojaSeguimiento({
           </button>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm text-tinta-suave">
+        <div className="flex flex-col gap-3.5">
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-tinta-suave">
             Tipo
             <select
               value={tipo}
@@ -93,7 +96,7 @@ export function HojaSeguimiento({
             </select>
           </label>
 
-          <label className="flex flex-col gap-1 text-sm text-tinta-suave">
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-tinta-suave">
             Estado
             <select
               value={estado}
@@ -108,7 +111,7 @@ export function HojaSeguimiento({
             </select>
           </label>
 
-          <label className="flex flex-col gap-1 text-sm text-tinta-suave">
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-tinta-suave">
             Nota
             <textarea
               value={nota}
@@ -121,11 +124,11 @@ export function HojaSeguimiento({
 
           {aviso && <p className="text-sm text-alerta">{aviso}</p>}
 
-          <div className="mt-1 flex justify-end gap-2">
+          <div className="mt-1 flex justify-end gap-2.5">
             <button
               type="button"
               onClick={alCerrar}
-              className="transicion-ui toque-actividad rounded-control border border-borde px-4 text-sm text-tinta-suave transition-colors hover:bg-superficie-hundida"
+              className="boton"
             >
               Cancelar
             </button>
@@ -133,7 +136,7 @@ export function HojaSeguimiento({
               type="button"
               onClick={guardar}
               disabled={guardando}
-              className="transicion-ui toque-actividad rounded-control bg-tinta px-4 text-sm font-medium text-superficie disabled:opacity-60"
+              className="boton-primario"
             >
               {guardando ? "Guardando…" : "Guardar seguimiento"}
             </button>

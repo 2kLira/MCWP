@@ -64,32 +64,34 @@ export function SelectorPunto({
         </div>
       </div>
 
-      <div className="border-t border-borde bg-superficie p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <p className="text-sm text-tinta-suave">
-          {clave ? (
-            <>
-              Punto en la sección <span className="cifras font-medium text-tinta">{clave}</span>
-            </>
-          ) : (
-            "El punto está fuera de las secciones del municipio."
-          )}
-        </p>
-        <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            onClick={alCancelar}
-            className="transicion-ui flex-1 rounded-control border border-borde bg-superficie text-sm font-medium text-tinta toque-actividad"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            disabled={!clave}
-            onClick={() => alConfirmar(centro, clave)}
-            className="transicion-ui flex-1 rounded-control bg-naranja text-sm font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
-          >
-            Usar este punto
-          </button>
+      <div className="border-t border-separador bg-superficie p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto w-full max-w-[47.5rem]">
+          <p className="text-sm text-tinta-suave">
+            {clave ? (
+              <>
+                Punto en la sección <span className="cifras font-medium text-tinta">{clave}</span>
+              </>
+            ) : (
+              "El punto está fuera de las secciones del municipio."
+            )}
+          </p>
+          <div className="mt-3 flex gap-2.5">
+            <button
+              type="button"
+              onClick={alCancelar}
+              className="boton min-h-12 flex-1"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={!clave}
+              onClick={() => alConfirmar(centro, clave)}
+              className="boton-primario min-h-12 flex-1"
+            >
+              Usar este punto
+            </button>
+          </div>
         </div>
       </div>
     </div>

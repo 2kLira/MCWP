@@ -9,6 +9,7 @@ import { HojaContrasena } from "@/components/usuarios/hoja-contrasena";
 import { HojaUsuario } from "@/components/usuarios/hoja-usuario";
 import { demarcacionPorId } from "@/lib/demarcaciones";
 import { PortonAgenda } from "@/components/porton-agenda";
+import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
 import { puedeVerListadosGenerales, puedeVerUsuarios } from "@/lib/puertas-ui";
 import { ETIQUETA_ROL } from "@/lib/tipos";
 import { useConsulta } from "@/lib/usar-consulta";
@@ -69,8 +70,8 @@ export default function Usuarios() {
 
   if (!puedeVerUsuarios(actuante)) {
     return (
-      <section className="flex flex-col gap-3">
-        <h1 className="text-xl">Usuarios</h1>
+      <section className="flex flex-col gap-5">
+        <EncabezadoPagina titulo="Usuarios" />
         <p className="medida text-sm text-tinta-suave">
           Esta pantalla solo la ve el administrador general.
         </p>
@@ -79,27 +80,25 @@ export default function Usuarios() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl">Usuarios</h1>
-          <p className="cifras text-sm text-tinta-suave">
+    <div className="flex flex-col gap-5">
+      <EncabezadoPagina
+        titulo="Usuarios"
+        apoyo={
+          <span className="cifras">
             {usuarios.cargando
               ? "Cargando…"
               : `${usuarios.datos.length} usuarios · ${totalPersonas.toLocaleString("es-MX")} personas registradas, ${totalHoy.toLocaleString("es-MX")} hoy`}
-          </p>
-        </div>
+          </span>
+        }
+      />
 
+      <div className="flex flex-wrap items-center gap-2.5">
         {/* La única acción primaria de la pantalla. */}
-        <button
-          type="button"
-          onClick={() => setHojaAlta(true)}
-          className="transicion-ui toque-actividad flex items-center gap-2 rounded-control bg-naranja px-4 text-sm font-medium text-sobre-naranja"
-        >
+        <button type="button" onClick={() => setHojaAlta(true)} className="boton-primario ml-auto">
           <UserPlus className="size-4" aria-hidden />
           Agregar usuario
         </button>
-      </header>
+      </div>
 
       {(usuarios.aviso || avisoBaja) && (
         <p role="alert" className="medida text-sm text-alerta">
@@ -107,102 +106,84 @@ export default function Usuarios() {
         </p>
       )}
 
-      <div className="vidrio filo overflow-hidden rounded-tarjeta">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[44rem] text-sm">
-            <thead>
-              <tr className="text-left text-xs text-tinta-tenue">
-                <th className="px-4 py-3 font-medium">Nombre</th>
-                <th className="px-4 py-3 font-medium">
-                  {/* El encabezado es el control: tocarlo ordena de quien más registró a quien
-                      menos, y tocarlo otra vez regresa al orden por rol. */}
+      <div className="tarjeta overflow-x-auto">
+        <table className="tabla min-w-[56rem]">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>
+                {/* El encabezado es el control: tocarlo ordena de quien más registró a quien
+                    menos, y tocarlo otra vez regresa al orden por rol. */}
+                <button
+                  type="button"
+                  onClick={() => setPorRegistros((v) => !v)}
+                  aria-pressed={porRegistros}
+                  className={cn(
+                    "transicion-ui -mx-2 -my-3 flex min-h-11 items-center gap-1.5 rounded-control px-2 transition-colors hover:bg-superficie-hundida hover:text-tinta",
+                    porRegistros && "text-tinta",
+                  )}
+                >
+                  Personas registradas
+                  <ArrowDownWideNarrow
+                    className={cn("size-3.5", !porRegistros && "opacity-40")}
+                    aria-hidden
+                  />
+                </button>
+              </th>
+              <th>Rol</th>
+              <th>Territorio</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map((u) => (
+              <tr key={u.id}>
+                <td className="font-semibold text-tinta">{u.nombre}</td>
+                <td>
+                  <CeldaCapturas c={capturasDe.get(u.id)} cargando={capturas.cargando} />
+                </td>
+                <td className="text-tinta-suave">{ETIQUETA_ROL[u.rol]}</td>
+                <td className="text-tinta-suave">
+                  {u.rol === "brigadista" ? (
+                    "Por invitación"
+                  ) : u.seccion_clave ? (
+                    <span className="cifras">Sección {u.seccion_clave}</span>
+                  ) : (
+                    (demarcacionPorId(u.demarcacion_id)?.nombre ?? "Todo el municipio")
+                  )}
+                </td>
+                <td>
                   <button
                     type="button"
-                    onClick={() => setPorRegistros((v) => !v)}
-                    aria-pressed={porRegistros}
-                    className={cn(
-                      "transicion-ui -mx-2 flex items-center gap-1.5 rounded-control px-2 hover:bg-superficie-hundida hover:text-tinta",
-                      porRegistros && "text-tinta",
-                    )}
-                    style={{ minHeight: 32 }}
+                    onClick={async () => {
+                      setAvisoBaja(null);
+                      const r = await cambiarActivo(actuante, u.id, !u.activo);
+                      if (r.aviso) setAvisoBaja(r.aviso);
+                      recargar();
+                    }}
+                    aria-pressed={u.activo}
+                    className="chip"
                   >
-                    Personas registradas
-                    <ArrowDownWideNarrow
-                      className={cn("size-3.5", !porRegistros && "opacity-40")}
-                      aria-hidden
-                    />
+                    {u.activo ? "Activo" : "Inactivo"}
                   </button>
-                </th>
-                <th className="px-4 py-3 font-medium">Rol</th>
-                <th className="px-4 py-3 font-medium">Territorio</th>
-                <th className="px-4 py-3 font-medium">Estado</th>
-                <th className="px-4 py-3 font-medium">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map((u) => (
-                <tr key={u.id} className="border-t border-borde">
-                  <td className="px-4 py-2 text-tinta">{u.nombre}</td>
-                  <td className="px-4 py-2">
-                    <CeldaCapturas c={capturasDe.get(u.id)} cargando={capturas.cargando} />
-                  </td>
-                  <td className="px-4 py-2 text-tinta-suave">{ETIQUETA_ROL[u.rol]}</td>
-                  <td className="px-4 py-2 text-tinta-suave">
-                    {u.rol === "brigadista" ? (
-                      "Por invitación"
-                    ) : u.seccion_clave ? (
-                      <span className="cifras">Sección {u.seccion_clave}</span>
-                    ) : (
-                      (demarcacionPorId(u.demarcacion_id)?.nombre ?? "Todo el municipio")
-                    )}
-                  </td>
-                  <td className="px-4 py-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setAvisoBaja(null);
-                        const r = await cambiarActivo(actuante, u.id, !u.activo);
-                        if (r.aviso) setAvisoBaja(r.aviso);
-                        recargar();
-                      }}
-                      className={cn(
-                        "pildora transicion-ui transition-colors",
-                        !u.activo && "hueco-punteado",
-                      )}
-                      style={{ minHeight: 32 }}
-                    >
-                      {u.activo ? "Activo" : "Inactivo"}
+                </td>
+                <td>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setEditando(u)} className="boton">
+                      <Pencil className="size-4 text-tinta-suave" aria-hidden />
+                      Editar
                     </button>
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setEditando(u)}
-                        title="Editar"
-                        className="transicion-ui flex items-center gap-1.5 rounded-control px-2 text-tinta-suave transition-colors hover:bg-superficie-hundida hover:text-tinta"
-                        style={{ minHeight: 32 }}
-                      >
-                        <Pencil className="size-4" aria-hidden />
-                        <span className="sr-only md:not-sr-only">Editar</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setReponiendo(u)}
-                        title="Reponer contraseña"
-                        className="transicion-ui flex items-center gap-1.5 rounded-control px-2 text-tinta-suave transition-colors hover:bg-superficie-hundida hover:text-tinta"
-                        style={{ minHeight: 32 }}
-                      >
-                        <KeyRound className="size-4" aria-hidden />
-                        <span className="sr-only md:not-sr-only">Contraseña</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <button type="button" onClick={() => setReponiendo(u)} className="boton">
+                      <KeyRound className="size-4 text-tinta-suave" aria-hidden />
+                      Reponer contraseña
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <p className="medida text-sm text-tinta-suave">
@@ -262,7 +243,7 @@ function CeldaCapturas({ c, cargando }: { c: CapturasUsuario | undefined; cargan
     .join(" · ");
   return (
     <div className="flex flex-col">
-      <span className="cifras text-base font-semibold text-tinta">
+      <span className="cifras text-sm font-semibold text-tinta">
         {c.personas.toLocaleString("es-MX")}
       </span>
       <span className="cifras text-xs text-tinta-suave">{detalle}</span>

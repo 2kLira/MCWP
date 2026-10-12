@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Download, FileSpreadsheet, ShieldAlert } from "lucide-react";
+import { Download, FileSpreadsheet, ShieldAlert, Table } from "lucide-react";
+import { Caja } from "@/components/sistema/caja";
+import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
 import { useActuante } from "@/components/proveedor-actuante";
 import { PortonAgenda } from "@/components/porton-agenda";
 import { esAdmin, puedeExportar, puedeVerListadosGenerales } from "@/lib/puertas-ui";
@@ -91,8 +93,8 @@ export default function Exportar() {
 
   if (!puedeExportar(actuante)) {
     return (
-      <section className="flex flex-col gap-3">
-        <h1 className="text-xl">Exportar a Excel</h1>
+      <section className="flex flex-col gap-5">
+        <EncabezadoPagina titulo="Exportar a Excel" />
         <p className="medida text-sm text-tinta-suave">
           La exportación la hacen el administrador general y los responsables de demarcación.
         </p>
@@ -127,87 +129,82 @@ export default function Exportar() {
 
   return (
     <section className="flex flex-col gap-5">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-xl">Exportar a Excel</h1>
-        <p className="medida text-sm text-tinta-suave">
-          Baja la información en un archivo que abre directo en Excel, Google Sheets o Numbers.
-          Cada tabla viene en su propia hoja, con filtros y fechas listas para ordenar.
-          {!esAdmin(actuante) && " Solo incluye lo de tu demarcación."}
+      <EncabezadoPagina
+        titulo="Exportar a Excel"
+        apoyo={
+          <>
+            Baja la información en un archivo que abre directo en Excel, Google Sheets o Numbers.
+            Cada tabla viene en su propia hoja, con filtros y fechas listas para ordenar.
+            {!esAdmin(actuante) && " Solo incluye lo de tu demarcación."}
+          </>
+        }
+      />
+
+      <div className="flex w-full max-w-[47.5rem] flex-col gap-4">
+        <Caja icono={FileSpreadsheet} titulo="Todo en un solo archivo">
+          <p className="text-sm text-tinta-suave">
+            {tablas.length} hojas: {tablas.map((t) => t.titulo).join(", ")}.
+          </p>
+          <button
+            type="button"
+            onClick={() => bajar("todo", tablas, "soet")}
+            disabled={bajando !== null}
+            className="boton-primario mt-3.5 max-sm:w-full"
+          >
+            {bajando === "todo" ? (
+              <>
+                Armando el archivo…
+              </>
+            ) : (
+              <>
+                <Download className="size-4" aria-hidden />
+                Descargar todo
+              </>
+            )}
+          </button>
+        </Caja>
+
+        {aviso && (
+          <p
+            role="status"
+            className={`text-sm ${aviso.tono === "error" ? "text-alerta" : "text-tinta-suave"}`}
+          >
+            {aviso.texto}
+          </p>
+        )}
+
+        <Caja icono={Table} titulo="O una tabla a la vez">
+          <ul className="divide-y divide-separador">
+            {tablas.map((t) => (
+              <li key={t.clave} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-tinta">{t.titulo}</p>
+                  <p className="text-[0.78125rem] text-tinta-suave">{t.descripcion}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => bajar(t.clave, [t], t.clave)}
+                  disabled={bajando !== null}
+                  aria-label={`Descargar ${t.titulo}`}
+                  className="boton shrink-0 max-sm:w-11 max-sm:px-0"
+                >
+                  <Download
+                    className={cn("size-4", bajando === t.clave && "animate-pulse")}
+                    aria-hidden
+                  />
+                  <span className="max-sm:hidden">Descargar</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Caja>
+
+        <p className="medida flex items-start gap-2 text-xs text-tinta-suave">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          El archivo trae datos personales y, ya descargado, el sistema no lo puede proteger. No lo
+          mandes por WhatsApp ni lo dejes en computadoras compartidas.
         </p>
-      </header>
-
-      <div className="vidrio filo flex flex-col gap-3 rounded-tarjeta p-4">
-        <div className="flex items-start gap-3">
-          <FileSpreadsheet className="mt-0.5 size-6 shrink-0 text-naranja-texto" aria-hidden />
-          <div>
-            <p className="text-base font-medium text-tinta">Todo en un solo archivo</p>
-            <p className="text-sm text-tinta-suave">
-              {tablas.length} hojas: {tablas.map((t) => t.titulo).join(", ")}.
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => bajar("todo", tablas, "soet")}
-          disabled={bajando !== null}
-          className="transicion-ui flex items-center justify-center gap-2 rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
-        >
-          {bajando === "todo" ? (
-            <>
-              Armando el archivo…
-            </>
-          ) : (
-            <>
-              <Download className="size-5" aria-hidden />
-              Descargar todo
-            </>
-          )}
-        </button>
       </div>
-
-      {aviso && (
-        <p
-          role="status"
-          className={`text-sm ${aviso.tono === "error" ? "text-alerta" : "text-tinta-suave"}`}
-        >
-          {aviso.texto}
-        </p>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <h2 className="text-xs font-medium text-tinta-suave">O una tabla a la vez</h2>
-        <ul className="vidrio filo overflow-hidden rounded-tarjeta">
-          {tablas.map((t, i) => (
-            <li
-              key={t.clave}
-              className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-borde" : ""}`}
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-tinta">{t.titulo}</p>
-                <p className="text-xs text-tinta-suave">{t.descripcion}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => bajar(t.clave, [t], t.clave)}
-                disabled={bajando !== null}
-                aria-label={`Descargar ${t.titulo}`}
-                className="transicion-ui grid size-11 shrink-0 place-items-center rounded-control border border-borde text-tinta hover:bg-superficie-hundida disabled:opacity-50"
-              >
-                <Download
-                  className={cn("size-5", bajando === t.clave && "animate-pulse")}
-                  aria-hidden
-                />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <p className="medida flex items-start gap-2 text-xs text-tinta-tenue">
-        <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-        El archivo trae datos personales y, ya descargado, el sistema no lo puede proteger. No lo
-        mandes por WhatsApp ni lo dejes en computadoras compartidas.
-      </p>
     </section>
   );
 }

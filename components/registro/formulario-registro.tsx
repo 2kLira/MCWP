@@ -1,7 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, LoaderCircle, MapPin, Search, TriangleAlert } from "lucide-react";
+import {
+  Check,
+  Handshake,
+  Heart,
+  House,
+  LoaderCircle,
+  MapPin,
+  MessageSquare,
+  Search,
+  TriangleAlert,
+  User,
+} from "lucide-react";
 import { SelectorPunto } from "@/components/registro/selector-punto";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId, DEMARCACIONES } from "@/lib/demarcaciones";
@@ -35,6 +46,7 @@ import { problematicas, type Problematica } from "@/lib/datos/catalogos";
 import { GENEROS, ETIQUETA_GENERO, type Genero } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
 import { Campo } from "@/components/campo";
+import { Caja } from "@/components/sistema/caja";
 
 /** El texto del aviso va provisional, con nota visible de que falta revisión legal. */
 const AVISO_VERSION = "provisional-1";
@@ -484,20 +496,20 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
   if (estado === "guardada") {
     return (
-      <div className="flex flex-col items-center gap-4 py-12 text-center">
-        <span className="grid size-14 place-items-center rounded-full bg-superficie-hundida">
-          <Check className="size-7 text-tinta" aria-hidden />
+      <div className="tarjeta flex max-w-[47.5rem] flex-col items-center gap-4 px-[1.125rem] py-12 text-center">
+        <span className="grid size-14 place-items-center rounded-full bg-naranja-suave">
+          <Check className="size-7 text-naranja-texto" aria-hidden />
         </span>
         <div>
-          <p className="text-lg font-medium">Persona registrada</p>
-          <p className="text-sm text-tinta-suave">
+          <p className="text-lg font-semibold text-tinta">Persona registrada</p>
+          <p className="cifras mt-1 text-sm text-tinta-suave">
             Sección {ubicacion?.clave} · {demarcacionNombre}
           </p>
         </div>
         <button
           type="button"
           onClick={otraCaptura}
-          className="transicion-ui w-full max-w-xs rounded-control bg-naranja text-sm font-medium text-sobre-naranja toque-actividad"
+          className="boton-primario min-h-12 w-full max-w-xs"
         >
           Registrar a alguien más
         </button>
@@ -507,27 +519,22 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
   return (
     <>
-      <form onSubmit={guardar} className="flex flex-col gap-5 pb-4">
+      <form onSubmit={guardar} className="flex max-w-[47.5rem] flex-col gap-5 pb-4">
         {/* La sección se muestra como confirmación, nunca como campo que alguien tenga que llenar. */}
-        <div
-          className={cn(
-            "rounded-tarjeta border p-3",
-            ubicacion ? "border-borde bg-superficie" : "hueco-punteado",
-          )}
-        >
+        <Caja icono={MapPin} titulo="Ubicación">
           {ubicando ? (
-            <p className="flex items-center gap-2 text-sm text-tinta-suave">
+            <p className="flex min-h-12 items-center gap-2 text-sm text-tinta-suave">
               <LoaderCircle className="size-4 animate-spin" aria-hidden />
               Leyendo la ubicación…
             </p>
           ) : ubicacion ? (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3.5">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm">
                   <span className="block text-tinta-suave">
                     {ETIQUETA_ORIGEN_UBICACION[ubicacion.origen]}
                   </span>
-                  <span className="cifras block text-lg font-medium text-tinta">
+                  <span className="cifras block text-lg font-semibold text-tinta">
                     Sección {ubicacion.clave}
                   </span>
                   <span className="block text-tinta-suave">{demarcacionNombre}</span>
@@ -535,23 +542,21 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
                 <button
                   type="button"
                   onClick={() => setAbrirMapa(true)}
-                  className="transicion-ui shrink-0 rounded-control border border-borde px-3 text-sm text-tinta-suave toque-actividad"
+                  className="boton min-h-12 shrink-0"
                 >
                   Cambiar
                 </button>
               </div>
 
               {opcionesSeccion.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 border-t border-borde pt-3">
-                  <label className="flex flex-wrap items-center gap-2 text-xs text-tinta-suave">
-                    Corregir sección a mano
-                    <SelectorSeccion
-                      opciones={opcionesSeccion}
-                      valor={ubicacion.clave}
-                      onCambiar={corregirSeccion}
-                    />
-                  </label>
-                </div>
+                <label className="flex flex-col gap-1.5 border-t border-separador pt-3.5 text-sm text-tinta-suave sm:max-w-[calc(50%-0.5rem)]">
+                  Corregir sección a mano
+                  <SelectorSeccion
+                    opciones={opcionesSeccion}
+                    valor={ubicacion.clave}
+                    onCambiar={corregirSeccion}
+                  />
+                </label>
               )}
               {noCoincideConGps && (
                 <p className="text-xs text-tinta-tenue">
@@ -560,7 +565,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
               )}
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3.5">
               <p className="flex items-start gap-2 text-sm text-tinta-suave">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
                 {errorGps ?? "Sin ubicación."}
@@ -568,13 +573,13 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
               <button
                 type="button"
                 onClick={() => setAbrirMapa(true)}
-                className="transicion-ui flex items-center justify-center gap-2 rounded-control border border-borde bg-superficie text-sm font-medium text-tinta toque-actividad"
+                className="boton min-h-12 sm:self-start"
               >
                 <MapPin className="size-4" aria-hidden />
                 Marcar en el mapa
               </button>
               {opcionesSeccion.length > 0 && (
-                <label className="flex flex-wrap items-center gap-2 text-xs text-tinta-suave">
+                <label className="flex flex-col gap-1.5 text-sm text-tinta-suave sm:max-w-[calc(50%-0.5rem)]">
                   O elige la sección a mano
                   <SelectorSeccion
                     opciones={opcionesSeccion}
@@ -585,340 +590,348 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
               )}
             </div>
           )}
-        </div>
+        </Caja>
 
-        <Campo etiqueta="Nombre(s)">
-          <input
-            ref={nombreRef}
-            value={nombres}
-            onChange={(e) => setNombres(e.target.value)}
-            autoComplete="off"
-            autoCapitalize="words"
-            required
-            className="campo"
-          />
-        </Campo>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Campo etiqueta="Apellido paterno">
-            <input
-              value={apellidoPaterno}
-              onChange={(e) => setApellidoPaterno(e.target.value)}
-              autoComplete="off"
-              autoCapitalize="words"
-              required
-              className="campo"
-            />
-          </Campo>
-          {/* Opcional: hay quien solo tiene un apellido, y obligarlo haría inventar uno. */}
-          <Campo etiqueta="Apellido materno (si tiene)">
-            <input
-              value={apellidoMaterno}
-              onChange={(e) => setApellidoMaterno(e.target.value)}
-              autoComplete="off"
-              autoCapitalize="words"
-              className="campo"
-            />
-          </Campo>
-        </div>
-
-        <div>
-          <p className="mb-2 text-sm text-tinta-suave">Género</p>
-          <div className="flex flex-wrap gap-2">
-            {GENEROS.map((g) => {
-              const activo = genero === g;
-              return (
-                <button
-                  key={g}
-                  type="button"
-                  aria-pressed={activo}
-                  onClick={() => setGenero(activo ? null : g)}
-                  className={cn(
-                    "transicion-ui rounded-pildora border px-3 py-2 text-sm transition-colors",
-                    activo
-                      ? "border-tinta bg-tinta text-superficie"
-                      : "border-borde bg-superficie text-tinta-suave",
-                  )}
-                >
-                  {ETIQUETA_GENERO[g]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <Campo etiqueta="Fecha de nacimiento">
-          <input
-            type="date"
-            value={fechaNacimiento}
-            max={new Date().toISOString().slice(0, 10)}
-            onChange={(e) => setFechaNacimiento(e.target.value)}
-            className="campo cifras"
-          />
-          {edad !== null && <span className="text-xs text-tinta-tenue">{edad} años</span>}
-        </Campo>
-
-        <Campo etiqueta="Teléfono" apoyo="Diez dígitos. Opcional.">
-          <input
-            value={telefono}
-            inputMode="tel"
-            onChange={(e) => {
-              const valor = e.target.value;
-              setTelefono(valor);
-              void revisarTelefono(valor);
-              // Solo regaña cuando ya hay diez dígitos; antes deja escribir en paz.
-              if (valor.replace(/\D/g, "").length >= 10) {
-                validarTelefonoEnVivo(valor);
-              } else {
-                setErrorTelefono(null);
-              }
-            }}
-            onBlur={(e) => validarTelefonoEnVivo(e.target.value)}
-            className="campo cifras"
-          />
-          {errorTelefono && <p className="text-sm text-alerta">{errorTelefono}</p>}
-        </Campo>
-
-        {duplicadoSinFicha && (
-          <div className="rounded-tarjeta border border-borde bg-superficie-hundida p-3">
-            <p className="text-sm font-medium text-tinta">Este teléfono ya está registrado</p>
-            <p className="medida mt-1 text-sm text-tinta-suave">
-              No puedes ver de quién es porque está fuera de tu actividad. Guárdala como persona
-              distinta sin teléfono y avísale al administrador general, o pídele que le agregue la
-              participación.
-            </p>
-          </div>
-        )}
-
-        {duplicada && (
-          <div className="rounded-tarjeta border border-borde bg-superficie-hundida p-3">
-            <p className="text-sm font-medium text-tinta">Este teléfono ya está registrado</p>
-            <p className="mt-1 text-sm text-tinta-suave">
-              {duplicada.nombre}
-              {duplicada.seccion_clave && ` · sección ${duplicada.seccion_clave}`}
-              {duplicada.demarcacion_id &&
-                ` · ${demarcacionPorId(duplicada.demarcacion_id)?.nombre}`}
-            </p>
-            <div className="mt-3 flex flex-col gap-2">
-              <Opcion
-                nombre="duplicado"
-                elegido={caminoDuplicado === "agregar"}
-                alElegir={() => setCaminoDuplicado("agregar")}
-                titulo="Agregar esta participación a la persona encontrada"
-                apoyo="Es el camino correcto casi siempre."
-              />
-              <Opcion
-                nombre="duplicado"
-                elegido={caminoDuplicado === "otra"}
-                alElegir={() => setCaminoDuplicado("otra")}
-                titulo="Es otra persona distinta"
-                apoyo="Se guarda sin teléfono y queda marcada para revisión."
-              />
+        <Caja icono={User} titulo="Datos">
+          <div className="grid gap-x-4 gap-y-3.5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Campo etiqueta="Nombre(s)">
+                <input
+                  ref={nombreRef}
+                  value={nombres}
+                  onChange={(e) => setNombres(e.target.value)}
+                  autoComplete="off"
+                  autoCapitalize="words"
+                  required
+                  className="campo"
+                />
+              </Campo>
             </div>
-          </div>
-        )}
 
-        <Campo etiqueta="Calle">
-          <input
-            value={calle}
-            onChange={(e) => setCalle(e.target.value)}
-            className="campo"
-            autoComplete="off"
-          />
-        </Campo>
-
-        {colonias.length > 0 && (
-          <Campo etiqueta="Colonia" apoyo="Referencia. La sección manda.">
-            <select
-              value={coloniaId ?? ""}
-              onChange={(e) => setColoniaId(e.target.value ? Number(e.target.value) : null)}
-              className="campo"
-            >
-              <option value="">Sin especificar</option>
-              {colonias.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                  {c.cp ? ` · CP ${c.cp}` : ""}
-                </option>
-              ))}
-            </select>
-          </Campo>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <Interruptor
-            etiqueta="¿Llegó por un promotor?"
-            valor={llegoPorPromotor}
-            alCambiar={(v) => {
-              setLlegoPorPromotor(v);
-              if (!v) {
-                setPromotor(null);
-                setTextoPromotor("");
-              }
-            }}
-          />
-          {llegoPorPromotor && (
-            <div className="rounded-tarjeta border border-borde bg-superficie p-3">
-              {promotor ? (
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm text-tinta">
-                    {promotor.nombre}
-                    {promotor.seccion_clave && (
-                      <span className="ml-2 text-xs text-tinta-suave">
-                        Sección {promotor.seccion_clave}
-                      </span>
-                    )}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPromotor(null);
-                      setTextoPromotor("");
-                    }}
-                    className="transicion-ui shrink-0 rounded-control border border-borde px-3 text-xs text-tinta-suave toque-actividad"
-                  >
-                    Cambiar
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <div className="relative">
-                    <Search
-                      className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tinta-tenue"
-                      aria-hidden
-                    />
-                    <input
-                      value={textoPromotor}
-                      onChange={(e) => setTextoPromotor(e.target.value)}
-                      autoComplete="off"
-                      placeholder="Buscar promotor por nombre"
-                      className="campo pl-9"
-                    />
-                  </div>
-                  {buscandoPromotor && <p className="text-xs text-tinta-tenue">Buscando…</p>}
-                  {!buscandoPromotor && resultadosPromotor.length > 0 && (
-                    <ul className="flex flex-col gap-1">
-                      {resultadosPromotor.map((p) => (
-                        <li key={p.id}>
-                          <button
-                            type="button"
-                            onClick={() => setPromotor(p)}
-                            className="transicion-ui w-full rounded-control border border-borde bg-superficie px-3 py-2 text-left text-sm text-tinta toque-actividad"
-                          >
-                            {p.nombre}
-                            {p.seccion_clave && (
-                              <span className="ml-2 text-xs text-tinta-suave">
-                                Sección {p.seccion_clave}
-                              </span>
-                            )}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {!buscandoPromotor &&
-                    textoPromotor.trim().length >= 2 &&
-                    resultadosPromotor.length === 0 && (
-                      <p className="text-xs text-tinta-tenue">Sin coincidencias.</p>
-                    )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Interruptor
-            etiqueta="Quiere participar"
-            valor={quiereParticipar}
-            alCambiar={setQuiereParticipar}
-          />
-          <Interruptor
-            etiqueta="Quiere recibir información"
-            valor={quiereInfo}
-            alCambiar={setQuiereInfo}
-          />
-          <Interruptor
-            etiqueta="Promovido, dará su voto"
-            valor={esPromovido}
-            alCambiar={setEsPromovido}
-          />
-          <Interruptor
-            etiqueta="Quiere ser representante de casilla"
-            valor={quiereSerRepresentante}
-            alCambiar={setQuiereSerRepresentante}
-          />
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Interruptor
-            etiqueta="¿Pidió algo en particular?"
-            valor={pidioAlgo}
-            alCambiar={(v) => {
-              setPidioAlgo(v);
-              if (!v) setDescripcionSolicitud("");
-            }}
-          />
-          {pidioAlgo && (
-            <Campo etiqueta="Qué pidió">
-              <textarea
-                value={descripcionSolicitud}
-                onChange={(e) => setDescripcionSolicitud(e.target.value)}
-                rows={2}
+            <Campo etiqueta="Apellido paterno">
+              <input
+                value={apellidoPaterno}
+                onChange={(e) => setApellidoPaterno(e.target.value)}
+                autoComplete="off"
+                autoCapitalize="words"
                 required
-                className="campo min-h-16 resize-y py-2"
+                className="campo"
               />
             </Campo>
-          )}
-        </div>
+            {/* Opcional: hay quien solo tiene un apellido, y obligarlo haría inventar uno. */}
+            <Campo etiqueta="Apellido materno (si tiene)">
+              <input
+                value={apellidoMaterno}
+                onChange={(e) => setApellidoMaterno(e.target.value)}
+                autoComplete="off"
+                autoCapitalize="words"
+                className="campo"
+              />
+            </Campo>
 
-        {catalogo.length > 0 && (
-          <div>
-            <p className="mb-2 text-sm text-tinta-suave">Problemáticas que mencionó</p>
-            <div className="flex flex-wrap gap-2">
-              {catalogo.map((p) => {
-                const activa = elegidas.includes(p.id);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    aria-pressed={activa}
-                    onClick={() =>
-                      setElegidas((previas) =>
-                        activa ? previas.filter((i) => i !== p.id) : [...previas, p.id],
-                      )
-                    }
-                    className={cn(
-                      "transicion-ui rounded-pildora border px-3 py-2 text-sm transition-colors",
-                      activa
-                        ? "border-tinta bg-tinta text-superficie"
-                        : "border-borde bg-superficie text-tinta-suave",
-                    )}
-                  >
-                    {p.nombre}
-                  </button>
-                );
-              })}
+            <div className="sm:col-span-2">
+              <p className="mb-1.5 text-sm text-tinta-suave">Género</p>
+              <div className="flex flex-wrap gap-2">
+                {GENEROS.map((g) => {
+                  const activo = genero === g;
+                  return (
+                    <button
+                      key={g}
+                      type="button"
+                      aria-pressed={activo}
+                      onClick={() => setGenero(activo ? null : g)}
+                      className="chip"
+                    >
+                      {ETIQUETA_GENERO[g]}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            {!actividadId && elegidas.length > 0 && (
-              <p className="mt-2 text-xs text-tinta-tenue">
-                Las menciones se guardan dentro de una actividad. Abre el registro desde una
-                actividad para que queden ligadas.
-              </p>
+
+            <Campo etiqueta="Fecha de nacimiento">
+              <input
+                type="date"
+                value={fechaNacimiento}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setFechaNacimiento(e.target.value)}
+                className="campo cifras"
+              />
+              {edad !== null && <span className="text-xs text-tinta-tenue">{edad} años</span>}
+            </Campo>
+
+            <Campo etiqueta="Teléfono" apoyo="Diez dígitos. Opcional.">
+              <input
+                value={telefono}
+                inputMode="tel"
+                onChange={(e) => {
+                  const valor = e.target.value;
+                  setTelefono(valor);
+                  void revisarTelefono(valor);
+                  // Solo regaña cuando ya hay diez dígitos; antes deja escribir en paz.
+                  if (valor.replace(/\D/g, "").length >= 10) {
+                    validarTelefonoEnVivo(valor);
+                  } else {
+                    setErrorTelefono(null);
+                  }
+                }}
+                onBlur={(e) => validarTelefonoEnVivo(e.target.value)}
+                className="campo cifras"
+              />
+              {errorTelefono && <p className="text-sm text-alerta">{errorTelefono}</p>}
+            </Campo>
+
+            {duplicadoSinFicha && (
+              <div className="rounded-control bg-superficie-hundida p-3.5 sm:col-span-2">
+                <p className="text-sm font-semibold text-tinta">Este teléfono ya está registrado</p>
+                <p className="medida mt-1 text-sm text-tinta-suave">
+                  No puedes ver de quién es porque está fuera de tu actividad. Guárdala como persona
+                  distinta sin teléfono y avísale al administrador general, o pídele que le agregue la
+                  participación.
+                </p>
+              </div>
+            )}
+
+            {duplicada && (
+              <div className="rounded-control bg-superficie-hundida p-3.5 sm:col-span-2">
+                <p className="text-sm font-semibold text-tinta">Este teléfono ya está registrado</p>
+                <p className="mt-1 text-sm text-tinta-suave">
+                  {duplicada.nombre}
+                  {duplicada.seccion_clave && ` · sección ${duplicada.seccion_clave}`}
+                  {duplicada.demarcacion_id &&
+                    ` · ${demarcacionPorId(duplicada.demarcacion_id)?.nombre}`}
+                </p>
+                <div className="mt-2 flex flex-col">
+                  <Opcion
+                    nombre="duplicado"
+                    elegido={caminoDuplicado === "agregar"}
+                    alElegir={() => setCaminoDuplicado("agregar")}
+                    titulo="Agregar esta participación a la persona encontrada"
+                    apoyo="Es el camino correcto casi siempre."
+                  />
+                  <Opcion
+                    nombre="duplicado"
+                    elegido={caminoDuplicado === "otra"}
+                    alElegir={() => setCaminoDuplicado("otra")}
+                    titulo="Es otra persona distinta"
+                    apoyo="Se guarda sin teléfono y queda marcada para revisión."
+                  />
+                </div>
+              </div>
             )}
           </div>
-        )}
+        </Caja>
 
-        <Campo etiqueta="Comentario">
-          <textarea
-            value={comentario}
-            onChange={(e) => setComentario(e.target.value)}
-            rows={3}
-            className="campo min-h-24 resize-y py-2"
-          />
-        </Campo>
+        <Caja icono={House} titulo="Domicilio">
+          <div className="grid gap-x-4 gap-y-3.5 sm:grid-cols-2">
+            <Campo etiqueta="Calle">
+              <input
+                value={calle}
+                onChange={(e) => setCalle(e.target.value)}
+                className="campo"
+                autoComplete="off"
+              />
+            </Campo>
 
-        <label className="flex items-start gap-3 rounded-tarjeta border border-borde bg-superficie p-3">
+            {colonias.length > 0 && (
+              <Campo etiqueta="Colonia" apoyo="Referencia. La sección manda.">
+                <select
+                  value={coloniaId ?? ""}
+                  onChange={(e) => setColoniaId(e.target.value ? Number(e.target.value) : null)}
+                  className="campo"
+                >
+                  <option value="">Sin especificar</option>
+                  {colonias.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}
+                      {c.cp ? ` · CP ${c.cp}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+            )}
+          </div>
+        </Caja>
+
+        <Caja icono={Handshake} titulo="Promotor">
+          <div className="flex flex-col gap-2">
+            <Interruptor
+              etiqueta="¿Llegó por un promotor?"
+              valor={llegoPorPromotor}
+              alCambiar={(v) => {
+                setLlegoPorPromotor(v);
+                if (!v) {
+                  setPromotor(null);
+                  setTextoPromotor("");
+                }
+              }}
+            />
+            {llegoPorPromotor && (
+              <div>
+                {promotor ? (
+                  <div className="flex items-center justify-between gap-3 rounded-control bg-superficie-hundida py-2 pl-3.5 pr-2">
+                    <p className="min-w-0 text-sm font-medium text-tinta">
+                      {promotor.nombre}
+                      {promotor.seccion_clave && (
+                        <span className="cifras ml-2 text-xs font-normal text-tinta-suave">
+                          Sección {promotor.seccion_clave}
+                        </span>
+                      )}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromotor(null);
+                        setTextoPromotor("");
+                      }}
+                      className="boton min-h-12 shrink-0"
+                    >
+                      Cambiar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="relative">
+                      <Search
+                        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tinta-tenue"
+                        aria-hidden
+                      />
+                      <input
+                        value={textoPromotor}
+                        onChange={(e) => setTextoPromotor(e.target.value)}
+                        autoComplete="off"
+                        placeholder="Buscar promotor por nombre"
+                        className="campo pl-9"
+                      />
+                    </div>
+                    {buscandoPromotor && <p className="text-xs text-tinta-tenue">Buscando…</p>}
+                    {!buscandoPromotor && resultadosPromotor.length > 0 && (
+                      <ul className="flex flex-col gap-1.5">
+                        {resultadosPromotor.map((p) => (
+                          <li key={p.id}>
+                            <button
+                              type="button"
+                              onClick={() => setPromotor(p)}
+                              className="boton min-h-12 w-full justify-start py-2 text-left whitespace-normal"
+                            >
+                              <span>
+                                {p.nombre}
+                                {p.seccion_clave && (
+                                  <span className="cifras ml-2 text-xs font-normal text-tinta-suave">
+                                    Sección {p.seccion_clave}
+                                  </span>
+                                )}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {!buscandoPromotor &&
+                      textoPromotor.trim().length >= 2 &&
+                      resultadosPromotor.length === 0 && (
+                        <p className="text-xs text-tinta-tenue">Sin coincidencias.</p>
+                      )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </Caja>
+
+        <Caja icono={Heart} titulo="Intereses">
+          <div className="flex flex-col">
+            <Interruptor
+              etiqueta="Quiere participar"
+              valor={quiereParticipar}
+              alCambiar={setQuiereParticipar}
+            />
+            <Interruptor
+              etiqueta="Quiere recibir información"
+              valor={quiereInfo}
+              alCambiar={setQuiereInfo}
+            />
+            <Interruptor
+              etiqueta="Promovido, dará su voto"
+              valor={esPromovido}
+              alCambiar={setEsPromovido}
+            />
+            <Interruptor
+              etiqueta="Quiere ser representante de casilla"
+              valor={quiereSerRepresentante}
+              alCambiar={setQuiereSerRepresentante}
+            />
+          </div>
+        </Caja>
+
+        <Caja icono={MessageSquare} titulo="Lo que dijo">
+          <div className="flex flex-col gap-3.5">
+            <div className="flex flex-col gap-2">
+              <Interruptor
+                etiqueta="¿Pidió algo en particular?"
+                valor={pidioAlgo}
+                alCambiar={(v) => {
+                  setPidioAlgo(v);
+                  if (!v) setDescripcionSolicitud("");
+                }}
+              />
+              {pidioAlgo && (
+                <Campo etiqueta="Qué pidió">
+                  <textarea
+                    value={descripcionSolicitud}
+                    onChange={(e) => setDescripcionSolicitud(e.target.value)}
+                    rows={2}
+                    required
+                    className="campo min-h-16 resize-y py-2"
+                  />
+                </Campo>
+              )}
+            </div>
+
+            {catalogo.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-sm text-tinta-suave">Problemáticas que mencionó</p>
+                <div className="flex flex-wrap gap-2">
+                  {catalogo.map((p) => {
+                    const activa = elegidas.includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        aria-pressed={activa}
+                        onClick={() =>
+                          setElegidas((previas) =>
+                            activa ? previas.filter((i) => i !== p.id) : [...previas, p.id],
+                          )
+                        }
+                        className="chip"
+                      >
+                        {p.nombre}
+                      </button>
+                    );
+                  })}
+                </div>
+                {!actividadId && elegidas.length > 0 && (
+                  <p className="mt-2 text-xs text-tinta-tenue">
+                    Las menciones se guardan dentro de una actividad. Abre el registro desde una
+                    actividad para que queden ligadas.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <Campo etiqueta="Comentario">
+              <textarea
+                value={comentario}
+                onChange={(e) => setComentario(e.target.value)}
+                rows={3}
+                className="campo min-h-24 resize-y py-2"
+              />
+            </Campo>
+          </div>
+        </Caja>
+
+        <label className="flex min-h-12 items-start gap-3 px-1">
           <input
             type="checkbox"
             checked={consiente}
@@ -942,7 +955,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         <button
           type="submit"
           disabled={!listo || estado === "guardando"}
-          className="transicion-ui sticky bottom-20 rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50 md:bottom-4"
+          className="boton-primario sticky bottom-20 min-h-12 text-base sm:self-start sm:px-6 md:bottom-4"
         >
           {estado === "guardando" ? "Guardando…" : "Guardar"}
         </button>
@@ -984,19 +997,19 @@ function Interruptor({
       role="switch"
       aria-checked={valor}
       onClick={() => alCambiar(!valor)}
-      className="transicion-ui flex items-center justify-between gap-3 rounded-control border border-borde bg-superficie px-3 text-left text-sm text-tinta toque-actividad"
+      className="transicion-ui flex min-h-12 w-full items-center justify-between gap-3 text-left text-sm text-tinta"
     >
       {etiqueta}
       <span
         aria-hidden
         className={cn(
           "transicion-ui relative h-6 w-10 shrink-0 rounded-pildora transition-colors",
-          valor ? "bg-tinta" : "bg-superficie-hundida border border-borde",
+          valor ? "bg-naranja" : "border border-borde bg-superficie-hundida",
         )}
       >
         <span
           className={cn(
-            "transicion-ui absolute top-0.5 size-5 rounded-full bg-superficie transition-[left]",
+            "transicion-ui absolute top-0.5 size-5 rounded-full bg-superficie shadow-sm transition-[left]",
             valor ? "left-[1.125rem]" : "left-0.5",
           )}
         />
@@ -1019,13 +1032,13 @@ function Opcion({
   apoyo: string;
 }) {
   return (
-    <label className="flex items-start gap-3 rounded-control border border-borde bg-superficie p-3">
+    <label className="flex min-h-12 items-start gap-3 py-2">
       <input
         type="radio"
         name={nombre}
         checked={elegido}
         onChange={alElegir}
-        className="mt-0.5 size-4 shrink-0 accent-[var(--naranja)]"
+        className="mt-0.5 size-5 shrink-0 accent-[var(--naranja)]"
         style={{ minHeight: 0 }}
       />
       <span className="text-sm">
@@ -1054,7 +1067,7 @@ function SelectorSeccion({
     <select
       value={valor}
       onChange={(e) => onCambiar(e.target.value)}
-      className="campo cifras w-auto"
+      className="campo cifras"
     >
       <option value="" disabled>
         Elegir sección…

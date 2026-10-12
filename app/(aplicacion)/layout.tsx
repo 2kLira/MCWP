@@ -28,7 +28,7 @@ export default function LayoutAplicacion({ children }: { children: React.ReactNo
       <div className="relative z-10 flex min-h-dvh flex-col">
         <BarraSuperior />
         {/* Espacio a la izquierda para el dock flotante y abajo para la píldora de celular. */}
-        <main className="mx-auto w-full max-w-tope flex-1 px-4 pb-28 pt-4 md:pl-24 md:pr-6 md:pb-10 md:pt-5">
+        <main className="mx-auto w-full max-w-tope flex-1 px-4 pb-28 pt-5 md:pb-12 md:pl-[6.5rem] md:pr-7 md:pt-6">
           <AvisoConfiguracion />
           {children}
         </main>

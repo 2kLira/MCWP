@@ -104,10 +104,8 @@ export function FormularioEntrada({ siguiente }: { siguiente?: string }) {
   }
 
   return (
-    <form
-      onSubmit={entrar}
-      className="flex flex-col gap-4 rounded-tarjeta border border-borde bg-superficie p-6"
-    >
+    // La superficie la pone la tarjeta de app/(entrada)/entrar/page.tsx, que también aloja el título.
+    <form onSubmit={entrar} className="flex flex-col gap-4">
       <Campo etiqueta="Correo">
         <input
           ref={campoCorreo}
@@ -156,7 +154,7 @@ export function FormularioEntrada({ siguiente }: { siguiente?: string }) {
       <button
         type="submit"
         disabled={!listo || entrando}
-        className="transicion-ui toque-actividad rounded-control bg-naranja text-base font-medium text-sobre-naranja disabled:opacity-50"
+        className="boton-primario min-h-12 w-full"
       >
         {entrando ? "Entrando…" : "Entrar"}
       </button>

@@ -147,7 +147,7 @@ export function BotonEvidencia({
         type="button"
         disabled={estado !== "listo"}
         onClick={() => entrada.current?.click()}
-        className="transicion-ui flex items-center justify-center gap-2 rounded-control border border-borde bg-superficie text-sm font-medium text-tinta toque-actividad disabled:opacity-50"
+        className="boton sm:self-start"
       >
         {estado === "ubicando" ? (
           <>
@@ -240,7 +240,7 @@ function LineaConFoto({ etiqueta, foto }: { etiqueta: string; foto: Foto }) {
           type="button"
           onClick={() => setAbierta(true)}
           aria-label={`Ver foto de ${etiqueta.toLowerCase()} en grande`}
-          className="transicion-ui size-14 shrink-0 overflow-hidden rounded-control border border-borde hover:opacity-90"
+          className="transicion-ui size-14 shrink-0 overflow-hidden rounded-control border border-borde transition-opacity hover:opacity-90"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={firmada} alt="" className="size-full object-cover" />

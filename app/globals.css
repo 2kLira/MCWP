@@ -38,7 +38,7 @@
   --naranja-suave-fuerte: #ffe4cb;
 
   /* Neutros, apenas más cálidos: el vidrio necesita un sustrato tibio para no leerse gris. */
-  --fondo: #f7f5f2;
+  --fondo: #f1efec; /* greige neutro: el naranja señala, no ambienta */
   --superficie: #fffdfa;
   --superficie-hundida: #f0ece7;
   --borde: rgba(65, 45, 25, 0.12);
@@ -67,14 +67,20 @@
   --vidrio-luz: oklch(1 0 0 / 0.85);
   --vidrio-desenfoque: 10px; /* antes 24px: el desenfoque caro ahora es un lujo de escritorio */
 
+  /* Tarjeta: la superficie de vidrio de todas las pantallas. Dos fondos, igual que el vidrio del
+     mapa: uno translúcido para cuando hay desenfoque y uno casi opaco para cuando no. */
+  --tarjeta-fondo: oklch(0.995 0.003 70 / 0.6);
+  --tarjeta-fondo-solido: oklch(0.995 0.003 70 / 0.92);
+  --sombra-tarjeta: 0 1px 2px rgba(50, 35, 20, 0.04), 0 10px 28px rgba(50, 35, 20, 0.05);
+
   /* Lámina territorial: el atlas que vive detrás de todo. */
   --lamina-papel: oklch(0.975 0.006 75);
-  --lamina-trazo: oklch(0.62 0.045 55 / 0.55);
-  --lamina-relleno: oklch(0.85 0.115 58 / 0.22);
-  --lamina-propio: oklch(0.76 0.175 55 / 0.3);
-  --lamina-bruma: oklch(0.985 0.005 75 / 0.78);
-  --bloom-naranja: oklch(0.85 0.1 58 / 0.16);
-  --bloom-lejano: oklch(0.9 0.05 40 / 0.1);
+  --lamina-trazo: oklch(0.62 0.02 60 / 0.3);
+  --lamina-relleno: oklch(0.85 0.02 60 / 0.12);
+  --lamina-propio: oklch(0.8 0.06 58 / 0.18);
+  --lamina-bruma: oklch(0.953 0.004 70 / 0.84);
+  --bloom-naranja: oklch(0.86 0.09 60 / 0.2); /* una sola luz cálida, arriba a la izquierda */
+  --bloom-lejano: oklch(0.72 0.012 70 / 0.16); /* y una sombra neutra en la esquina opuesta */
 
   /* Sombra: poco, y nunca la gris genérica. Una sola capa contenida en vez de tres difusas: se
      lee igual de flotante y cuesta mucho menos pintar en un celular. */
@@ -86,15 +92,15 @@
   /* Tipografía. */
   --texto-xs: 0.75rem; /* 12, etiquetas de tabla */
   --texto-sm: 0.8125rem; /* 13, apoyo */
-  --texto-base: clamp(0.9375rem, 0.9rem + 0.2vw, 1rem);
+  --texto-base: 0.875rem; /* 14: un punto menos, para que las tarjetas respiren */
   --texto-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.1875rem);
   --texto-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
-  --texto-cifra: clamp(1.75rem, 1.4rem + 1.6vw, 2.5rem); /* indicadores */
-  --texto-titulo: clamp(2rem, 1.3rem + 2.6vw, 3.25rem); /* encabezado de página */
+  --texto-cifra: 1.75rem; /* indicadores */
+  --texto-titulo: clamp(1.75rem, 1.5rem + 0.6vw, 2rem); /* encabezado de página */
   --texto-cifra-mayor: clamp(2.5rem, 1.6rem + 3.2vw, 4rem); /* la cifra más grande del tablero */
 
   /* Forma: los radios cambian según jerarquía. */
-  --radio-control: 6px;
+  --radio-control: 10px;
   --radio-tarjeta: 16px;
   --radio-hoja: 20px;
   --radio-pildora: 999px;
@@ -135,6 +141,10 @@
   --vidrio-borde-bajo: oklch(1 0 0 / 0.06);
   --vidrio-luz: oklch(1 0 0 / 0.14);
 
+  --tarjeta-fondo: oklch(0.25 0.012 60 / 0.6);
+  --tarjeta-fondo-solido: oklch(0.25 0.012 60 / 0.94);
+  --sombra-tarjeta: 0 10px 28px rgba(0, 0, 0, 0.35);
+
   --lamina-papel: oklch(0.19 0.01 60);
   --lamina-trazo: oklch(0.55 0.03 60 / 0.42);
   --lamina-relleno: oklch(0.42 0.07 55 / 0.55);
@@ -174,6 +184,10 @@
     --vidrio-borde: oklch(1 0 0 / 0.1);
     --vidrio-borde-bajo: oklch(1 0 0 / 0.06);
     --vidrio-luz: oklch(1 0 0 / 0.14);
+
+    --tarjeta-fondo: oklch(0.25 0.012 60 / 0.6);
+    --tarjeta-fondo-solido: oklch(0.25 0.012 60 / 0.94);
+    --sombra-tarjeta: 0 10px 28px rgba(0, 0, 0, 0.35);
 
     --lamina-papel: oklch(0.19 0.01 60);
     --lamina-trazo: oklch(0.55 0.03 60 / 0.42);
@@ -332,7 +346,7 @@
 
   --ease-curva: var(--curva);
 
-  --container-tope: 1280px;
+  --container-tope: 1360px;
 }
 
 /* ===========================================================================
@@ -428,7 +442,7 @@
 /* Título de página: la cifra tipográfica más alta de la jerarquía. */
 @utility titulo-pagina {
   font-size: var(--texto-titulo);
-  font-weight: 700;
+  font-weight: 600; /* Plex se carga hasta 600; con 700 el navegador lo engordaba a la fuerza */
   line-height: 1.05;
   letter-spacing: -0.03em;
   text-wrap: balance;
@@ -438,7 +452,7 @@
 @utility cifra-mayor {
   font-variant-numeric: tabular-nums;
   font-size: var(--texto-cifra-mayor);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: -0.035em;
 }
@@ -571,6 +585,14 @@
   font-size: var(--texto-base);
 }
 
+/* El texto base bajó a 14, pero un campo por debajo de 16 hace que iOS acerque la página al
+   enfocarlo. En celular los campos se quedan en 16. */
+@media (max-width: 767px) {
+  .campo {
+    font-size: 1rem;
+  }
+}
+
 /* Coreografía de entrada, una sola vez al montar. El escalonado se pasa con --retraso. */
 @keyframes entrada-sube {
   from {
@@ -595,6 +617,217 @@
 }
 
 /* ===========================================================================
+   Piezas del rediseño de octubre de 2026: tinta para la jerarquía, naranja para señalar.
+   Las utilidades de vidrio de arriba (vidrio, capsula, dock…) no se tocaron porque el mapa las
+   usa y el mapa se queda tal cual; todo lo demás se arma con estas.
+   =========================================================================== */
+
+/* Tarjeta de vidrio. Sin desenfoque es casi opaca; el desenfoque y el fondo translúcido se
+   encienden más abajo, junto con el del resto del vidrio. */
+@utility tarjeta {
+  border-radius: var(--radio-tarjeta);
+  background: var(--tarjeta-fondo-solido);
+  border: 1px solid var(--vidrio-borde-bajo);
+  border-top-color: var(--vidrio-borde);
+  box-shadow: var(--sombra-tarjeta);
+  color: var(--tinta);
+}
+
+/* Ficha de icono: el cuadro naranja suave que encabeza una cifra. */
+@utility ficha-icono {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 12px;
+  background: var(--naranja-suave);
+  color: var(--naranja-tipografico);
+}
+
+/* La única acción naranja de una pantalla. */
+@utility boton-primario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: var(--toque-minimo);
+  padding-inline: 1rem;
+  border-radius: var(--radio-control);
+  background: var(--naranja);
+  color: var(--sobre-naranja);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: transform var(--dur-ui) var(--curva), background-color var(--dur-ui) var(--curva);
+  &:active {
+    transform: scale(0.97);
+  }
+  &:disabled {
+    opacity: 0.5;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled) {
+      background: var(--naranja-fuerte);
+    }
+  }
+}
+
+/* Acción secundaria: neutra, con borde. */
+@utility boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: var(--toque-minimo);
+  padding-inline: 0.875rem;
+  border-radius: var(--radio-control);
+  border: 1px solid var(--borde);
+  background: var(--tarjeta-fondo-solido);
+  color: var(--tinta);
+  font-size: var(--texto-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: transform var(--dur-ui) var(--curva), background-color var(--dur-ui) var(--curva);
+  &:active {
+    transform: scale(0.97);
+  }
+  &:disabled {
+    opacity: 0.5;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled) {
+      background: var(--superficie-hundida);
+    }
+  }
+}
+
+/* Filtro que se enciende y se apaga. Encendido es selección, y la selección sí es naranja. */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: var(--toque-minimo);
+  padding-inline: 0.875rem;
+  border-radius: var(--radio-pildora);
+  border: 1px solid var(--borde);
+  background: var(--tarjeta-fondo-solido);
+  color: var(--tinta-suave);
+  font-size: var(--texto-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color var(--dur-ui) var(--curva), color var(--dur-ui) var(--curva);
+  &[aria-pressed="true"],
+  &[aria-selected="true"],
+  &[aria-checked="true"] {
+    background: var(--naranja-suave);
+    border-color: transparent;
+    color: var(--naranja-tipografico);
+    font-weight: 600;
+  }
+}
+
+/* Conmutador de dos o tres opciones. Va en el contenedor; los botones llevan aria-pressed. */
+@utility segmento {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--radio-pildora);
+  background: var(--superficie-hundida);
+  & > button,
+  & > a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.375rem;
+    padding-inline: 0.875rem;
+    border-radius: var(--radio-pildora);
+    color: var(--tinta-suave);
+    font-size: var(--texto-sm);
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background-color var(--dur-ui) var(--curva), color var(--dur-ui) var(--curva);
+  }
+  & > [aria-pressed="true"],
+  & > [aria-selected="true"],
+  & > [aria-current="page"] {
+    background: var(--tarjeta-fondo-solido);
+    color: var(--tinta);
+    box-shadow: var(--sombra-apoyo);
+  }
+}
+
+/* Estatus con punto. Neutro por defecto; estado-vivo es el único que se pinta de naranja. */
+@utility estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  color: var(--tinta-suave);
+  font-size: 0.78125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  &::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--tinta-tenue);
+    opacity: 0.55;
+  }
+}
+
+@utility estado-vivo {
+  color: var(--naranja-tipografico);
+  &::before {
+    background: var(--naranja);
+    opacity: 1;
+  }
+}
+
+/* Tabla del sistema. Va en el <table>, dentro de una tarjeta con overflow-x-auto. */
+@utility tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--texto-sm);
+  & th {
+    padding: 0.8125rem 1rem 0.6875rem;
+    color: var(--tinta-suave);
+    font-size: var(--texto-xs);
+    font-weight: 500;
+    text-align: left;
+    white-space: nowrap;
+  }
+  & td {
+    padding: 0.6875rem 1rem;
+    border-top: 1px solid var(--separador);
+    vertical-align: middle;
+  }
+  & th.num,
+  & td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Renglón de tabla o de lista que lleva a otro lado. */
+@utility renglon-activo {
+  cursor: pointer;
+  transition: background-color var(--dur-ui) var(--curva);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--superficie-hundida);
+    }
+  }
+}
+
+/* El mapa se queda tal cual. Su contenedor lleva esta clase para que, adentro, los tokens que el
+   rediseño cambió (texto base y radio de control) sigan valiendo lo de antes. */
+@utility mapa-intacto {
+  --texto-base: clamp(0.9375rem, 0.9rem + 0.2vw, 1rem);
+  --radio-control: 6px;
+  font-size: var(--texto-base);
+}
+
+/* ===========================================================================
    Sustrato y navegación flotante
    =========================================================================== */
 
@@ -614,8 +847,8 @@
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(120% 80% at 12% 0%, var(--bloom-naranja) 0%, transparent 58%),
-    radial-gradient(90% 70% at 100% 100%, var(--bloom-lejano) 0%, transparent 60%),
+    radial-gradient(70% 55% at 0% 0%, var(--bloom-naranja) 0%, transparent 62%),
+    radial-gradient(60% 60% at 100% 100%, var(--bloom-lejano) 0%, transparent 65%),
     var(--lamina-bruma);
 }
 
@@ -671,6 +904,29 @@
       backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.35);
       -webkit-backdrop-filter: blur(var(--vidrio-desenfoque)) saturate(1.35);
     }
+
+    .tarjeta {
+      background: var(--tarjeta-fondo);
+      backdrop-filter: blur(14px) saturate(1.2);
+      -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    }
+  }
+}
+
+/* Altura de los botones del rediseño. `boton` y `boton-primario` fijan 44; el orden entre
+   utilidades no garantiza que `toque-actividad` o `min-h-12` les ganen, así que se dice aquí,
+   fuera de capa. Y en pantalla táctil todos suben a 48: es donde se captura, con una mano. */
+.boton.toque-actividad,
+.boton-primario.toque-actividad,
+.boton.min-h-12,
+.boton-primario.min-h-12 {
+  min-height: var(--toque-actividad);
+}
+
+@media (pointer: coarse) {
+  .boton,
+  .boton-primario {
+    min-height: var(--toque-actividad);
   }
 }
 
@@ -681,7 +937,8 @@
   .vidrio-denso,
   .vidrio-flotante,
   .capsula,
-  .dock {
+  .dock,
+  .tarjeta {
     background: var(--superficie);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;

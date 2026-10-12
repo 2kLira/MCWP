@@ -1,8 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
+import {
+  ChartPie,
+  ChevronDown,
+  ChevronRight,
+  ClipboardList,
+  Flag,
+  Info,
+  Layers,
+  Map as IconoMapa,
+  Megaphone,
+} from "lucide-react";
+import { BarraAvance } from "@/components/sistema/barra-avance";
+import { Caja } from "@/components/sistema/caja";
+import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
+import { Estado } from "@/components/sistema/estado";
+import { TarjetaCifra } from "@/components/sistema/tarjeta-cifra";
 import { PortonAgenda } from "@/components/porton-agenda";
 import { useActuante } from "@/components/proveedor-actuante";
 import { puedeVerListadosGenerales } from "@/lib/puertas-ui";
@@ -73,38 +88,66 @@ function sumarDemarcaciones(filas: DemarcacionResumen[]): MetaAvance {
   };
 }
 
-function FilaMetaAvance({ fila }: { fila: MetaAvance }) {
-  const avance = fila.metaVotos ? Math.min(1, fila.promovidos / fila.metaVotos) : null;
+/** Avance contra la meta, de 0 a 1. Nulo mientras la meta no esté cargada. */
+function avanceDe(fila: MetaAvance): number | null {
+  return fila.metaVotos ? Math.min(1, fila.promovidos / fila.metaVotos) : null;
+}
+
+/** Las tres celdas de meta y avance de un renglón: lista nominal, promovidos / meta y la barra. */
+function CeldasMetaAvance({ fila }: { fila: MetaAvance }) {
+  const avance = avanceDe(fila);
+  const porcentaje = Math.round((avance ?? 0) * 100);
   return (
-    <div className="flex flex-col gap-2 py-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="min-w-0 flex-1 truncate text-sm text-tinta">{fila.etiqueta}</p>
-        <p className="cifras shrink-0 text-xs text-tinta-suave">
-          {cifra(fila.listaNominal)} en lista nominal
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="h-1.5 w-full max-w-[16rem] overflow-hidden rounded-pildora bg-superficie-hundida">
-          {avance != null && (
-            <div
-              className="transicion-panel h-full rounded-pildora bg-naranja"
-              style={{ width: `${Math.round(avance * 100)}%` }}
-            />
-          )}
+    <>
+      <td className="num">{cifra(fila.listaNominal)}</td>
+      <td className="cifras whitespace-nowrap">
+        {cifra(fila.promovidos)}
+        {" / "}
+        {fila.metaVotos != null ? (
+          cifra(fila.metaVotos)
+        ) : (
+          <span className="text-tinta-tenue">—</span>
+        )}
+      </td>
+      <td>
+        <div className="flex items-center gap-3">
+          <BarraAvance
+            valor={avance ?? 0}
+            descripcion={
+              avance != null
+                ? `${porcentaje} por ciento de la meta en ${fila.etiqueta}`
+                : `Meta sin cargar en ${fila.etiqueta}`
+            }
+            className="w-28 shrink-0"
+          />
+          <span className="cifras w-9 shrink-0">
+            {avance != null ? `${porcentaje}%` : <span className="text-tinta-tenue">—</span>}
+          </span>
         </div>
-        <p className="cifras shrink-0 text-xs text-tinta-suave">
-          <span className="font-medium text-tinta">{cifra(fila.promovidos)}</span> promovidos
-          {" · meta "}
-          {fila.metaVotos != null ? (
-            <>
-              <span className="font-medium text-tinta">{cifra(fila.metaVotos)}</span>{" "}
-              ({Math.round((avance ?? 0) * 100)}%)
-            </>
-          ) : (
-            <span className="text-tinta-tenue">—</span>
-          )}
-        </p>
+      </td>
+    </>
+  );
+}
+
+/** Renglón de una caja de contexto: rótulo, cifra y, si aplica, su barra. */
+function Medidor({
+  etiqueta,
+  valor,
+  avance,
+  descripcion,
+}: {
+  etiqueta: string;
+  valor: string;
+  avance?: number;
+  descripcion?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2 py-1.5">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="min-w-0 text-tinta">{etiqueta}</span>
+        <span className="cifras shrink-0 font-semibold text-tinta">{valor}</span>
       </div>
+      {avance != null && <BarraAvance valor={avance} descripcion={descripcion ?? etiqueta} />}
     </div>
   );
 }
@@ -156,6 +199,25 @@ function PanelColonias({ estado }: { estado: ColoniaDeSeccion[] | "cargando" | u
   );
 }
 
+/** La clave de una sección con su flecha de abrir y sus notas. Igual en las tres tablas. */
+function CeldaClave({ seccion, abierta }: { seccion: SeccionResumen; abierta: boolean }) {
+  return (
+    <td className="whitespace-nowrap">
+      <span className="inline-flex items-center gap-1">
+        <ChevronRight
+          className={cn(
+            "transicion-ui size-3.5 shrink-0 text-tinta-tenue transition-transform",
+            abierta && "rotate-90",
+          )}
+          aria-hidden
+        />
+        <span className="cifras font-medium text-tinta">{seccion.clave}</span>
+      </span>
+      <NotaSeccion seccion={seccion} tieneGeometria={seccion.tiene_geometria} />
+    </td>
+  );
+}
+
 function ListaPrioridad({
   titulo,
   filas,
@@ -172,76 +234,59 @@ function ListaPrioridad({
   const pendientes = filas.filter((s) => !s.recorrida).length;
 
   return (
-    <div className="vidrio filo overflow-hidden rounded-tarjeta">
-      <div className="flex items-baseline justify-between gap-3 border-b border-borde px-4 py-3">
-        <h3 className="text-sm font-medium text-tinta">{titulo}</h3>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <h3 className="text-sm font-semibold text-tinta">{titulo}</h3>
         <p className="cifras text-xs text-tinta-suave">
           {filas.length} secciones · {pendientes} por recorrer
         </p>
       </div>
 
       {filas.length === 0 ? (
-        <p className="px-4 py-4 text-sm text-tinta-tenue">
+        <p className="tarjeta px-4 py-4 text-sm text-tinta-tenue">
           Sin secciones clasificadas todavía en esta prioridad.
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[40rem] text-sm">
+        <div className="tarjeta overflow-x-auto">
+          <table className="tabla min-w-[40rem]">
             <thead>
-              <tr className="text-left text-xs text-tinta-tenue">
-                <th className="px-4 py-2 font-medium">Sección</th>
-                <th className="px-4 py-2 font-medium">Demarcación</th>
-                <th className="px-4 py-2 font-medium">Lista nominal</th>
-                <th className="px-4 py-2 font-medium">Promovidos</th>
-                <th className="px-4 py-2 font-medium">Meta</th>
-                <th className="px-4 py-2 font-medium">Recorrida</th>
+              <tr>
+                <th>Sección</th>
+                <th>Demarcación</th>
+                <th className="num">Lista nominal</th>
+                <th className="num">Promovidos</th>
+                <th className="num">Meta</th>
+                <th>Recorrida</th>
               </tr>
             </thead>
             <tbody>
               {filas.map((s) => {
                 const abierta = seccionAbierta === s.clave;
-                return [
+                return (
+                  <Fragment key={s.clave}>
                     <tr
-                      key={s.clave}
                       onClick={() => onAlternar(s)}
                       aria-expanded={abierta}
-                      className="transicion-ui cursor-pointer border-t border-borde hover:bg-superficie-hundida"
+                      className="renglon-activo h-11"
                     >
-                      <td className="px-4 py-2">
-                        <span className="inline-flex items-center gap-1">
-                          <ChevronRight
-                            className={cn(
-                              "transicion-ui size-3.5 shrink-0 text-tinta-tenue transition-transform",
-                              abierta && "rotate-90",
-                            )}
-                            aria-hidden
-                          />
-                          <span className="cifras font-medium text-tinta">{s.clave}</span>
-                        </span>
-                        <NotaSeccion seccion={s} tieneGeometria={s.tiene_geometria} />
+                      <CeldaClave seccion={s} abierta={abierta} />
+                      <td className="text-tinta-suave">{s.demarcacion}</td>
+                      <td className="num">{cifra(s.lista_nominal)}</td>
+                      <td className="num">{cifra(s.promovidos)}</td>
+                      <td className="num">{cifra(s.meta_votos)}</td>
+                      <td>
+                        {s.recorrida ? <Estado vivo>Recorrida</Estado> : <Estado>Por recorrer</Estado>}
                       </td>
-                      <td className="px-4 py-2 text-tinta-suave">{s.demarcacion}</td>
-                      <td className="cifras px-4 py-2">{cifra(s.lista_nominal)}</td>
-                      <td className="cifras px-4 py-2">{cifra(s.promovidos)}</td>
-                      <td className="cifras px-4 py-2">{cifra(s.meta_votos)}</td>
-                      <td className="px-4 py-2">
-                        {s.recorrida ? (
-                          <span className="pildora">
-                            <Check className="size-3" aria-hidden /> Recorrida
-                          </span>
-                        ) : (
-                          <span className="pildora hueco-punteado">Por recorrer</span>
-                        )}
-                      </td>
-                    </tr>,
-                    abierta && (
-                      <tr key={`${s.clave}-colonias`} className="border-t border-borde bg-superficie-hundida/40">
-                        <td colSpan={6} className="p-0">
+                    </tr>
+                    {abierta && (
+                      <tr className="bg-superficie-hundida/40">
+                        <td colSpan={6} className="p-0!">
                           <PanelColonias estado={colonias[s.clave]} />
                         </td>
                       </tr>
-                    ),
-                  ];
+                    )}
+                  </Fragment>
+                );
               })}
             </tbody>
           </table>
@@ -304,176 +349,275 @@ export default function Territorio() {
     return <PortonAgenda titulo="Estructura territorial" />;
   }
 
-  return (
-    <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="text-xl">Estructura territorial</h1>
-        <p className="cifras text-sm text-tinta-suave">
-          {cargando
-            ? "Cargando…"
-            : `${demarcaciones.datos.length} demarcaciones · ${secciones.datos.length} secciones · ${sinResponsable} sin responsable`}
-        </p>
-      </header>
+  /* Lo que alimenta las fichas y las cajas ya estaba contado arriba: aquí solo se acomoda. */
+  const total = metaAvance.find((f) => f.id === "total");
+  const resumen: MetaAvance | undefined = metaAvance[0];
+  const totalSecciones = secciones.datos.length;
+  const conResponsable = totalSecciones - sinResponsable;
+  const recorridasA = prioridadA.filter((s) => s.recorrida).length;
+  const recorridasB = prioridadB.filter((s) => s.recorrida).length;
 
-      {/* b) Indicadores de meta y avance. Existen desde ahora aunque la meta llegue vacía: es lo
-          que se presenta en la junta, con el hueco a la vista en vez de escondido. */}
-      <section className="flex flex-col gap-2">
-        <div>
-          <h2 className="text-sm font-medium text-tinta-tenue">Meta y avance</h2>
+  return (
+    <div className="flex flex-col gap-6">
+      <EncabezadoPagina
+        titulo="Estructura territorial"
+        apoyo={
+          <span className="cifras">
+            {cargando
+              ? "Cargando…"
+              : `${demarcaciones.datos.length} demarcaciones · ${totalSecciones} secciones · ${sinResponsable} sin responsable`}
+          </span>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <TarjetaCifra
+          icono={Layers}
+          etiqueta="Total del territorio a la vista"
+          valor={resumen?.listaNominal}
+          pie="en lista nominal"
+          cargando={cargando}
+        />
+        <TarjetaCifra
+          icono={IconoMapa}
+          etiqueta="Demarcaciones"
+          valor={demarcaciones.datos.length}
+          pie="a la vista"
+          cargando={cargando}
+        />
+        <TarjetaCifra
+          icono={ClipboardList}
+          etiqueta="Secciones"
+          valor={totalSecciones}
+          pie={cargando ? undefined : <span className="cifras">{sinResponsable} sin responsable</span>}
+          cargando={cargando}
+        />
+        <TarjetaCifra
+          icono={Megaphone}
+          etiqueta="Promovidos"
+          valor={resumen?.promovidos}
+          pie={
+            cargando || !resumen ? undefined : resumen.metaVotos != null ? (
+              <span className="cifras">de una meta de {cifra(resumen.metaVotos)}</span>
+            ) : (
+              "Meta todavía sin cargar"
+            )
+          }
+          cargando={cargando}
+        />
+      </div>
+
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* b) Meta y avance, y la lista de demarcaciones, en una sola tabla. El indicador existe
+            aunque la meta llegue vacía: el hueco queda a la vista en vez de escondido. */}
+        <div className="flex min-w-0 flex-col gap-3">
+          {cargando ? (
+            <div className="tarjeta flex flex-col gap-2 p-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-11 animate-pulse rounded-control bg-superficie-hundida" />
+              ))}
+            </div>
+          ) : demarcaciones.datos.length === 0 ? (
+            <p className="tarjeta px-4 py-4 text-sm text-tinta-tenue">Sin territorio a la vista.</p>
+          ) : (
+            <div className="tarjeta overflow-x-auto">
+              <table className="tabla min-w-[46rem]">
+                <thead>
+                  <tr>
+                    <th>Demarcación</th>
+                    <th className="num">Lista nominal</th>
+                    <th>Promovidos / meta</th>
+                    <th>Avance</th>
+                    <th className="num">Secciones</th>
+                    <th className="num">Alcanzadas</th>
+                    <th aria-hidden />
+                  </tr>
+                </thead>
+                <tbody>
+                  {total && (
+                    <tr className="h-11 font-semibold">
+                      <td>{total.etiqueta}</td>
+                      <CeldasMetaAvance fila={total} />
+                      <td className="num">{totalSecciones}</td>
+                      <td />
+                      <td />
+                    </tr>
+                  )}
+                  {demarcaciones.datos.map((d) => {
+                    const suyas = secciones.datos.filter(
+                      (s) => s.demarcacion_id === d.demarcacion_id,
+                    );
+                    const expandida = abierta === d.demarcacion_id;
+                    return (
+                      <Fragment key={d.demarcacion_id}>
+                        {/* El clic vive en el renglón; el botón de la primera celda le da foco,
+                            teclado y aria-expanded, y su clic sube hasta aquí. */}
+                        <tr
+                          onClick={() => setAbierta(expandida ? null : d.demarcacion_id)}
+                          className="renglon-activo"
+                        >
+                          <td className="py-0!">
+                            <button
+                              type="button"
+                              aria-expanded={expandida}
+                              className="flex min-h-12 w-full flex-col justify-center py-1.5 text-left"
+                            >
+                              <span className="font-medium text-tinta">{d.demarcacion}</span>
+                              <span className="cifras text-xs font-normal text-tinta-suave">
+                                {d.secciones_sin_responsable} sin responsable
+                              </span>
+                            </button>
+                          </td>
+                          <CeldasMetaAvance fila={deDemarcacion(d)} />
+                          <td className="num">{d.secciones}</td>
+                          <td className="num">{d.personas.toLocaleString("es-MX")}</td>
+                          <td className="w-10">
+                            <ChevronDown
+                              className={cn(
+                                "transicion-ui size-4 text-tinta-tenue transition-transform",
+                                expandida && "rotate-180",
+                              )}
+                              aria-hidden
+                            />
+                          </td>
+                        </tr>
+
+                        {expandida && (
+                          <tr>
+                            <td colSpan={7} className="pt-0!">
+                              <div className="overflow-x-auto rounded-control bg-superficie-hundida">
+                                <table className="tabla min-w-[38rem]">
+                                  <thead>
+                                    <tr>
+                                      <th>Sección</th>
+                                      <th>Responsable</th>
+                                      <th className="num">Personas alcanzadas</th>
+                                      <th className="num">Actividades</th>
+                                      <th>Última</th>
+                                      <th>Próxima</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {suyas.map((s) => {
+                                      const filaAbierta = seccionAbierta === s.clave;
+                                      return (
+                                        <Fragment key={s.clave}>
+                                          <tr
+                                            onClick={() => alternarSeccion(s)}
+                                            aria-expanded={filaAbierta}
+                                            className="transicion-ui h-11 cursor-pointer transition-colors hover:bg-superficie/70"
+                                          >
+                                            <CeldaClave seccion={s} abierta={filaAbierta} />
+                                            <td className="text-tinta-suave">
+                                              {s.responsable ?? (
+                                                <span className="pildora hueco-punteado">
+                                                  Sin responsable
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="num">{s.personas}</td>
+                                            <td className="num text-tinta-suave">
+                                              {s.reuniones + s.activismo + s.recorridos}
+                                            </td>
+                                            <td className="whitespace-nowrap text-tinta-suave">
+                                              {fechaCorta(s.ultima_actividad)}
+                                            </td>
+                                            <td className="whitespace-nowrap text-tinta-suave">
+                                              {fechaCorta(s.proxima_actividad)}
+                                            </td>
+                                          </tr>
+                                          {filaAbierta && (
+                                            <tr className="bg-superficie/50">
+                                              <td colSpan={6} className="p-0!">
+                                                <PanelColonias estado={colonias[s.clave]} />
+                                              </td>
+                                            </tr>
+                                          )}
+                                        </Fragment>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <p className="text-xs text-tinta-tenue">
             La meta de votos todavía no está cargada por el cliente; el indicador ya está listo
             para cuando llegue.
           </p>
         </div>
-        <div className="vidrio filo divide-y divide-borde rounded-tarjeta px-4">
-          {cargando ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-14 animate-pulse py-3">
-                <div className="h-full rounded-control bg-superficie-hundida" />
-              </div>
-            ))
-          ) : metaAvance.length === 0 ? (
-            <p className="py-4 text-sm text-tinta-tenue">Sin territorio a la vista.</p>
-          ) : (
-            metaAvance.map((fila) => <FilaMetaAvance key={fila.id} fila={fila} />)
-          )}
-        </div>
-      </section>
 
-      {cargando ? (
-        <div className="flex flex-col gap-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-tarjeta bg-superficie-hundida" />
-          ))}
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {demarcaciones.datos.map((d) => {
-            const suyas = secciones.datos.filter((s) => s.demarcacion_id === d.demarcacion_id);
-            const expandida = abierta === d.demarcacion_id;
-            return (
-              <li
-                key={d.demarcacion_id}
-                className="vidrio filo overflow-hidden rounded-tarjeta"
+        <div className="flex min-w-0 flex-col gap-4">
+          <Caja icono={ChartPie} titulo="Distribución del territorio">
+            <Medidor
+              etiqueta="Con responsable"
+              valor={cargando ? "—" : conResponsable.toLocaleString("es-MX")}
+              avance={cargando || totalSecciones === 0 ? 0 : conResponsable / totalSecciones}
+              descripcion={`${conResponsable} de ${totalSecciones} secciones con responsable`}
+            />
+            <Medidor
+              etiqueta="Sin responsable"
+              valor={cargando ? "—" : sinResponsable.toLocaleString("es-MX")}
+            />
+          </Caja>
+
+          <Caja icono={Flag} titulo="Secciones prioritarias">
+            <Medidor
+              etiqueta="Prioridad A recorridas"
+              valor={cargando ? "—" : `${recorridasA} de ${prioridadA.length}`}
+              avance={prioridadA.length === 0 ? 0 : recorridasA / prioridadA.length}
+              descripcion={`${recorridasA} de ${prioridadA.length} secciones de prioridad A recorridas`}
+            />
+            <Medidor
+              etiqueta="Prioridad B recorridas"
+              valor={cargando ? "—" : `${recorridasB} de ${prioridadB.length}`}
+              avance={prioridadB.length === 0 ? 0 : recorridasB / prioridadB.length}
+              descripcion={`${recorridasB} de ${prioridadB.length} secciones de prioridad B recorridas`}
+            />
+          </Caja>
+
+          <Caja icono={Info} titulo="Sobre los datos">
+            <p className="text-sm leading-relaxed text-tinta-suave">
+              Cabecera Municipal concentra 86 de las 169 secciones del catálogo. La desproporción
+              es del territorio, no de los datos.{" "}
+              <Link
+                href="/mapa"
+                className="font-semibold text-naranja-texto underline-offset-4 hover:underline"
               >
-                <button
-                  type="button"
-                  aria-expanded={expandida}
-                  onClick={() => setAbierta(expandida ? null : d.demarcacion_id)}
-                  className="transicion-ui flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-superficie-hundida"
-                >
-                  <ChevronRight
-                    className={cn(
-                      "transicion-ui size-4 shrink-0 text-tinta-tenue transition-transform",
-                      expandida && "rotate-90",
-                    )}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-tinta">
-                      {d.demarcacion}
-                    </span>
-                    <span className="cifras block text-xs text-tinta-suave">
-                      {d.secciones} secciones · {d.secciones_sin_responsable} sin responsable
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="cifras block text-lg font-medium text-tinta">
-                      {d.personas.toLocaleString("es-MX")}
-                    </span>
-                    <span className="block text-xs text-tinta-tenue">alcanzadas</span>
-                  </span>
-                </button>
-
-                {expandida && (
-                  <div className="overflow-x-auto border-t border-borde">
-                    <table className="w-full min-w-[38rem] text-sm">
-                      <thead>
-                        <tr className="text-left text-xs text-tinta-tenue">
-                          <th className="px-4 py-2 font-medium">Sección</th>
-                          <th className="px-4 py-2 font-medium">Responsable</th>
-                          <th className="px-4 py-2 font-medium">Personas alcanzadas</th>
-                          <th className="px-4 py-2 font-medium">Actividades</th>
-                          <th className="px-4 py-2 font-medium">Última</th>
-                          <th className="px-4 py-2 font-medium">Próxima</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {suyas.map((s) => {
-                          const filaAbierta = seccionAbierta === s.clave;
-                          return [
-                              <tr
-                                key={s.clave}
-                                onClick={() => alternarSeccion(s)}
-                                aria-expanded={filaAbierta}
-                                className="transicion-ui cursor-pointer border-t border-borde hover:bg-superficie-hundida"
-                              >
-                                <td className="px-4 py-2">
-                                  <span className="inline-flex items-center gap-1">
-                                    <ChevronRight
-                                      className={cn(
-                                        "transicion-ui size-3.5 shrink-0 text-tinta-tenue transition-transform",
-                                        filaAbierta && "rotate-90",
-                                      )}
-                                      aria-hidden
-                                    />
-                                    <span className="cifras font-medium text-tinta">{s.clave}</span>
-                                  </span>
-                                  <NotaSeccion seccion={s} tieneGeometria={s.tiene_geometria} />
-                                </td>
-                                <td className="px-4 py-2 text-tinta-suave">
-                                  {s.responsable ?? (
-                                    <span className="pildora hueco-punteado">Sin responsable</span>
-                                  )}
-                                </td>
-                                <td className="cifras px-4 py-2">{s.personas}</td>
-                                <td className="cifras px-4 py-2 text-tinta-suave">
-                                  {s.reuniones + s.activismo + s.recorridos}
-                                </td>
-                                <td className="px-4 py-2 text-tinta-suave">
-                                  {fechaCorta(s.ultima_actividad)}
-                                </td>
-                                <td className="px-4 py-2 text-tinta-suave">
-                                  {fechaCorta(s.proxima_actividad)}
-                                </td>
-                              </tr>,
-                              filaAbierta && (
-                                <tr key={`${s.clave}-colonias`} className="border-t border-borde bg-superficie-hundida/40">
-                                  <td colSpan={6} className="p-0">
-                                    <PanelColonias estado={colonias[s.clave]} />
-                                  </td>
-                                </tr>
-                              ),
-                          ];
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                Verlo en el mapa
+              </Link>
+            </p>
+          </Caja>
+        </div>
+      </div>
 
       {/* a) y c) Secciones prioritarias, después de lo que ya existe. A y B en listas separadas,
           cada una con su propio conteo. Al abrir una sección se ven sus colonias, igual que
           arriba: es el mismo dato, en el mismo lugar de la pantalla. */}
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-4">
         <header>
-          <h2 className="text-lg">Secciones prioritarias</h2>
-          <p className="text-xs text-tinta-tenue">
+          <h2 className="text-base font-semibold text-tinta">Secciones prioritarias</h2>
+          <p className="mt-1 text-xs text-tinta-tenue">
             La clasificación A y B es la que manda para dónde va primero el recorrido.
           </p>
         </header>
         {cargando ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-4">
             {Array.from({ length: 2 }).map((_, i) => (
               <div key={i} className="h-24 animate-pulse rounded-tarjeta bg-superficie-hundida" />
             ))}
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-5">
             <ListaPrioridad
               titulo="Prioridad A"
               filas={prioridadA}
@@ -491,14 +635,6 @@ export default function Territorio() {
           </div>
         )}
       </section>
-
-      <p className="text-xs text-tinta-tenue">
-        Cabecera Municipal concentra 86 de las 169 secciones del catálogo. La desproporción es del
-        territorio, no de los datos.{" "}
-        <Link href="/mapa" className="text-naranja-texto underline-offset-4 hover:underline">
-          Verlo en el mapa
-        </Link>
-      </p>
     </div>
   );
 }

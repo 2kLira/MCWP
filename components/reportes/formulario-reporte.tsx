@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, CircleCheck, LoaderCircle, MapPin, MapPinOff, X } from "lucide-react";
-import { Campo } from "@/components/campo";
+import {
+  AlignLeft,
+  Camera,
+  CircleCheck,
+  LoaderCircle,
+  LocateFixed,
+  MapPinOff,
+  Tag,
+  X,
+} from "lucide-react";
+import { Caja } from "@/components/sistema/caja";
+import { Estado } from "@/components/sistema/estado";
 import { comprimirFoto } from "@/components/actividades/comprimir";
 import { CATEGORIAS_REPORTE } from "@/components/reportes/categorias";
 import { subirFotoReporte } from "@/lib/datos/almacenamiento";
 import { levantarReporte, type CategoriaReporte } from "@/lib/datos/reportes-territorio";
-import { cn } from "@/lib/utils";
 
 /**
  * Levantar un reporte del territorio. Al brigadista se le piden dos cosas: categoría y
@@ -184,9 +193,9 @@ export function FormularioReporte() {
 
   if (guardado) {
     return (
-      <div className="flex flex-col items-start gap-4">
-        <p className="flex items-center gap-2 text-base font-medium text-tinta">
-          <CircleCheck className="size-5 shrink-0" aria-hidden />
+      <div className="tarjeta flex max-w-[47.5rem] flex-col items-start gap-4 p-[1.125rem]">
+        <p className="flex items-center gap-2 text-base font-semibold text-tinta">
+          <CircleCheck className="size-5 shrink-0 text-naranja-texto" aria-hidden />
           Reporte guardado
         </p>
         <p className="medida text-sm text-tinta-suave">
@@ -195,7 +204,7 @@ export function FormularioReporte() {
         <button
           type="button"
           onClick={otro}
-          className="transicion-ui w-full rounded-control bg-naranja px-4 text-base font-medium text-sobre-naranja toque-actividad sm:w-auto"
+          className="boton-primario min-h-12 w-full text-base sm:w-auto"
         >
           Levantar otro reporte
         </button>
@@ -204,35 +213,33 @@ export function FormularioReporte() {
   }
 
   return (
-    <form onSubmit={guardar} className="flex flex-col gap-5">
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm text-tinta-suave">Categoría</legend>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-          {CATEGORIAS_REPORTE.map(({ valor, etiqueta, Icono }) => {
-            const elegida = categoria === valor;
-            return (
-              <button
-                key={valor}
-                type="button"
-                aria-pressed={elegida}
-                onClick={() => setCategoria(valor)}
-                className={cn(
-                  "transicion-ui flex min-h-14 items-center gap-2.5 rounded-control border px-3 py-2 text-left text-sm transition-colors",
-                  elegida
-                    ? "border-tinta bg-tinta text-fondo"
-                    : "border-borde bg-superficie text-tinta hover:bg-superficie-hundida",
-                )}
-              >
-                <Icono className="size-5 shrink-0" aria-hidden />
-                <span className="leading-tight">{etiqueta}</span>
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
+    <form onSubmit={guardar} className="flex max-w-[47.5rem] flex-col gap-5 pb-4">
+      <Caja icono={Tag} titulo="Categoría">
+        <fieldset>
+          <legend className="sr-only">Categoría</legend>
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIAS_REPORTE.map(({ valor, etiqueta, Icono }) => {
+              const elegida = categoria === valor;
+              return (
+                <button
+                  key={valor}
+                  type="button"
+                  aria-pressed={elegida}
+                  onClick={() => setCategoria(valor)}
+                  className="chip min-h-12 max-w-full"
+                >
+                  <Icono className="size-[1.125rem] shrink-0" aria-hidden />
+                  <span className="truncate">{etiqueta}</span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+      </Caja>
 
-      <Campo etiqueta="Descripción">
+      <Caja icono={AlignLeft} titulo="Descripción">
         <textarea
+          aria-label="Descripción"
           value={descripcion}
           onChange={(e) => setDescripcion(e.target.value)}
           rows={4}
@@ -241,65 +248,73 @@ export function FormularioReporte() {
           placeholder="Qué pasa y dónde exactamente. Ej.: hay un bache grande frente a la tienda de la esquina."
           className="campo min-h-28 resize-y py-2"
         />
-      </Campo>
+      </Caja>
 
-      <div className="flex flex-col gap-2">
-        <p className="text-sm text-tinta-suave">
-          Foto <span className="text-tinta-tenue">(opcional)</span>
-        </p>
-        {foto ? (
-          <div className="relative self-start">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={foto.vistaPrevia}
-              alt="Foto que acompaña el reporte"
-              className="max-h-56 w-auto max-w-full rounded-tarjeta border border-borde object-cover"
-            />
+      <Caja
+        icono={Camera}
+        titulo={
+          <>
+            Foto <span className="font-normal text-tinta-tenue">(opcional)</span>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-2">
+          {foto ? (
+            <div className="relative self-start">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={foto.vistaPrevia}
+                alt="Foto que acompaña el reporte"
+                className="max-h-56 w-auto max-w-full rounded-control border border-separador object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => setFoto(null)}
+                disabled={guardando}
+                aria-label="Quitar la foto"
+                className="transicion-ui absolute top-2 right-2 grid size-11 place-items-center rounded-full bg-tinta/80 text-fondo disabled:opacity-50"
+              >
+                <X className="size-5" aria-hidden />
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={() => setFoto(null)}
-              disabled={guardando}
-              aria-label="Quitar la foto"
-              className="transicion-ui absolute top-2 right-2 grid size-11 place-items-center rounded-full bg-tinta/80 text-fondo disabled:opacity-50"
+              disabled={comprimiendo || guardando}
+              onClick={() => entradaFoto.current?.click()}
+              className="transicion-ui flex min-h-[5.25rem] flex-col items-center justify-center gap-1.5 self-stretch rounded-control border border-dashed border-tinta-tenue px-5 text-sm font-medium text-tinta-suave transition-colors hover:bg-superficie-hundida disabled:opacity-50 sm:min-w-40 sm:self-start"
             >
-              <X className="size-5" aria-hidden />
+              {comprimiendo ? (
+                <>
+                  <LoaderCircle className="size-5 animate-spin" aria-hidden />
+                  Comprimiendo…
+                </>
+              ) : (
+                <>
+                  <Camera className="size-5" aria-hidden />
+                  Agregar foto
+                </>
+              )}
             </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            disabled={comprimiendo || guardando}
-            onClick={() => entradaFoto.current?.click()}
-            className="transicion-ui flex items-center justify-center gap-2 self-stretch rounded-control border border-borde bg-superficie px-4 text-sm font-medium text-tinta toque-actividad hover:bg-superficie-hundida disabled:opacity-50 sm:self-start"
-          >
-            {comprimiendo ? (
-              <>
-                <LoaderCircle className="size-4 animate-spin" aria-hidden />
-                Comprimiendo…
-              </>
-            ) : (
-              <>
-                <Camera className="size-4" aria-hidden />
-                Agregar foto
-              </>
-            )}
-          </button>
-        )}
-        {/* Sin `capture`: así el celular ofrece la cámara o la galería, porque la foto del bache
-            pudo tomarse antes de abrir la pantalla. */}
-        <input ref={entradaFoto} type="file" accept="image/*" hidden onChange={elegirFoto} />
-        {errorFoto ? (
-          <p className="text-sm text-alerta">{errorFoto}</p>
-        ) : (
-          !foto && (
-            <p className="text-xs text-tinta-tenue">
-              Se comprime en el celular antes de subir: máximo 1600 px de lado y 400 KB.
-            </p>
-          )
-        )}
-      </div>
+          )}
+          {/* Sin `capture`: así el celular ofrece la cámara o la galería, porque la foto del bache
+              pudo tomarse antes de abrir la pantalla. */}
+          <input ref={entradaFoto} type="file" accept="image/*" hidden onChange={elegirFoto} />
+          {errorFoto ? (
+            <p className="text-sm text-alerta">{errorFoto}</p>
+          ) : (
+            !foto && (
+              <p className="text-xs text-tinta-tenue">
+                Se comprime en el celular antes de subir: máximo 1600 px de lado y 400 KB.
+              </p>
+            )
+          )}
+        </div>
+      </Caja>
 
-      <EstadoUbicacion ubicacion={ubicacion} alReintentar={reintentarUbicacion} />
+      <Caja icono={LocateFixed} titulo="Ubicación">
+        <EstadoUbicacion ubicacion={ubicacion} alReintentar={reintentarUbicacion} />
+      </Caja>
 
       {error && (
         <p role="alert" className="text-sm text-alerta">
@@ -311,7 +326,7 @@ export function FormularioReporte() {
         <button
           type="submit"
           disabled={guardando || comprimiendo || faltan.length > 0}
-          className="transicion-ui rounded-control bg-naranja px-4 text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
+          className="boton-primario min-h-12 text-base sm:self-start sm:px-6"
         >
           {guardando ? "Guardando…" : "Guardar reporte"}
         </button>
@@ -332,34 +347,28 @@ function EstadoUbicacion({
 }) {
   if (ubicacion.estado === "buscando") {
     return (
-      <p className="flex items-center gap-2 text-sm text-tinta-suave">
-        <MapPin className="size-4 shrink-0 animate-pulse" aria-hidden />
-        Obteniendo tu ubicación…
+      <p className="flex min-h-7 items-center">
+        <Estado className="animate-pulse">Obteniendo tu ubicación…</Estado>
       </p>
     );
   }
   if (ubicacion.estado === "lista") {
     return (
-      <p className="flex items-center gap-2 text-sm text-tinta-suave">
-        <MapPin className="size-4 shrink-0" aria-hidden />
-        Ubicación lista
+      <p className="flex min-h-7 flex-wrap items-center gap-2">
+        <Estado vivo>Ubicación lista</Estado>
         {ubicacion.precision != null && (
-          <span className="cifras text-tinta-tenue">(±{ubicacion.precision} m)</span>
+          <span className="cifras text-xs text-tinta-tenue">(±{ubicacion.precision} m)</span>
         )}
       </p>
     );
   }
   return (
-    <div className="flex flex-col gap-2 rounded-control border border-alerta/40 bg-alerta/10 p-3">
+    <div className="flex flex-col gap-3">
       <p className="flex items-start gap-2 text-sm text-alerta">
         <MapPinOff className="mt-0.5 size-4 shrink-0" aria-hidden />
         {ubicacion.mensaje}
       </p>
-      <button
-        type="button"
-        onClick={alReintentar}
-        className="transicion-ui self-start rounded-control border border-borde bg-superficie px-4 text-sm font-medium text-tinta toque-actividad hover:bg-superficie-hundida"
-      >
+      <button type="button" onClick={alReintentar} className="boton min-h-12 self-start">
         Volver a intentar
       </button>
     </div>

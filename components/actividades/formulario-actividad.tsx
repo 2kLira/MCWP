@@ -9,7 +9,6 @@ import { ETIQUETA_TIPO_ACTIVIDAD, type TipoActividad } from "@/lib/tipos";
 import { crearActividad } from "@/lib/datos/actividades";
 import { usuariosAsignables, type UsuarioBreve } from "@/components/actividades/datos";
 import { CampoSeccion } from "@/components/actividades/campo-seccion";
-import { cn } from "@/lib/utils";
 import { Campo } from "@/components/campo";
 import { InvitarBrigadistas } from "@/components/actividades/invitar-brigadistas";
 
@@ -113,12 +112,13 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
           actividadId={recienCreada.id}
           estatus="programada"
           puedeInvitar={esAdmin(actuante)}
+          plano
         />
 
         <button
           type="button"
           onClick={() => alCrear(recienCreada.id)}
-          className="transicion-ui toque-actividad rounded-control bg-naranja text-base font-medium text-sobre-naranja"
+          className="boton-primario"
         >
           Listo
         </button>
@@ -127,7 +127,7 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
   }
 
   return (
-    <form onSubmit={guardar} className="flex flex-col gap-5 pb-2">
+    <form onSubmit={guardar} className="flex flex-col gap-3.5 pb-2">
       <Campo etiqueta="Tipo">
         <div className="flex flex-wrap gap-2">
           {TIPOS.map((t) => (
@@ -136,12 +136,7 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
               type="button"
               aria-pressed={tipo === t}
               onClick={() => setTipo(t)}
-              className={cn(
-                "transicion-ui rounded-control border px-3 text-sm toque-actividad",
-                tipo === t
-                  ? "border-tinta bg-tinta text-superficie"
-                  : "border-borde bg-superficie text-tinta-suave",
-              )}
+              className="chip"
             >
               {ETIQUETA_TIPO_ACTIVIDAD[t]}
             </button>
@@ -158,7 +153,7 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
         />
       </Campo>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
         <Campo etiqueta="Fecha">
           <input
             type="date"
@@ -243,7 +238,7 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
       <button
         type="submit"
         disabled={!listo || guardando}
-        className="transicion-ui rounded-control bg-naranja text-base font-medium text-sobre-naranja toque-actividad disabled:opacity-50"
+        className="boton-primario mt-1.5"
       >
         {guardando ? "Guardando…" : "Crear actividad"}
       </button>

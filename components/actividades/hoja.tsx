@@ -46,15 +46,18 @@ export function Hoja({
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        className="transicion-panel relative flex max-h-[90dvh] w-full flex-col rounded-t-hoja border border-borde bg-superficie elevacion-flotante md:max-w-lg md:rounded-hoja"
+        className="tarjeta transicion-panel relative flex max-h-[90dvh] w-full flex-col max-md:rounded-t-hoja max-md:rounded-b-none md:max-w-lg md:rounded-hoja"
+        // Opaca a propósito: una hoja se abre sobre la pantalla y no debe dejar ver lo de atrás.
+        // La sombra va aquí y no como clase para que no compita con la de `tarjeta`.
+        style={{ background: "var(--superficie)", boxShadow: "var(--sombra-flotante)" }}
       >
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-borde px-5 py-4">
-          <h2 className="text-lg font-semibold text-tinta">{titulo}</h2>
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-separador py-3 pl-5 pr-3">
+          <h2 className="text-base font-semibold text-tinta">{titulo}</h2>
           <button
             type="button"
             onClick={alCerrar}
             aria-label="Cerrar"
-            className="grid size-11 shrink-0 place-items-center rounded-control text-tinta-suave transicion-ui hover:bg-superficie-hundida"
+            className="transicion-ui grid size-11 shrink-0 place-items-center rounded-control text-tinta-suave transition-colors hover:bg-superficie-hundida hover:text-tinta"
           >
             <X className="size-5" aria-hidden />
           </button>

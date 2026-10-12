@@ -108,7 +108,7 @@ export function HojaUsuario({
             correos de recuperación.
           </p>
 
-          <div className="flex flex-col gap-1 rounded-control border border-borde bg-superficie-hundida p-3">
+          <div className="flex flex-col gap-1 rounded-control bg-superficie-hundida p-3.5">
             <span className="text-xs text-tinta-tenue">Correo</span>
             <span className="cifras text-sm text-tinta">{credencial.correo}</span>
             <span className="mt-2 text-xs text-tinta-tenue">Contraseña</span>
@@ -125,7 +125,7 @@ export function HojaUsuario({
                 setError("No se pudo copiar. Selecciónala y cópiala a mano.");
               }
             }}
-            className="transicion-ui toque-actividad flex items-center justify-center gap-2 rounded-control border border-borde bg-superficie text-sm text-tinta hover:bg-superficie-hundida"
+            className="boton min-h-12 w-full"
           >
             {copiada ? (
               <>
@@ -147,7 +147,7 @@ export function HojaUsuario({
           <button
             type="button"
             onClick={alCerrar}
-            className="transicion-ui toque-actividad rounded-control bg-naranja text-base font-medium text-sobre-naranja"
+            className="boton-primario min-h-12 w-full"
           >
             Listo
           </button>
@@ -162,7 +162,7 @@ export function HojaUsuario({
       abierta={abierta}
       alCerrar={alCerrar}
     >
-      <form onSubmit={guardar} className="flex flex-col gap-4">
+      <form onSubmit={guardar} className="flex flex-col gap-3.5">
         <Campo etiqueta="Nombre">
           <input
             className="campo"
@@ -268,7 +268,7 @@ export function HojaUsuario({
         <button
           type="submit"
           disabled={!listo || guardando}
-          className="transicion-ui toque-actividad rounded-control bg-naranja text-base font-medium text-sobre-naranja disabled:opacity-50"
+          className="boton-primario min-h-12 w-full"
         >
           {guardando ? "Guardando…" : editando ? "Guardar cambios" : "Crear cuenta"}
         </button>
