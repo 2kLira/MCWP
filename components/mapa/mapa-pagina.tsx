@@ -93,10 +93,19 @@ export function MapaPagina({
   // Reportes del territorio pendientes, que pinta la vista "reportes". RLS decide cuáles: el
   // administrador todos, los demás solo los suyos. Al marcar uno como atendido se quita de aquí sin volver a pedir la lista.
   const [reportes, setReportes] = useState<ReporteTerritorio[]>([]);
-  const [reporteSeleccionadoId, setReporteSeleccionadoId] = useState<string | null>(null);
-  const reporteSeleccionado = reporteSeleccionadoId
-    ? (reportes.find((r) => r.id === reporteSeleccionadoId) ?? null)
+  const [seleccionReporte, setSeleccionReporte] = useState<{
+    id: string;
+    origen: { x: number; y: number };
+  } | null>(null);
+  const reporteSeleccionadoId = seleccionReporte?.id ?? null;
+  const reporteSeleccionado = seleccionReporte
+    ? (reportes.find((r) => r.id === seleccionReporte.id) ?? null)
     : null;
+  // Atendido o borrado, el reporte sale del mapa sin volver a pedir la lista.
+  function quitarReporte(id: string) {
+    setSeleccionReporte(null);
+    setReportes((actuales) => actuales.filter((r) => r.id !== id));
+  }
 
   useEffect(() => {
     let cancelado = false;
@@ -241,10 +250,10 @@ export function MapaPagina({
             }}
             reportes={reportes}
             reporteSeleccionadoId={reporteSeleccionadoId}
-            onClicReporte={(id) => {
+            onClicReporte={(id, origen) => {
               setSeleccion(null);
               setSeleccionCasilla(null);
-              setReporteSeleccionadoId(id);
+              setSeleccionReporte({ id, origen });
             }}
           />
 
@@ -297,7 +306,7 @@ export function MapaPagina({
                 // regla que ya separa la selección de sección de la de colonia.
                 if (!esVistaDeCasillas(nueva)) setSeleccionCasilla(null);
                 // Igual con el reporte: sus marcadores solo existen en la vista de reportes.
-                if (!esVistaDeReportes(nueva)) setReporteSeleccionadoId(null);
+                if (!esVistaDeReportes(nueva)) setSeleccionReporte(null);
               }}
               enMovimiento={enMovimiento}
               className="pointer-events-auto max-w-full"
@@ -333,16 +342,15 @@ export function MapaPagina({
             />
           )}
 
-          {reporteSeleccionado && (
+          {seleccionReporte && reporteSeleccionado && (
             <FichaReporte
               key={reporteSeleccionado.id}
               reporte={reporteSeleccionado}
-              puedeAtender={esAdmin(actuante)}
-              onCerrar={() => setReporteSeleccionadoId(null)}
-              onAtendido={(id) => {
-                setReporteSeleccionadoId(null);
-                setReportes((actuales) => actuales.filter((r) => r.id !== id));
-              }}
+              origen={seleccionReporte.origen}
+              enMovimiento={enMovimiento}
+              puedeAdministrar={esAdmin(actuante)}
+              onCerrar={() => setSeleccionReporte(null)}
+              onQuitado={quitarReporte}
             />
           )}
         </>

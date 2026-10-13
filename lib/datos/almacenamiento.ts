@@ -146,7 +146,7 @@ export function avisoDeAlmacenamiento(mensaje: string): string {
 }
 
 /**
- * Borra archivos de la cubeta. Lo usa la eliminación de actividades: la base no puede borrar
+ * Borra archivos de la cubeta. Lo usan la eliminación de actividades y la de reportes: la base no puede borrar
  * objetos de Storage desde SQL, así que regresa las rutas y el cliente las borra aquí. Si falla,
  * los renglones ya no existen y los archivos quedan huérfanos: nadie los enlaza y solo el
  * administrador los alcanza. Se avisa en consola; no se revierte nada.
@@ -156,6 +156,6 @@ export async function borrarArchivos(rutas: string[]): Promise<boolean> {
   const supabase = clienteSupabase();
   if (!supabase) return false;
   const { error } = await supabase.storage.from(CUBETA_FOTOS).remove(rutas);
-  if (error) console.warn("No se pudieron borrar los archivos de la actividad:", error);
+  if (error) console.warn("No se pudieron borrar los archivos:", error);
   return !error;
 }

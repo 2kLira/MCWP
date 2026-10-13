@@ -230,7 +230,7 @@ export type MapaLienzoProps = {
   /** Reportes del territorio pendientes. Solo se pintan en la vista de reportes. */
   reportes: readonly ReporteTerritorio[];
   reporteSeleccionadoId: string | null;
-  onClicReporte: (id: string) => void;
+  onClicReporte: (id: string, origen: { x: number; y: number }) => void;
 };
 
 /**

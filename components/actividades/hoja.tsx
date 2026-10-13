@@ -1,11 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+
+const sinSuscripcion = () => () => {};
 
 /**
  * Hoja que sube desde abajo en celular y flota centrada en escritorio. Radio 20, la única forma
  * que usa el sistema para paneles que se abren sobre la pantalla completa.
+ *
+ * Se monta con un portal en `document.body`, no donde se declara. Si se queda dentro de una
+ * tarjeta de vidrio, el `backdrop-filter` de esa tarjeta atrapa al `position: fixed`: la hoja deja
+ * de medirse contra la pantalla y queda en el apilamiento de la tarjeta, debajo de la barra
+ * inferior del celular. Así pasó con "Eliminar actividad": la barra tapaba el botón de borrar y
+ * solo se veía "Cancelar".
  */
 export function Hoja({
   titulo,
@@ -32,9 +41,16 @@ export function Hoja({
     };
   }, [abierta, alCerrar]);
 
-  if (!abierta) return null;
+  // En el servidor no hay `document`: la hoja se pinta hasta que el navegador ya montó.
+  const enNavegador = useSyncExternalStore(
+    sinSuscripcion,
+    () => true,
+    () => false,
+  );
 
-  return (
+  if (!abierta || !enNavegador) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-tinta/40 md:items-center md:p-4">
       <button
         type="button"
@@ -62,8 +78,11 @@ export function Hoja({
             <X className="size-5" aria-hidden />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {children}
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

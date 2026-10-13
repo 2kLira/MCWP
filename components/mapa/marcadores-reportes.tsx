@@ -36,7 +36,8 @@ export function MarcadoresReportes({
   reportes: readonly ReporteTerritorio[];
   visible: boolean;
   seleccionadoId: string | null;
-  onClic: (id: string) => void;
+  /** `origen` es el centro del pin en coordenadas de pantalla: de ahí crece la ficha. */
+  onClic: (id: string, origen: { x: number; y: number }) => void;
 }) {
   const entradasRef = useRef(new Map<string, Entrada>());
   // Qué elementos existen ahora mismo, para pintarles adentro con un portal. Es estado y no ref
@@ -72,7 +73,11 @@ export function MarcadoresReportes({
         const elemento = document.createElement("div");
         elemento.addEventListener("click", (evento) => {
           evento.stopPropagation();
-          onClicRef.current(reporte.id);
+          const caja = elemento.getBoundingClientRect();
+          onClicRef.current(reporte.id, {
+            x: caja.left + caja.width / 2,
+            y: caja.top + caja.height / 2,
+          });
         });
         const marcador = new ClaseMarcador({ element: elemento, anchor: "center" })
           .setLngLat([reporte.lng, reporte.lat])
