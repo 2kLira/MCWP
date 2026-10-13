@@ -374,3 +374,32 @@ export async function telefonoYaRegistrado(telefono: string): Promise<Resultado<
   const { data, error } = await db().rpc("telefono_ya_registrado", { tel: telefono });
   return resultado(data === true, error, false);
 }
+
+/** Lo que se va a borrar (o se borró) al eliminar una persona. Lo cuenta la base. */
+export type ResumenEliminacionPersona = {
+  nombre: string;
+  participaciones: number;
+  menciones: number;
+  solicitudes: number;
+  seguimientos: number;
+  /** Personas que ella trajo. No se borran: solo pierden el vínculo con su promotor. */
+  promovidos: number;
+  /** Registros de representante de casilla. No se borran: se desligan del padrón. */
+  representante: number;
+};
+
+/**
+ * Eliminar a una persona con su historia. Solo el administrador; la base lo vuelve a exigir en
+ * `eliminar_persona`. Con `soloContar` regresa lo que se borraría sin tocar nada; sin él, borra y
+ * regresa el mismo resumen. Qué se borra y qué se conserva está en seguridad.sql, sección 3e.
+ */
+export async function eliminarPersona(
+  personaId: string,
+  soloContar: boolean,
+): Promise<Resultado<ResumenEliminacionPersona | null>> {
+  const { data, error } = await db().rpc("eliminar_persona", {
+    p_id: personaId,
+    solo_contar: soloContar,
+  });
+  return resultado((data as ResumenEliminacionPersona | null) ?? null, error, null);
+}

@@ -884,3 +884,16 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     casillas de selección y menú por renglón; en Estructura territorial, pestañas
     Demarcaciones/Secciones/Responsables, minimapa de demarcaciones, dona y conmutador
     lista/rejilla. Cada una es una función nueva y se decide aparte.
+
+- **Eliminar persona (13 de octubre de 2026).** Pedido del cliente. Solo el administrador, al
+  final de la ficha de la persona, con las mismas dos confirmaciones que eliminar actividad (ver
+  qué se borra y escribir ELIMINAR). `public.eliminar_persona` en seguridad.sql, sección 3e. Se
+  borran la persona, sus participaciones con sus menciones, sus solicitudes y sus seguimientos.
+  Decisiones que no venían en el pedido:
+  · Las personas que ella trajo se conservan y solo pierden el promotor.
+  · Si es representante de casilla, ese registro se conserva (guarda su propia copia de nombre y
+    teléfono) y solo se desliga del padrón; la confirmación lo avisa. Si el cliente quiere que se
+    borre también, es una línea en la función.
+- **Personas de prueba con cumpleaños (13 de octubre de 2026).** Dos, con teléfonos 951 100 0101
+  y 951 100 0102 y apellidos "Prueba Cumpleaños", a nombre del administrador. Se quitan desde su
+  ficha con "Eliminar persona".

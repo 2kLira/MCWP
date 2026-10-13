@@ -322,6 +322,76 @@ revoke all on function public.eliminar_actividad(uuid, boolean) from anon;
 grant execute on function public.eliminar_actividad(uuid, boolean) to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- 3e. Eliminar una persona con su historia
+-- ---------------------------------------------------------------------------
+-- Pedido del cliente (13 de octubre de 2026). Solo el administrador, con doble confirmación en la
+-- interfaz. Es borrado de verdad, igual que eliminar_actividad, y por la misma razón es una sola
+-- función para contar y para borrar: lo que ve el administrador antes de confirmar sale de la
+-- misma regla que lo que se borra.
+--
+-- Qué se borra: la persona, sus participaciones (y con ellas sus menciones, en cascada), sus
+-- solicitudes y sus seguimientos. Todo eso es suyo y sin ella no significa nada.
+--
+-- Qué NO se borra:
+--   · Las personas que ella trajo (`promotor_id`). Se conservan y solo pierden el vínculo.
+--   · Su registro como representante de casilla. Ese renglón guarda su propia copia de nombre y
+--     teléfono porque es un dato de la casilla, no del padrón; borrarlo dejaría la casilla
+--     descubierta sin que nadie lo decidiera. Se desliga y se avisa en la confirmación, para que
+--     el administrador lo quite desde la casilla si eso es lo que quiere.
+create or replace function public.eliminar_persona(p_id uuid, solo_contar boolean default true)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_nombre text;
+  v_participaciones uuid[];
+  v_resumen jsonb;
+begin
+  if auth.uid() is null then
+    raise exception 'Se requiere sesión';
+  end if;
+  if not privado.es_admin() then
+    raise exception 'Solo el administrador puede eliminar personas';
+  end if;
+
+  select nombre into v_nombre from public.personas where id = p_id;
+  if v_nombre is null then
+    return null;
+  end if;
+
+  select coalesce(array_agg(id), '{}') into v_participaciones
+    from public.participaciones where persona_id = p_id;
+
+  v_resumen := jsonb_build_object(
+    'nombre', v_nombre,
+    'participaciones', cardinality(v_participaciones),
+    'menciones', (select count(*) from public.menciones_problematica
+                   where participacion_id = any(v_participaciones)),
+    'solicitudes', (select count(*) from public.solicitudes
+                     where persona_id = p_id or participacion_id = any(v_participaciones)),
+    'seguimientos', (select count(*) from public.seguimientos where persona_id = p_id),
+    'promovidos', (select count(*) from public.personas where promotor_id = p_id),
+    'representante', (select count(*) from public.representantes_casilla where persona_id = p_id)
+  );
+
+  if solo_contar then
+    return v_resumen;
+  end if;
+
+  delete from public.solicitudes
+   where persona_id = p_id or participacion_id = any(v_participaciones);
+  delete from public.participaciones where id = any(v_participaciones);
+  delete from public.seguimientos where persona_id = p_id;
+  update public.personas set promotor_id = null where promotor_id = p_id;
+  update public.representantes_casilla set persona_id = null where persona_id = p_id;
+  delete from public.personas where id = p_id;
+
+  return v_resumen;
+end $$;
+
+revoke all on function public.eliminar_persona(uuid, boolean) from public;
+revoke all on function public.eliminar_persona(uuid, boolean) from anon;
+grant execute on function public.eliminar_persona(uuid, boolean) to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- 4. RLS en todas las tablas
 -- ---------------------------------------------------------------------------
 -- Sin excepciones. Una tabla de public sin RLS es una tabla abierta.

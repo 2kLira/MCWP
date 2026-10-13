@@ -12,10 +12,11 @@ import {
 } from "lucide-react";
 import { Caja } from "@/components/sistema/caja";
 import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
+import { EliminarPersona } from "@/components/personas/eliminar-persona";
 import { Estado } from "@/components/sistema/estado";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId } from "@/lib/demarcaciones";
-import { puedeEditarPersona } from "@/lib/puertas-ui";
+import { esAdmin, puedeEditarPersona } from "@/lib/puertas-ui";
 import { cumpleHoy, etiquetaEdad } from "@/lib/personas";
 import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido } from "@/lib/transicion";
@@ -284,6 +285,14 @@ export function FichaPersona({ id }: { id: string }) {
           </Caja>
         </div>
       </div>
+
+      {/* Al final de la ficha y separado, para que nadie lo toque buscando otra cosa. Mismo lugar
+          que "Eliminar actividad" en la ficha de actividad. */}
+      {esAdmin(actuante) && (
+        <div className="flex justify-center pt-1">
+          <EliminarPersona personaId={p.id} />
+        </div>
+      )}
     </div>
   );
 }
