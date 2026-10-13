@@ -28,6 +28,7 @@ import {
   GRUPOS_RETRASO,
   PROP_GRUPO_RETRASO,
   bboxConMargen,
+  MARGEN_PANEO,
   calcularGruposRetraso,
   retrasoDeGrupoMs,
 } from "./geometria";
@@ -563,7 +564,7 @@ export function MapaLienzo({
       const { Map: ClaseMapaLibre, NavigationControl } = await import("maplibre-gl");
       if (!activo) return;
 
-      const limite = bboxConMargen(MUNICIPIO.bbox);
+      const limite = bboxConMargen(MUNICIPIO.bbox, MARGEN_PANEO);
 
       const mapa = new ClaseMapaLibre({
         container: contenedor,

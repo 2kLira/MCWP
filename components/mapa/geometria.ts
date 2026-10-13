@@ -50,7 +50,16 @@ export function retrasoDeGrupoMs(grupo: number, ventanaMs: number): number {
 
 type Bbox = readonly [number, number, number, number]; // oeste, sur, este, norte
 
-/** El bbox del municipio, con un margen holgado alrededor, para limitar el paneo. */
+/**
+ * Margen del límite de paneo, en proporción del ancho y alto del municipio por lado. Es también
+ * lo que deja alejar el zoom: MapLibre no deja ver más allá de `maxBounds`. Con 0.35 el municipio
+ * llenaba la pantalla y no se podía alejar lo bastante para que el cromo flotante (leyenda,
+ * selector de capas, fichas) dejara ver las orillas. Con 1.5 se puede alejar y mover hasta ver
+ * los municipios vecinos, sin perderse en el resto del país.
+ */
+export const MARGEN_PANEO = 1.5;
+
+/** El bbox del municipio, con un margen alrededor. Para limitar el paneo, `MARGEN_PANEO`. */
 export function bboxConMargen(bbox: Bbox, proporcion = 0.35): [number, number, number, number] {
   const [oeste, sur, este, norte] = bbox;
   const anchoMargen = (este - oeste) * proporcion;

@@ -5,7 +5,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { ChevronDown } from "lucide-react";
 import type { Map as MapaLibreMap, GeoJSONSource } from "maplibre-gl";
 import { estiloCartoDe, usePreferenciaOscura } from "@/components/mapa/estilo-base";
-import { bboxConMargen } from "@/components/mapa/geometria";
+import { bboxConMargen, MARGEN_PANEO } from "@/components/mapa/geometria";
 import {
   crearFuncionCurva,
   leerColor,
@@ -196,7 +196,7 @@ export function MapaCasillas({
         style: estiloCartoDe(oscura),
         center: MUNICIPIO.centro as unknown as [number, number],
         zoom: MUNICIPIO.zoomSugerido,
-        maxBounds: bboxConMargen(MUNICIPIO.bbox),
+        maxBounds: bboxConMargen(MUNICIPIO.bbox, MARGEN_PANEO),
         attributionControl: { compact: true },
       });
 

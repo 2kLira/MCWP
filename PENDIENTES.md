@@ -812,6 +812,10 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     propia o que no existan en la cubeta, y la lectura de la cubeta sigue la regla de la tabla
     (admin todas, cada quien las suyas). Hueco conocido: si la subida pasa y el insert del reporte
     falla, la foto queda suelta en la cubeta sin nadie que la enlace; solo el admin la alcanza.
+  · (13 de octubre de 2026) Se sembraron 15 reportes de prueba para la demostración, a nombre del
+    administrador y sin foto. Todos empiezan con "[PRUEBA]" en la descripción. Antes de capturar
+    en campo se borran con:
+    `delete from reportes_territorio where descripcion like '[PRUEBA]%';`
 
 - **Cierre de pendientes de código (12 de octubre de 2026).** Revisados contra el código y la base,
   no contra este archivo:
