@@ -266,6 +266,8 @@ export type ParticipacionEnLista = {
   tipo: "registro" | "asistencia";
   persona_id: string;
   personas: { nombre: string; telefono_norm: string | null } | null;
+  /** Quien la capturó. Null si RLS no deja leer a ese usuario (solo el admin ve a los demás). */
+  registrador: { nombre: string } | null;
 };
 
 export function participacionesDeActividad(
@@ -274,7 +276,9 @@ export function participacionesDeActividad(
   // supabase-js tipa la relación a-uno como arreglo; en tiempo de ejecución llega un objeto.
   const consulta = db()
     .from("participaciones")
-    .select("id, tipo, persona_id, personas(nombre, telefono_norm)")
+    .select(
+      "id, tipo, persona_id, personas(nombre, telefono_norm), registrador:usuarios!participaciones_registrada_por_fkey(nombre)",
+    )
     .eq("actividad_id", actividadId)
     .order("created_at") as unknown as PromiseLike<{
     data: ParticipacionEnLista[] | null;
@@ -360,11 +364,17 @@ export type Foto = {
   /** Coordenada del GPS al subir. Nulas si no respondió o si el permiso se negó. */
   lat: number | null;
   lng: number | null;
+  /** Quien la subió. Null si RLS no deja leer a ese usuario (solo el admin ve a los demás). */
+  autor?: { nombre: string } | null;
 };
 
 export function fotosDeActividad(actividadId: string): Promise<Resultado<Foto[]>> {
   return lista<Foto>(
-    db().from("fotos").select("*").eq("actividad_id", actividadId).order("created_at"),
+    db()
+      .from("fotos")
+      .select("*, autor:usuarios!fotos_subida_por_fkey(nombre)")
+      .eq("actividad_id", actividadId)
+      .order("created_at"),
   );
 }
 

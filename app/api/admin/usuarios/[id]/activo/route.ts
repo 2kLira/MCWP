@@ -1,4 +1,9 @@
-import { json, portonAdmin } from "@/lib/api/porton-admin";
+import {
+  json,
+  portonAdmin,
+  avisarFaltaConfiguracion,
+  MENSAJE_FALLA_SISTEMA_ADMIN,
+} from "@/lib/api/porton-admin";
 import { clienteAdministrador } from "@/lib/supabase-administrador";
 
 /**
@@ -53,7 +58,8 @@ export async function PATCH(
 
   const admin = clienteAdministrador();
   if (!admin) {
-    return json({ mensaje: "Este despliegue no tiene configurada la llave secreta." }, 503);
+    avisarFaltaConfiguracion("llave secreta", "/api/admin/usuarios/[id]/activo");
+    return json({ mensaje: MENSAJE_FALLA_SISTEMA_ADMIN }, 503);
   }
 
   // El candado del último administrador vive en el trigger `privado.sellar_usuario`, no aquí: así

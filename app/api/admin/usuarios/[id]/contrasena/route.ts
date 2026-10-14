@@ -1,4 +1,10 @@
-import { generarContrasena, json, portonAdmin } from "@/lib/api/porton-admin";
+import {
+  generarContrasena,
+  json,
+  portonAdmin,
+  avisarFaltaConfiguracion,
+  MENSAJE_FALLA_SISTEMA_ADMIN,
+} from "@/lib/api/porton-admin";
 import { clienteAdministrador } from "@/lib/supabase-administrador";
 
 /**
@@ -19,7 +25,8 @@ export async function PATCH(_peticion: Request, contexto: RouteContext<"/api/adm
 
   const admin = clienteAdministrador();
   if (!admin) {
-    return json({ mensaje: "Este despliegue no tiene configurada la llave secreta." }, 503);
+    avisarFaltaConfiguracion("llave secreta", "/api/admin/usuarios/[id]/contrasena");
+    return json({ mensaje: MENSAJE_FALLA_SISTEMA_ADMIN }, 503);
   }
 
   // Que la ficha exista se comprueba antes de tocar Auth: si alguien manda un id que no es de

@@ -21,7 +21,12 @@ import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
 import { Estado } from "@/components/sistema/estado";
 import { BarraAvance } from "@/components/sistema/barra-avance";
 import { FotosActividad } from "@/components/actividades/fotos-actividad";
-import { BotonEvidencia, LineaEvidencia } from "@/components/actividades/evidencia";
+import {
+  armarBrigadas,
+  BotonEvidencia,
+  EvidenciaPorBrigada,
+  LineaEvidencia,
+} from "@/components/actividades/evidencia";
 import { demarcacionPorId } from "@/lib/demarcaciones";
 import { esAdmin, puedeCrear, puedeEditar } from "@/lib/puertas-ui";
 import { ETIQUETA_ESTATUS, ETIQUETA_TIPO_ACTIVIDAD, type EstatusActividad } from "@/lib/tipos";
@@ -40,7 +45,9 @@ import {
   type ParticipacionEnLista,
 } from "@/lib/datos/actividades";
 import {
+  brigadistasDeActividad,
   obtenerUsuario,
+  type Brigadista,
   type UsuarioBreve,
 } from "@/components/actividades/datos";
 
@@ -81,9 +88,14 @@ export function FichaActividad({ id }: { id: string }) {
 
   const fotos = useConsulta<Foto[]>(() => fotosDeActividad(id), [], [id, recargar]);
   // La evidencia de inicio y de cierre se distingue por momento; el resto es galería general.
-  const fotoInicio = fotos.datos.find((f) => f.momento === "inicio") ?? null;
-  const fotoCierre = fotos.datos.find((f) => f.momento === "cierre") ?? null;
+  // Cada brigadista invitado sube la suya (ver armarBrigadas). Para marcar en curso y para cerrar
+  // basta con una de cualquier brigada: las demás suben la suya cuando llegan.
+  const evidencia = fotos.datos.filter((f) => f.momento);
+  const fotoInicio = evidencia.find((f) => f.momento === "inicio") ?? null;
+  const fotoCierre = evidencia.find((f) => f.momento === "cierre") ?? null;
   const galeria = fotos.datos.filter((f) => !f.momento);
+
+  const invitados = useConsulta<Brigadista[]>(() => brigadistasDeActividad(id), [], [id, recargar]);
 
   const consolidado = useConsulta<Consolidado>(
     () => consolidadoDeActividad(id),
@@ -276,8 +288,17 @@ export function FichaActividad({ id }: { id: string }) {
               <ul className="flex flex-col divide-y divide-separador">
                 {participaciones.datos.map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <span className="min-w-0 truncate text-sm text-tinta">
-                      {p.personas?.nombre ?? "Persona sin nombre"}
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm text-tinta">
+                        {p.personas?.nombre ?? "Persona sin nombre"}
+                      </span>
+                      {/* Quién la capturó. Solo sale si la base entrega el nombre: RLS sobre
+                          `usuarios` solo le deja ver nombres ajenos al administrador. */}
+                      {p.registrador?.nombre && (
+                        <span className="block truncate text-xs text-tinta-suave">
+                          Registró: {p.registrador.nombre}
+                        </span>
+                      )}
                     </span>
                     <span className="shrink-0 text-xs text-tinta-suave">
                       {p.tipo === "registro" ? "Nueva" : "Asistencia"}
@@ -290,42 +311,24 @@ export function FichaActividad({ id }: { id: string }) {
 
           <Caja icono={Camera} titulo="Evidencia de inicio y cierre">
             <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-2">
-                <LineaEvidencia
-                  etiqueta="Inicio"
-                  foto={fotoInicio}
-                  faltaAviso={
-                    !fotoInicio && (a.estatus === "en_curso" || a.estatus === "realizada")
-                      ? "Esta actividad ya arrancó y no tiene foto de inicio."
-                      : undefined
-                  }
-                />
-                {!fotoInicio && subirDesdeTarjeta && (
-                  <BotonEvidencia
-                    actividadId={id}
-                    momento="inicio"
-                    usuarioId={actuante.id}
-                    alSubir={() => setRecargar((v) => v + 1)}
-                  />
+              <EvidenciaPorBrigada
+                brigadas={armarBrigadas(
+                  evidencia,
+                  invitados.datos,
+                  { id: actuante.id, nombre: actuante.nombre },
+                  subirDesdeTarjeta,
                 )}
-              </div>
-
-              <div className="flex flex-col gap-2 border-t border-separador pt-3">
-                <LineaEvidencia etiqueta="Cierre" foto={fotoCierre} />
-                {!fotoCierre && subirDesdeTarjeta && (
-                  <BotonEvidencia
-                    actividadId={id}
-                    momento="cierre"
-                    usuarioId={actuante.id}
-                    alSubir={() => setRecargar((v) => v + 1)}
-                  />
-                )}
-              </div>
+                actividadId={id}
+                usuarioId={actuante.id}
+                puedeSubir={subirDesdeTarjeta}
+                yaArranco={a.estatus === "en_curso" || a.estatus === "realizada"}
+                alSubir={() => setRecargar((v) => v + 1)}
+              />
 
               {subirDesdeTarjeta && (
-                <p className="text-xs text-tinta-tenue">
-                  Tú subes la foto de inicio y la de cierre. Cerrar la actividad lo hace el
-                  administrador.
+                <p className="border-t border-separador pt-3 text-xs text-tinta-tenue">
+                  Cada brigadista sube su foto de inicio y la de cierre. Cerrar la actividad lo
+                  hace el administrador.
                 </p>
               )}
             </div>

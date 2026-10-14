@@ -175,6 +175,9 @@ export function FichaPersona({ id }: { id: string }) {
               }
             />
             <Dato etiqueta="Registrada" valor={fechaLarga(p.created_at)} />
+            {/* Quién la capturó. Si quien mira no es admin, RLS sobre `usuarios` no le entrega
+                el nombre de otro: solo se muestra cuando la base lo da. */}
+            {p.registrador?.nombre && <Dato etiqueta="La registró" valor={p.registrador.nombre} />}
           </dl>
         </Caja>
 

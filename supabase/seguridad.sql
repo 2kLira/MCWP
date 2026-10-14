@@ -143,9 +143,13 @@ end $$;
 revoke all on function public.telefono_ya_registrado(text) from public;
 revoke all on function public.normalizar_telefono(text) from public;
 revoke all on function public.seccion_por_punto(double precision, double precision) from public;
+revoke all on function public.hoy_oaxaca() from public;
 grant execute on function public.telefono_ya_registrado(text) to authenticated;
 grant execute on function public.normalizar_telefono(text) to authenticated;
 grant execute on function public.seccion_por_punto(double precision, double precision) to authenticated;
+-- Valor por omisión de fechas y base de v_cumpleanos_hoy y v_seccion_resumen: quien inserta o
+-- consulta tiene que poder ejecutarla.
+grant execute on function public.hoy_oaxaca() to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 3b. Marcar una actividad en curso

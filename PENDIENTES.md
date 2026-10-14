@@ -897,3 +897,23 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
 - **Personas de prueba con cumpleaños (13 de octubre de 2026).** Dos, con teléfonos 951 100 0101
   y 951 100 0102 y apellidos "Prueba Cumpleaños", a nombre del administrador. Se quitan desde su
   ficha con "Eliminar persona".
+- **"Hoy" en hora de Oaxaca (13 de octubre de 2026).** La base corre en UTC y `current_date`
+  cambiaba de día a las 18:00 de Oaxaca: de ahí a medianoche el tablero mostraba los cumpleaños
+  de mañana, un seguimiento capturado en la noche quedaba con fecha del día siguiente y las
+  actividades de hoy dejaban de contar como "próxima actividad". Ahora todo sale de
+  `public.hoy_oaxaca()` (schema.sql): `v_cumpleanos_hoy`, `v_seccion_resumen` y los valores por
+  omisión de `seguimientos.fecha` y `asignaciones_responsable.desde`. El check de
+  `personas.fecha_nacimiento <= current_date` se dejó en UTC a propósito: UTC va adelantado, así
+  que solo es más permisivo unas horas y nunca rechaza una fecha válida.
+- **Evidencia por brigada (14 de octubre de 2026).** Pedido del cliente: "evidencia de inicio y
+  cierre de brigada 1 y de brigada 2". Decidido con el cliente: cada brigadista invitado es una
+  brigada, y para marcar en curso o cerrar basta la foto de cualquiera. La base pasó de una foto
+  de inicio y una de cierre por actividad a una de cada una por brigadista (índice único
+  `fotos_momento_unico_idx` sobre `actividad_id, subida_por, momento`). La ficha las agrupa como
+  "Brigada 1 · Nombre", y cada quien solo ve botón de subir en la suya.
+- **Quién registró a cada persona (14 de octubre de 2026).** Se muestra en la lista de personas
+  (columna "Registró", desde 1024 px), en la ficha de la persona ("La registró") y bajo cada
+  participación de la ficha de actividad ("Registró: …"). Limitación: la política
+  `usuarios_ve_su_fila` solo deja ver nombres ajenos al administrador, así que un responsable de
+  demarcación o de sección ve "—" o "Brigadista". Si el cliente quiere que también lo vean ellos,
+  hay que abrir la lectura de `usuarios` (al menos `id, nombre`) a esos roles, en seguridad.sql.

@@ -5,6 +5,7 @@
  * brigadista solo a la gente de la actividad a la que lo invitaron, mientras siga abierta.
  */
 
+import type { PostgrestError } from "@supabase/supabase-js";
 import { puedeEditarPersona } from "@/lib/puertas-ui";
 import { normalizarTelefono } from "@/lib/territorio";
 import type { Genero, UsuarioActuante } from "@/lib/tipos";
@@ -42,6 +43,8 @@ export type Persona = {
   promovido_en: string | null;
   promovido_por: string | null;
   quiere_ser_representante: boolean;
+  /** Quien la registró. Null si RLS no deja leer a ese usuario (solo el admin ve a los demás). */
+  registrador?: { nombre: string } | null;
   /**
    * Quién la trajo, si llegó por un promotor. Apunta a `personas`, no a `usuarios`: a la gente la
    * trae gente ya registrada. La columna **existe** en el esquema consolidado; la nota de que
@@ -66,6 +69,7 @@ export type PersonaEnLista = Pick<
   | "fecha_nacimiento"
   | "es_promovido"
   | "quiere_ser_representante"
+  | "registrador"
 >;
 
 export type FiltrosPersonas = {
@@ -80,7 +84,7 @@ export type FiltrosPersonas = {
 };
 
 const COLUMNAS_LISTA =
-  "id, nombre, telefono_norm, calle, colonia_id, seccion_clave, demarcacion_id, quiere_participar, quiere_info, created_at, genero, fecha_nacimiento, es_promovido, quiere_ser_representante";
+  "id, nombre, telefono_norm, calle, colonia_id, seccion_clave, demarcacion_id, quiere_participar, quiere_info, created_at, genero, fecha_nacimiento, es_promovido, quiere_ser_representante, registrador:usuarios!personas_registrada_por_fkey(nombre)";
 
 export async function listarPersonas(
   usuario: UsuarioActuante | null,
@@ -118,7 +122,9 @@ export async function listarPersonas(
     .range(desde, desde + limite - 1);
 
   return resultado(
-    { filas: (data ?? []) as PersonaEnLista[], total: count ?? 0 },
+    // Sin tipos generados, supabase-js cree que el embebido `registrador` es un arreglo; con la
+    // llave foránea hacia un solo usuario, PostgREST devuelve un objeto.
+    { filas: (data ?? []) as unknown as PersonaEnLista[], total: count ?? 0 },
     error,
     { filas: [], total: 0 },
   );
@@ -129,7 +135,11 @@ export async function obtenerPersona(
   id: string,
 ): Promise<Resultado<Persona | null>> {
   const r = await uno<Persona>(
-    db().from("personas").select("*").eq("id", id).maybeSingle(),
+    db()
+      .from("personas")
+      .select("*, registrador:usuarios!personas_registrada_por_fkey(nombre)")
+      .eq("id", id)
+      .maybeSingle(),
   );
   // Sin comprobación posterior: si RLS no la dejó ver, r.datos ya viene en null. Comprobar aquí
   // por territorio le escondía al brigadista la persona que acababa de capturar.
@@ -182,7 +192,12 @@ export function coincidenciasPorNombre(
   if (!limpio) return Promise.resolve({ datos: [], sinEsquema: false, aviso: null });
   let consulta = db().from("personas").select(COLUMNAS_LISTA).ilike("nombre", `%${limpio}%`);
   if (seccionClave) consulta = consulta.eq("seccion_clave", seccionClave);
-  return lista<PersonaEnLista>(consulta.limit(5));
+  return lista<PersonaEnLista>(
+    consulta.limit(5) as unknown as PromiseLike<{
+      data: PersonaEnLista[] | null;
+      error: PostgrestError | null;
+    }>,
+  );
 }
 
 export type EntradaPersona = {

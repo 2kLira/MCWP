@@ -8,6 +8,7 @@ import type { UsuarioActuante } from "@/lib/tipos";
 import { db, esFaltaDeEsquema, lista, type Resultado } from "@/lib/datos/cliente";
 import { seccionesResumen } from "@/lib/datos/catalogos";
 import { totalBandeja } from "@/lib/datos/seguimientos";
+import { fechaLocalIso } from "@/lib/utils";
 
 export type ResumenTablero = {
   personas: number;
@@ -50,7 +51,7 @@ function haceDias(dias: number): string {
 }
 
 function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocalIso();
 }
 
 async function contar(

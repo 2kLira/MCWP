@@ -29,11 +29,12 @@ const PAGINA = 300;
 const ALTO_RENGLON = 56;
 
 /**
- * Columnas de la lista desde 1024 px: nombre, teléfono, sección, demarcación, (edad) y estatus.
+ * Columnas de la lista desde 1024 px: nombre, teléfono, sección, demarcación, quién la registró,
+ * (edad) y estatus.
  * La comparten el encabezado y cada renglón para que no se desalineen.
  */
 const REJILLA =
-  "gap-x-4 lg:grid-cols-[minmax(0,1.5fr)_7.5rem_4.5rem_minmax(0,1.2fr)_14.5rem] xl:grid-cols-[minmax(0,1.5fr)_7.5rem_4.5rem_minmax(0,1.2fr)_4.5rem_14.5rem]";
+  "gap-x-4 lg:grid-cols-[minmax(0,1.5fr)_7.5rem_4.5rem_minmax(0,1fr)_minmax(0,1fr)_14.5rem] xl:grid-cols-[minmax(0,1.5fr)_7.5rem_4.5rem_minmax(0,1fr)_minmax(0,1fr)_4.5rem_14.5rem]";
 
 /** Columnas del CSV de promovidos, en el orden que pidió el cliente. */
 const COLUMNAS_PROMOVIDOS = [
@@ -256,6 +257,7 @@ export default function Personas() {
           <span>Teléfono</span>
           <span>Sección</span>
           <span>Demarcación</span>
+          <span>Registró</span>
           <span className="hidden text-right xl:block">Edad</span>
           <span>Estatus</span>
         </div>
@@ -356,6 +358,11 @@ export default function Personas() {
                       {persona.seccion_clave}
                     </span>
                     <span className="hidden truncate text-tinta lg:block">{demarcacion}</span>
+                    {/* Quién la capturó. Sin nombre si quien mira no es admin: RLS sobre
+                        `usuarios` solo le deja ver su propia fila. */}
+                    <span className="hidden truncate text-tinta-suave lg:block">
+                      {persona.registrador?.nombre ?? "—"}
+                    </span>
                     {/* La edad ocupa espacio que antes de 1280 ya no sobra. */}
                     <span className="cifras hidden text-right text-tinta xl:block">{edad}</span>
                     <span className="hidden min-w-0 items-center gap-3 overflow-hidden lg:flex">

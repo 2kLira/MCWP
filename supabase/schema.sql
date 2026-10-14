@@ -70,6 +70,15 @@ create table secciones_geom (
 );
 create index secciones_geom_gix on secciones_geom using gist (geom);
 
+-- "Hoy" en Oaxaca. La base corre en UTC, así que `current_date` cambia de día a las 18:00 de
+-- Oaxaca: de ahí a la medianoche el tablero mostraba los cumpleaños de mañana y un seguimiento
+-- capturado en la noche quedaba fechado al día siguiente. Toda fecha "de hoy" de la base sale de
+-- aquí. Oaxaca sigue la hora del centro y sin horario de verano desde 2022.
+create or replace function hoy_oaxaca()
+returns date language sql stable set search_path = '' as $$
+  select (now() at time zone 'America/Mexico_City')::date
+$$;
+
 -- Respaldo del servidor para punto en polígono. En el cliente la misma resolución se hace
 -- contra secciones.geojson cacheado. Ambas rutas deben dar el mismo resultado.
 create or replace function seccion_por_punto(lng double precision, lat double precision)
@@ -106,7 +115,7 @@ create table asignaciones_responsable (
   ambito         text not null check (ambito in ('demarcacion','seccion')),
   demarcacion_id integer references demarcaciones(id),
   seccion_clave  text references secciones(clave),
-  desde          date not null default current_date,
+  desde          date not null default hoy_oaxaca(),
   hasta          date
 );
 create unique index una_asignacion_vigente_por_seccion
@@ -280,7 +289,7 @@ create type estado_seguimiento as enum ('pendiente','en_seguimiento','atendido')
 create table seguimientos (
   id             uuid primary key default gen_random_uuid(),
   persona_id     uuid not null references personas(id),
-  fecha          date not null default current_date,
+  fecha          date not null default hoy_oaxaca(),
   tipo           tipo_seguimiento not null,
   nota           text,
   responsable_id uuid references usuarios(id),
@@ -304,7 +313,9 @@ create table fotos (
   lng          double precision,
   created_at   timestamptz not null default now()
 );
-create unique index fotos_momento_unico_idx on fotos (actividad_id, momento)
+-- Una foto de inicio y una de cierre **por brigadista**, no por actividad (14 de octubre de 2026):
+-- cada brigadista invitado es una brigada y documenta su propio arranque y su propio cierre.
+create unique index fotos_momento_unico_idx on fotos (actividad_id, subida_por, momento)
   where momento is not null;
 
 -- ---------------------------------------------------------------------------
@@ -510,7 +521,7 @@ left join lateral (
                                                          as recorridos_realizados,
     max(ac.fecha) filter (where ac.estatus = 'realizada')            as ultima_actividad,
     min(ac.fecha) filter (where ac.estatus = 'programada'
-                            and ac.fecha >= current_date)            as proxima_actividad
+                            and ac.fecha >= hoy_oaxaca())            as proxima_actividad
   from actividades ac
   where ac.seccion_clave = s.clave and ac.estatus <> 'cancelada'
 ) a on true
@@ -612,11 +623,11 @@ where (p.quiere_participar or p.quiere_info
 create view v_cumpleanos_hoy with (security_invoker = true) as
 select p.id as persona_id, p.nombre, p.telefono_norm, p.seccion_clave, p.demarcacion_id,
   p.fecha_nacimiento,
-  extract(year from age(current_date, p.fecha_nacimiento))::int as edad
+  extract(year from age(hoy_oaxaca(), p.fecha_nacimiento))::int as edad
 from personas p
 where p.fecha_nacimiento is not null
-  and extract(month from p.fecha_nacimiento) = extract(month from current_date)
-  and extract(day   from p.fecha_nacimiento) = extract(day   from current_date);
+  and extract(month from p.fecha_nacimiento) = extract(month from hoy_oaxaca())
+  and extract(day   from p.fecha_nacimiento) = extract(day   from hoy_oaxaca());
 
 -- Cuánto capturó cada usuario. Pedido del cliente (11 de octubre de 2026): el administrador quiere
 -- ver cuántas personas registró cada brigadista. "Hoy" es el día de Oaxaca, no el de UTC, que a

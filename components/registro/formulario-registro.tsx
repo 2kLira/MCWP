@@ -44,7 +44,7 @@ import { ElegirActividad } from "@/components/registro/elegir-actividad";
 import { esAdmin } from "@/lib/puertas-ui";
 import { problematicas, type Problematica } from "@/lib/datos/catalogos";
 import { GENEROS, ETIQUETA_GENERO, type Genero } from "@/lib/tipos";
-import { cn } from "@/lib/utils";
+import { cn, fechaLocalIso } from "@/lib/utils";
 import { Campo } from "@/components/campo";
 import { Caja } from "@/components/sistema/caja";
 
@@ -653,7 +653,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
               <input
                 type="date"
                 value={fechaNacimiento}
-                max={new Date().toISOString().slice(0, 10)}
+                max={fechaLocalIso()}
                 onChange={(e) => setFechaNacimiento(e.target.value)}
                 className="campo cifras"
               />

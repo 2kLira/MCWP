@@ -274,3 +274,130 @@ function LineaConFoto({ etiqueta, foto }: { etiqueta: string; foto: Foto }) {
     </div>
   );
 }
+
+/** Una brigada: un brigadista invitado (o quien haya subido evidencia) y sus dos fotos. */
+export type Brigada = {
+  usuarioId: string;
+  nombre: string;
+  inicio: Foto | null;
+  cierre: Foto | null;
+};
+
+/**
+ * Arma las brigadas de una actividad. Cada brigadista invitado es una brigada y sube su propia
+ * foto de inicio y de cierre (pedido del cliente, 14 de octubre de 2026); la base lo sostiene con
+ * el índice único `(actividad_id, subida_por, momento)`.
+ *
+ * Entran, en este orden: los invitados, en el orden en que llegan; quien subió evidencia sin estar
+ * en la lista (el administrador o el responsable); y quien mira, si puede subir y todavía no
+ * aparece, para que tenga dónde hacerlo.
+ *
+ * El nombre sale de la foto, de la invitación o de la sesión. Si ninguno lo trae —RLS sobre
+ * `usuarios` solo le deja ver nombres ajenos al administrador—, queda "Brigadista".
+ */
+export function armarBrigadas(
+  evidencia: readonly Foto[],
+  invitados: readonly { usuario_id: string; nombre: string }[],
+  actuante: { id: string; nombre: string },
+  incluirActuante: boolean,
+): Brigada[] {
+  const porUsuario = new Map<string, Brigada>();
+  const asegurar = (usuarioId: string, nombre?: string | null) => {
+    const existente = porUsuario.get(usuarioId);
+    if (existente) {
+      if (nombre && existente.nombre === "Brigadista") existente.nombre = nombre;
+      return existente;
+    }
+    const nueva: Brigada = {
+      usuarioId,
+      nombre: nombre || (usuarioId === actuante.id ? actuante.nombre : "Brigadista"),
+      inicio: null,
+      cierre: null,
+    };
+    porUsuario.set(usuarioId, nueva);
+    return nueva;
+  };
+
+  for (const invitado of invitados) asegurar(invitado.usuario_id, invitado.nombre);
+  for (const foto of evidencia) {
+    if (!foto.subida_por || !foto.momento) continue;
+    const brigada = asegurar(foto.subida_por, foto.autor?.nombre);
+    brigada[foto.momento] = foto;
+  }
+  if (incluirActuante) asegurar(actuante.id, actuante.nombre);
+  return [...porUsuario.values()];
+}
+
+/**
+ * La tarjeta de evidencia, una sección por brigada: "Brigada 1 · Nombre" con su inicio y su
+ * cierre. Los botones de subir solo aparecen en la brigada de quien mira: cada quien documenta lo
+ * suyo, y la política `fotos_insert` sella `subida_por` con la sesión de todos modos.
+ */
+export function EvidenciaPorBrigada({
+  brigadas,
+  actividadId,
+  usuarioId,
+  puedeSubir,
+  yaArranco,
+  alSubir,
+}: {
+  brigadas: readonly Brigada[];
+  actividadId: string;
+  usuarioId: string;
+  /** Si quien mira puede subir evidencia aquí (espejo de `fotos_insert`). */
+  puedeSubir: boolean;
+  /** En curso o realizada: a una brigada sin inicio se le marca que le falta. */
+  yaArranco: boolean;
+  alSubir: () => void;
+}) {
+  if (brigadas.length === 0) {
+    return (
+      <p className="text-sm text-tinta-suave">
+        Todavía no hay brigadistas invitados ni evidencia subida.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      {brigadas.map((b, i) => {
+        const esMia = b.usuarioId === usuarioId;
+        return (
+          <section
+            key={b.usuarioId}
+            aria-label={`Brigada ${i + 1}: ${b.nombre}`}
+            className="flex flex-col gap-2 border-t border-separador py-3 first:border-t-0 first:pt-0 last:pb-0"
+          >
+            <p className="text-sm font-medium text-tinta">
+              Brigada <span className="cifras">{i + 1}</span>
+              <span className="font-normal text-tinta-suave"> · {b.nombre}</span>
+              {esMia && <span className="font-normal text-tinta-tenue"> (tú)</span>}
+            </p>
+            <LineaEvidencia
+              etiqueta="Inicio"
+              foto={b.inicio}
+              faltaAviso={!b.inicio && yaArranco ? "Le falta la foto de inicio." : undefined}
+            />
+            {!b.inicio && esMia && puedeSubir && (
+              <BotonEvidencia
+                actividadId={actividadId}
+                momento="inicio"
+                usuarioId={usuarioId}
+                alSubir={alSubir}
+              />
+            )}
+            <LineaEvidencia etiqueta="Cierre" foto={b.cierre} />
+            {!b.cierre && esMia && puedeSubir && (
+              <BotonEvidencia
+                actividadId={actividadId}
+                momento="cierre"
+                usuarioId={usuarioId}
+                alSubir={alSubir}
+              />
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}

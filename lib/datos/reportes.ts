@@ -5,6 +5,7 @@
 
 import type { UsuarioActuante } from "@/lib/tipos";
 import { db, type Resultado } from "@/lib/datos/cliente";
+import { fechaLocalIso } from "@/lib/utils";
 
 export type SemanaReporte = {
   etiqueta: string;
@@ -43,8 +44,8 @@ export async function reporteSemanal(
       .from("actividades")
       .select("*", { count: "exact", head: true })
       .eq("estatus", "realizada")
-      .gte("fecha", inicio.toISOString().slice(0, 10))
-      .lt("fecha", fin.toISOString().slice(0, 10)),
+      .gte("fecha", fechaLocalIso(inicio))
+      .lt("fecha", fechaLocalIso(fin)),
   ]);
 
   const respuestas = await Promise.all(consultas);
@@ -55,7 +56,7 @@ export async function reporteSemanal(
   return {
     datos: rangos.map(({ inicio }, i) => ({
       etiqueta: inicio.toLocaleDateString("es-MX", { day: "numeric", month: "short" }),
-      inicio: inicio.toISOString().slice(0, 10),
+      inicio: fechaLocalIso(inicio),
       personas: respuestas[i * 2]?.count ?? 0,
       actividades: respuestas[i * 2 + 1]?.count ?? 0,
     })),

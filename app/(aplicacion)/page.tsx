@@ -33,6 +33,7 @@ import {
 } from "@/lib/datos/tablero";
 import { actividadesDeAgenda, type Actividad } from "@/lib/datos/actividades";
 import { estatusVisibles } from "@/lib/puertas-ui";
+import { fechaLocalIso } from "@/lib/utils";
 
 const MapaPagina = dynamic(
   () => import("@/components/mapa/mapa-pagina").then((m) => m.MapaPagina),
@@ -44,7 +45,7 @@ const RESUMEN_VACIO = {} as ResumenTablero;
 function enDias(dias: number): string {
   const f = new Date();
   f.setDate(f.getDate() + dias);
-  return f.toISOString().slice(0, 10);
+  return fechaLocalIso(f);
 }
 
 function fechaCorta(iso: string): string {

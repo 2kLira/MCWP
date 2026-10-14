@@ -1,4 +1,9 @@
-import { json, portonSesion } from "@/lib/api/porton-admin";
+import {
+  avisarFaltaConfiguracion,
+  json,
+  MENSAJE_FALLA_SISTEMA_FOTOS,
+  portonSesion,
+} from "@/lib/api/porton-admin";
 import { validarYLimpiar } from "@/lib/api/imagen";
 import { clienteAdministrador } from "@/lib/supabase-administrador";
 import { clienteServidor } from "@/lib/supabase-servidor";
@@ -73,7 +78,8 @@ export async function POST(peticion: Request) {
   // La autorización, preguntada a la base y no decidida aquí.
   const supabase = await clienteServidor();
   if (!supabase) {
-    return json({ mensaje: "Este despliegue no está conectado a la base de datos." }, 503);
+    avisarFaltaConfiguracion("url", "/api/fotos");
+    return json({ mensaje: MENSAJE_FALLA_SISTEMA_FOTOS }, 503);
   }
   const { data: actividad } = await supabase
     .from("actividades")
@@ -99,7 +105,8 @@ async function subirAlmacen(archivo: File, carpeta: string, prefijo: string) {
 
   const admin = clienteAdministrador();
   if (!admin) {
-    return json({ mensaje: "Este despliegue no tiene configurada la llave secreta." }, 503);
+    avisarFaltaConfiguracion("llave secreta", "/api/fotos");
+    return json({ mensaje: MENSAJE_FALLA_SISTEMA_FOTOS }, 503);
   }
 
   // El nombre lo pone el servidor, con marca de tiempo y azar: nunca se sobreescribe un objeto, y

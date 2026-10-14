@@ -19,6 +19,27 @@ import { clienteServidor } from "@/lib/supabase-servidor";
  * no sabe quién es esa persona ni si su cuenta sigue activa.
  */
 
+/**
+ * Lo que ve la persona cuando al servidor le falta configuración (la URL de Supabase o la llave
+ * secreta en las variables de entorno de Vercel). Antes se le decía tal cual —"Este despliegue no
+ * tiene configurada la llave secreta"—, y eso no le sirve a un brigadista en la calle: no sabe qué
+ * es ni puede hacer nada. Se le dice a quién avisar, y el detalle técnico va al registro del
+ * servidor con `avisarFaltaConfiguracion`, que es donde lo busca quien lo puede arreglar.
+ */
+export const MENSAJE_FALLA_SISTEMA_FOTOS =
+  "No se pudo subir la foto por una falla del sistema. Avisa al administrador.";
+export const MENSAJE_FALLA_SISTEMA_ADMIN =
+  "No se pudo completar por una falla de configuración del sistema. Avisa a soporte técnico.";
+
+/** Deja en el registro del servidor qué variable de entorno falta. Nunca su valor. */
+export function avisarFaltaConfiguracion(que: "url" | "llave secreta", donde: string) {
+  const variable = que === "url" ? "NEXT_PUBLIC_SUPABASE_URL" : "SUPABASE_SECRET_KEY";
+  console.error(
+    `[configuración] ${donde}: falta ${variable} en las variables de entorno de este despliegue. ` +
+      "En Vercel: Settings › Environment Variables, y después Redeploy.",
+  );
+}
+
 export type Porton =
   | { ok: true; adminId: string }
   | { ok: false; estado: number; mensaje: string };
@@ -26,11 +47,8 @@ export type Porton =
 export async function portonAdmin(): Promise<Porton> {
   const supabase = await clienteServidor();
   if (!supabase) {
-    return {
-      ok: false,
-      estado: 503,
-      mensaje: "Este despliegue no está conectado a la base de datos.",
-    };
+    avisarFaltaConfiguracion("url", "portón de administración");
+    return { ok: false, estado: 503, mensaje: MENSAJE_FALLA_SISTEMA_ADMIN };
   }
 
   const { data } = await supabase.auth.getClaims();
@@ -71,11 +89,8 @@ export type PortonSesion =
 export async function portonSesion(): Promise<PortonSesion> {
   const supabase = await clienteServidor();
   if (!supabase) {
-    return {
-      ok: false,
-      estado: 503,
-      mensaje: "Este despliegue no está conectado a la base de datos.",
-    };
+    avisarFaltaConfiguracion("url", "portón de sesión");
+    return { ok: false, estado: 503, mensaje: MENSAJE_FALLA_SISTEMA_FOTOS };
   }
 
   const { data } = await supabase.auth.getClaims();
