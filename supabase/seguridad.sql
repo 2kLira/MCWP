@@ -468,11 +468,46 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- 6. Usuarios
 -- ---------------------------------------------------------------------------
--- Cada quien ve su propia fila. El admin ve todas y es el único que da de alta, cambia rol
--- o desactiva.
+-- Cada quien ve su propia fila. El admin y los responsables ven todas; solo el admin da de alta,
+-- cambia rol o desactiva.
+--
+-- Los responsables ven el equipo desde el 14 de octubre de 2026 (pedido del cliente): necesitan
+-- saber qué brigadista registró a cada persona y de quién es cada evidencia, y esos nombres se
+-- leen de aquí. El brigadista sigue viendo solo la suya.
+--
+-- Lo que **no** se abrió es el teléfono del equipo. RLS decide renglones, no columnas, así que el
+-- candado va por privilegio de columna: `authenticated` lee todas las columnas de `usuarios`
+-- menos `telefono`. El administrador lo lee con `public.telefonos_de_usuarios()` y lo sigue
+-- escribiendo con UPDATE normal (escribir una columna no exige poder leerla). Cuidado al agregar
+-- una columna a `usuarios`: no se lee desde el navegador hasta que se agregue al grant de abajo.
+
+create or replace function privado.ve_al_equipo()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.usuarios u
+                 where u.id = auth.uid() and u.activo and u.rol <> 'brigadista');
+$$;
+revoke all on function privado.ve_al_equipo() from public;
+grant execute on function privado.ve_al_equipo() to authenticated;
 
 create policy usuarios_ve_su_fila on usuarios for select to authenticated
-  using (id = (select auth.uid()) or (select privado.es_admin()));
+  using (id = (select auth.uid()) or (select privado.ve_al_equipo()));
+
+revoke select on public.usuarios from authenticated;
+grant select (id, nombre, rol, demarcacion_id, seccion_clave, activo, created_at)
+  on public.usuarios to authenticated;
+
+create or replace function public.telefonos_de_usuarios()
+returns table (id uuid, telefono text)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not privado.es_admin() then
+    raise exception 'Solo el administrador ve los teléfonos del equipo';
+  end if;
+  return query select u.id, u.telefono from public.usuarios u;
+end $$;
+revoke all on function public.telefonos_de_usuarios() from public;
+revoke all on function public.telefonos_de_usuarios() from anon;
+grant execute on function public.telefonos_de_usuarios() to authenticated;
 create policy usuarios_admin_inserta on usuarios for insert to authenticated
   with check ((select privado.es_admin()));
 create policy usuarios_admin_actualiza on usuarios for update to authenticated

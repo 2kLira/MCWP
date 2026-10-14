@@ -8,6 +8,7 @@ import {
   History,
   ListChecks,
   MessageCircle,
+  MessageSquareText,
   User,
 } from "lucide-react";
 import { Caja } from "@/components/sistema/caja";
@@ -25,8 +26,10 @@ import {
   historialPersona,
   marcarPromovido,
   obtenerPersona,
+  solicitudesDePersona,
   type EventoHistorial,
   type Persona,
+  type SolicitudDePersona,
 } from "@/lib/datos/personas";
 import { seguimientosDePersona, type Seguimiento } from "@/lib/datos/seguimientos";
 import { ETIQUETA_GENERO, ETIQUETA_TIPO_ACTIVIDAD, NOTA_SUSTITUTA } from "@/lib/tipos";
@@ -54,6 +57,7 @@ export function FichaPersona({ id }: { id: string }) {
   ]);
   const historial = useConsulta<EventoHistorial[]>(() => historialPersona(id), [], [id]);
   const seguimientos = useConsulta<Seguimiento[]>(() => seguimientosDePersona(id), [], [id]);
+  const solicitudes = useConsulta<SolicitudDePersona[]>(() => solicitudesDePersona(id), [], [id]);
 
   const [marcando, setMarcando] = useState(false);
   const [avisoPromovido, setAvisoPromovido] = useState<string | null>(null);
@@ -257,12 +261,41 @@ export function FichaPersona({ id }: { id: string }) {
                         ` · ${ETIQUETA_TIPO_ACTIVIDAD[e.tipo_actividad as keyof typeof ETIQUETA_TIPO_ACTIVIDAD]}`}
                       {e.usuario && ` · ${e.usuario}`}
                     </span>
-                    {e.nota && <span className="block text-xs text-tinta-suave">{e.nota}</span>}
+                    {/* En una participación es el "Comentario" que dejó quien la registró; en
+                        un seguimiento, su nota. Va en tinta y no en gris: es el dato. */}
+                    {e.nota && (
+                      <span className="mt-1.5 block whitespace-pre-line rounded-control bg-superficie-hundida px-3 py-2 text-sm text-tinta">
+                        {e.nota}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ol>
             )}
           </Caja>
+
+          {/* Lo que pidió en el registro ("¿Pidió algo en particular?"). Solo aparece si pidió
+              algo: una tarjeta vacía no dice nada que la ausencia no diga. */}
+          {solicitudes.datos.length > 0 && (
+            <Caja icono={MessageSquareText} titulo="Peticiones">
+              <ul className="flex flex-col">
+                {solicitudes.datos.map((s) => (
+                  <li
+                    key={s.id}
+                    className="border-t border-separador py-3 first:border-t-0 first:pt-0 last:pb-0"
+                  >
+                    <span className="block whitespace-pre-line text-sm text-tinta">
+                      {s.descripcion || s.tema}
+                    </span>
+                    <span className="cifras mt-0.5 block text-xs text-tinta-suave">
+                      {fechaLarga(s.created_at)}
+                      {s.descripcion && s.tema !== "Petición particular" && ` · ${s.tema}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Caja>
+          )}
 
           <Caja icono={ListChecks} titulo="Seguimientos">
             {seguimientos.datos.length === 0 ? (

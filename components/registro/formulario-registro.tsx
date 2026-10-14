@@ -149,6 +149,10 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const [duplicadoSinFicha, setDuplicadoSinFicha] = useState(false);
 
   const [estado, setEstado] = useState<Estado>("capturando");
+  // Lo que no se pudo guardar después de que la persona sí quedó: la participación (y con ella el
+  // comentario y las problemáticas) o la petición. Antes esos fallos se tiraban y se perdían sin
+  // que nadie se enterara.
+  const [faltantes, setFaltantes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const nombreRef = useRef<HTMLInputElement>(null);
 
@@ -429,6 +433,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
       }
     }
 
+    const noGuardado: string[] = [];
     let participacionId: string | null = null;
     if (personaId && actividadId) {
       const rp = await registrarParticipacion({
@@ -436,30 +441,42 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         actividadId,
         tipo: agregarAExistente ? "asistencia" : "registro",
         registradaPor: actuante.id,
+        // La nota va en la participación, que es lo que muestra la ficha de la persona. Se sigue
+        // copiando en cada problemática porque la hoja de Problemáticas de la exportación la lee
+        // de ahí.
+        comentario: comentario.trim() || null,
         problematicas: elegidas.map((id) => ({
           id,
           comentario: comentario.trim() || null,
         })),
       });
       participacionId = rp.datos?.id ?? null;
+      if (rp.aviso) noGuardado.push(rp.aviso);
     }
 
     // La petición particular cae en solicitudes con requiere_seguimiento en verdadero, para que
     // la persona aparezca en la bandeja de seguimiento igual que quien quiere participar.
     if (personaId && pidioAlgo && descripcionSolicitud.trim()) {
-      await crearSolicitud({
+      const rs = await crearSolicitud({
         personaId,
         participacionId,
         tema: "Petición particular",
         descripcion: descripcionSolicitud.trim(),
         requiereSeguimiento: true,
       });
+      if (!rs.datos) {
+        noGuardado.push(
+          `La petición no se guardó${rs.aviso ? `: ${rs.aviso}` : "."} Anótala y avísale al administrador.`,
+        );
+      }
     }
 
+    setFaltantes(noGuardado);
     setEstado("guardada");
   }
 
   function otraCaptura() {
+    setFaltantes([]);
     setNombres("");
     setApellidoPaterno("");
     setApellidoMaterno("");
@@ -506,6 +523,16 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
             Sección {ubicacion?.clave} · {demarcacionNombre}
           </p>
         </div>
+        {faltantes.length > 0 && (
+          <div
+            role="alert"
+            className="flex w-full max-w-md flex-col gap-1 rounded-control border border-alerta/40 bg-alerta/10 p-3 text-left text-sm text-alerta"
+          >
+            {faltantes.map((f) => (
+              <p key={f}>{f}</p>
+            ))}
+          </div>
+        )}
         <button
           type="button"
           onClick={otraCaptura}

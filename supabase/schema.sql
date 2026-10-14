@@ -246,6 +246,10 @@ create table participaciones (
   actividad_id   uuid not null references actividades(id),
   tipo           text not null check (tipo in ('registro','asistencia')),
   registrada_por uuid references usuarios(id),
+  -- El cuadro "Comentario" del registro: la nota de quien capturó, en esta actividad. Antes solo
+  -- se copiaba dentro de cada problemática marcada, así que sin problemáticas se perdía y la
+  -- ficha de la persona nunca lo mostraba (14 de octubre de 2026).
+  comentario     text check (comentario is null or char_length(comentario) <= 2000),
   created_at     timestamptz not null default now(),
   unique (persona_id, actividad_id)
 );
@@ -587,7 +591,7 @@ group by pe.seccion_clave, pe.demarcacion_id, pr.id, pr.nombre;
 create view v_historial_persona with (security_invoker = true) as
 select par.persona_id, 'participacion'::text as evento, par.tipo as detalle,
   ac.fecha, ac.id as actividad_id, ac.nombre as actividad, ac.tipo::text as tipo_actividad,
-  par.registrada_por as usuario_id, ur.nombre as usuario, null::text as nota, par.created_at
+  par.registrada_por as usuario_id, ur.nombre as usuario, par.comentario as nota, par.created_at
 from participaciones par
 join actividades ac on ac.id = par.actividad_id
 left join usuarios ur on ur.id = par.registrada_por

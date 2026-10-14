@@ -913,7 +913,28 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
   "Brigada 1 · Nombre", y cada quien solo ve botón de subir en la suya.
 - **Quién registró a cada persona (14 de octubre de 2026).** Se muestra en la lista de personas
   (columna "Registró", desde 1024 px), en la ficha de la persona ("La registró") y bajo cada
-  participación de la ficha de actividad ("Registró: …"). Limitación: la política
-  `usuarios_ve_su_fila` solo deja ver nombres ajenos al administrador, así que un responsable de
-  demarcación o de sección ve "—" o "Brigadista". Si el cliente quiere que también lo vean ellos,
-  hay que abrir la lectura de `usuarios` (al menos `id, nombre`) a esos roles, en seguridad.sql.
+  participación de la ficha de actividad ("Registró: …").
+  · Para eso los responsables (todo rol activo que no sea brigadista) ahora leen todas las filas
+    de `usuarios` (`privado.ve_al_equipo()` en `usuarios_ve_su_fila`). El brigadista sigue viendo
+    solo la suya.
+  · El **teléfono del equipo no se abrió**: `authenticated` ya no tiene SELECT sobre
+    `usuarios.telefono` (privilegio de columna). El administrador lo lee con
+    `public.telefonos_de_usuarios()` y lo sigue escribiendo con UPDATE normal. Consecuencia para
+    quien toque esto después: `select("*")` sobre `usuarios` desde el navegador falla entero; hay
+    que pedir columnas explícitas (`COLUMNAS_USUARIO` en lib/datos/usuarios.ts), y una columna
+    nueva no se lee hasta agregarla al grant de seguridad.sql, sección 6.
+- **Comentario y peticiones del registro en la ficha (14 de octubre de 2026).** Reporte del
+  cliente: el admin no veía el "Comentario" ni lo de "¿Pidió algo en particular?".
+  · El comentario solo se copiaba dentro de cada problemática marcada: sin problemáticas se
+    perdía, y la ficha nunca lo mostraba. Ahora va en `participaciones.comentario` (columna
+    nueva) y sale en el Historial de la persona, con su actividad, fecha y quién lo capturó. Se
+    rescataron los 11 comentarios que ya existían dentro de las menciones. Se sigue copiando en
+    las menciones porque la hoja de Problemáticas de la exportación lo lee de ahí.
+  · Las peticiones sí se guardaban (`solicitudes`), pero la ficha no tenía dónde mostrarlas.
+    Ahora hay una tarjeta "Peticiones".
+  · El registro tiraba sin avisar los fallos al guardar la participación o la petición: la
+    persona quedaba y lo demás se perdía. Ahora la pantalla de "Persona registrada" dice qué no
+    se guardó.
+  · Sin actividad no hay participación, así que el comentario de un registro hecho fuera de una
+    actividad (solo admin o responsables) sigue sin tener dónde guardarse. Pendiente decidir si
+    se le da una columna en `personas`.

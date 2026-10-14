@@ -319,6 +319,30 @@ export function crearSolicitud(entrada: {
   );
 }
 
+export type SolicitudDePersona = {
+  id: string;
+  tema: string;
+  descripcion: string | null;
+  requiere_seguimiento: boolean;
+  created_at: string;
+};
+
+/**
+ * Lo que pidió la persona ("¿Pidió algo en particular?" del registro). RLS decide cuáles: el
+ * administrador todas; el brigadista, las de gente de su actividad abierta.
+ */
+export function solicitudesDePersona(
+  personaId: string,
+): Promise<Resultado<SolicitudDePersona[]>> {
+  return lista<SolicitudDePersona>(
+    db()
+      .from("solicitudes")
+      .select("id, tema, descripcion, requiere_seguimiento, created_at")
+      .eq("persona_id", personaId)
+      .order("created_at", { ascending: false }),
+  );
+}
+
 /* ---------------------------------------------------------------------------
  * Exportación
  * ------------------------------------------------------------------------- */

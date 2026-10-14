@@ -13,18 +13,37 @@ export type Usuario = {
   created_at: string;
 };
 
-/** La pantalla de usuarios solo existe para el administrador; el recorte lo decide permisos.ts. */
-export function listarUsuarios(
+/**
+ * Las columnas de `usuarios` que el navegador puede leer. `telefono` no está: tiene el privilegio
+ * de columna cerrado (seguridad.sql, sección 6) y pedirlo, aunque sea con `*`, hace fallar la
+ * consulta entera. El administrador lo trae aparte con `telefonos_de_usuarios`.
+ */
+const COLUMNAS_USUARIO = "id, nombre, rol, demarcacion_id, seccion_clave, activo, created_at";
+
+type UsuarioSinTelefono = Omit<Usuario, "telefono">;
+
+async function telefonosDelEquipo(): Promise<Map<string, string | null>> {
+  const { data, error } = await db().rpc("telefonos_de_usuarios");
+  if (error) console.warn("No se pudieron leer los teléfonos del equipo:", error);
+  return new Map(
+    ((data ?? []) as { id: string; telefono: string | null }[]).map((f) => [f.id, f.telefono]),
+  );
+}
+
+/** La pantalla de usuarios solo existe para el administrador; el recorte lo decide RLS. */
+export async function listarUsuarios(
   usuario: UsuarioActuante | null,
 ): Promise<Resultado<Usuario[]>> {
   if (!esAdmin(usuario)) {
-    return Promise.resolve({
-      datos: [],
-      sinEsquema: false,
-      aviso: "Solo el administrador ve los usuarios.",
-    });
+    return { datos: [], sinEsquema: false, aviso: "Solo el administrador ve los usuarios." };
   }
-  return lista<Usuario>(db().from("usuarios").select("*").order("rol").order("nombre"));
+  const [r, telefonos] = await Promise.all([
+    lista<UsuarioSinTelefono>(
+      db().from("usuarios").select(COLUMNAS_USUARIO).order("rol").order("nombre"),
+    ),
+    telefonosDelEquipo(),
+  ]);
+  return { ...r, datos: r.datos.map((u) => ({ ...u, telefono: telefonos.get(u.id) ?? null })) };
 }
 
 /** Cuánto capturó cada usuario. Lo cuenta la vista `v_capturas_por_usuario`, no el navegador. */
@@ -81,18 +100,26 @@ export async function cambiarActivo(
  * quien llama es admin.
  */
 
-export function actualizarUsuario(
+export async function actualizarUsuario(
   usuario: UsuarioActuante | null,
   id: string,
   cambios: Partial<Pick<Usuario, "nombre" | "telefono" | "rol" | "demarcacion_id" | "seccion_clave">>,
 ): Promise<Resultado<Usuario | null>> {
   if (!esAdmin(usuario)) {
-    return Promise.resolve({ datos: null, sinEsquema: false, aviso: "No tienes permiso." });
+    return { datos: null, sinEsquema: false, aviso: "No tienes permiso." };
   }
-  return uno<Usuario>(
-    db().from("usuarios").update(cambios).eq("id", id).select().single(),
+  // Se escribe `telefono` pero no se pide de vuelta: escribir una columna no exige poder leerla,
+  // pedirla sí. El valor nuevo es el que se acaba de mandar; si no se mandó, se lee aparte.
+  const r = await uno<UsuarioSinTelefono>(
+    db().from("usuarios").update(cambios).eq("id", id).select(COLUMNAS_USUARIO).single(),
     "Solo el administrador general edita usuarios.",
   );
+  if (!r.datos) return { ...r, datos: null };
+  const telefono =
+    cambios.telefono !== undefined
+      ? cambios.telefono
+      : ((await telefonosDelEquipo()).get(id) ?? null);
+  return { ...r, datos: { ...r.datos, telefono } };
 }
 
 export type EntradaUsuarioNuevo = {

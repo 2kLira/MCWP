@@ -296,6 +296,8 @@ export async function registrarParticipacion(entrada: {
   actividadId: string;
   tipo: "registro" | "asistencia";
   registradaPor?: string | null;
+  /** El cuadro "Comentario" del registro. Va en la participación, con o sin problemáticas. */
+  comentario?: string | null;
   problematicas?: { id: number; comentario?: string | null }[];
 }): Promise<Resultado<{ id: string } | null>> {
   const { data, error } = await db()
@@ -306,6 +308,7 @@ export async function registrarParticipacion(entrada: {
         actividad_id: entrada.actividadId,
         tipo: entrada.tipo,
         registrada_por: entrada.registradaPor ?? null,
+        comentario: entrada.comentario ?? null,
       },
       { onConflict: "persona_id,actividad_id", ignoreDuplicates: false },
     )
