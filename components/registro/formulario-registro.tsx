@@ -92,7 +92,7 @@ type Ubicacion = {
 type Estado = "capturando" | "guardando" | "guardada";
 
 /** Una opción del selector de sección. `conGeometria` falso = el mapa no la puede mostrar. */
-type OpcionSeccion = { clave: string; demarcacion: string; conGeometria: boolean };
+export type OpcionSeccion = { clave: string; demarcacion: string; conGeometria: boolean };
 
 export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const { actuante } = useActuante();
@@ -366,12 +366,20 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
   function corregirSeccion(clave: string) {
     if (!clave) return;
-    setUbicacion((previa) => ({
-      lat: previa?.lat ?? null,
-      lng: previa?.lng ?? null,
-      clave,
-      origen: "manual",
-    }));
+    // El punto solo se conserva si cae en la sección elegida. Si no, se suelta: la base resuelve
+    // la sección desde el punto (privado.sellar_persona) y la corrección se perdía sin aviso.
+    setUbicacion((previa) => {
+      const puntoCoincide =
+        previa?.lat != null &&
+        previa?.lng != null &&
+        seccionPorPunto(previa.lng, previa.lat) === clave;
+      return {
+        lat: puntoCoincide ? (previa?.lat ?? null) : null,
+        lng: puntoCoincide ? (previa?.lng ?? null) : null,
+        clave,
+        origen: "manual",
+      };
+    });
     setErrorGps(null);
   }
 
@@ -668,7 +676,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
               )}
               {noCoincideConGps && (
                 <p className="text-xs text-tinta-tenue">
-                  No coincide con la sección {claveGps} que dio el GPS.
+                  No coincide con la sección {claveGps} que dio el GPS: se guarda sin ese punto.
                 </p>
               )}
             </div>
@@ -1263,7 +1271,7 @@ function Opcion({
  * secciones y un nativo las resuelve bien hasta en pantallas angostas, a diferencia de un
  * buscador de personas donde sí puede haber miles de renglones.
  */
-function SelectorSeccion({
+export function SelectorSeccion({
   opciones,
   valor,
   onCambiar,

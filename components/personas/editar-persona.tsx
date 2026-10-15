@@ -1,17 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Pencil } from "lucide-react";
+import { createPortal } from "react-dom";
+import { MapPin, Pencil } from "lucide-react";
 import { Campo } from "@/components/campo";
 import { Hoja } from "@/components/actividades/hoja";
-import { Interruptor } from "@/components/registro/formulario-registro";
+import { Interruptor, SelectorSeccion } from "@/components/registro/formulario-registro";
+import { SelectorPunto } from "@/components/registro/selector-punto";
 import { useActuante } from "@/components/proveedor-actuante";
+import { DEMARCACIONES } from "@/lib/demarcaciones";
 import { actualizarPersona, type Persona } from "@/lib/datos/personas";
 import {
   cargarCatalogoColonias,
+  cargarCatalogoSecciones,
+  cargarSecciones,
   coloniasDeSeccionEnCatalogo,
+  seccionPorPunto,
   validarTelefonoMexicano,
   type ColoniaCatalogo,
+  type SeccionCatalogo,
 } from "@/lib/territorio";
 import { GENEROS, ETIQUETA_GENERO, type Genero } from "@/lib/tipos";
 import { fechaLocalIso } from "@/lib/utils";
@@ -23,9 +30,12 @@ import { fechaLocalIso } from "@/lib/utils";
  * capturó mientras su actividad siga abierta. El botón se pinta con `puedeEditarPersona`, que es
  * el espejo cosmético de esa política.
  *
+ * La sección se corrige de dos maneras, y las dos respetan que la base la calcula desde el punto
+ * (privado.sellar_persona): moviendo el punto en el mapa, o eligiéndola a mano. A mano, el punto
+ * se suelta si no cae en la sección elegida; si se quedara, la base volvería a sacar la sección
+ * de él y la corrección no se guardaría.
+ *
  * Lo que **no** se edita aquí, a propósito:
- * - La ubicación y la sección. Si hay coordenada, la sección la calcula la base desde el punto y
- *   lo que mande el cliente no cuenta; moverla pide el mapa, no un campo de texto.
  * - Promovido, que tiene su propio botón porque el sistema sella quién y cuándo.
  * - Quién la registró, cuándo, el consentimiento y la actividad de origen: `sellar_persona` los
  *   congela en cualquier UPDATE, así que mandarlos sería fingir que se pueden cambiar.
@@ -81,6 +91,13 @@ function HojaEditarPersona({
   const [telefono, setTelefono] = useState(p.telefono_raw ?? p.telefono_norm ?? "");
   const [calle, setCalle] = useState(p.calle ?? "");
   const [coloniaId, setColoniaId] = useState<number | null>(p.colonia_id);
+  const [seccionClave, setSeccionClave] = useState<string | null>(p.seccion_clave);
+  const [punto, setPunto] = useState<{ lat: number; lng: number } | null>(
+    p.lat != null && p.lng != null ? { lat: p.lat, lng: p.lng } : null,
+  );
+  const [origen, setOrigen] = useState(p.origen_ubicacion);
+  const [abrirMapa, setAbrirMapa] = useState(false);
+  const [catalogoSecciones, setCatalogoSecciones] = useState<SeccionCatalogo[]>([]);
   const [quiereParticipar, setQuiereParticipar] = useState(p.quiere_participar);
   const [quiereInfo, setQuiereInfo] = useState(p.quiere_info);
   const [quiereSerRepresentante, setQuiereSerRepresentante] = useState(
@@ -97,27 +114,59 @@ function HojaEditarPersona({
     cargarCatalogoColonias().then((c) => {
       if (vigente) setCatalogoColonias(c);
     });
+    cargarCatalogoSecciones().then((c) => {
+      if (vigente) setCatalogoSecciones([...c].sort((a, b) => a.clave.localeCompare(b.clave)));
+    });
+    // Los polígonos hacen falta para saber si el punto cae en la sección elegida, y para que el
+    // selector de punto resuelva la sección al mover el mapa.
+    void cargarSecciones();
     return () => {
       vigente = false;
     };
   }, []);
 
+  // La demarcación sale de la sección, como en el registro: no se le pide a nadie.
+  const nombreDemarcacion = catalogoSecciones.find((s) => s.clave === seccionClave)?.demarcacion;
+  const demarcacionId =
+    seccionClave === p.seccion_clave && !nombreDemarcacion
+      ? p.demarcacion_id
+      : (DEMARCACIONES.find((d) => d.nombre === nombreDemarcacion)?.id ?? null);
+  const seccionCambiada = seccionClave !== p.seccion_clave;
+
+  /** La colonia es de la sección: si la nueva no la toca, se vacía en lugar de quedar huérfana. */
+  function cambiarSeccion(clave: string) {
+    setSeccionClave(clave);
+    const colonia = catalogoColonias.find((c) => c.id === coloniaId);
+    if (colonia && !colonia.secciones.includes(clave)) setColoniaId(null);
+  }
+
+  function corregirSeccionAMano(clave: string) {
+    if (!clave) return;
+    if (punto && seccionPorPunto(punto.lng, punto.lat) !== clave) setPunto(null);
+    setOrigen("manual");
+    cambiarSeccion(clave);
+  }
+
   // Las colonias de su sección, como en el registro. Si la que ya tenía no está entre ellas se
   // conserva en la lista: borrarla en silencio por abrir la hoja sería perder un dato.
   const colonias = useMemo(() => {
-    const deSeccion = p.seccion_clave
-      ? coloniasDeSeccionEnCatalogo(catalogoColonias, p.seccion_clave)
+    const deSeccion = seccionClave
+      ? coloniasDeSeccionEnCatalogo(catalogoColonias, seccionClave)
       : [];
-    const actual = catalogoColonias.find((c) => c.id === p.colonia_id);
+    const actual = catalogoColonias.find((c) => c.id === coloniaId);
     return actual && !deSeccion.includes(actual) ? [actual, ...deSeccion] : deSeccion;
-  }, [catalogoColonias, p.seccion_clave, p.colonia_id]);
+  }, [catalogoColonias, seccionClave, coloniaId]);
 
   const telefonoLimpio = telefono.trim();
   const revisionTelefono = telefonoLimpio ? validarTelefonoMexicano(telefonoLimpio) : null;
   const motivoTelefono =
     revisionTelefono && !revisionTelefono.valido ? revisionTelefono.motivo : null;
 
-  const listo = nombres.trim().length > 1 && !motivoTelefono;
+  // Sin el catálogo no se sabe la demarcación de la sección nueva: se espera a que cargue.
+  const listo =
+    nombres.trim().length > 1 &&
+    !motivoTelefono &&
+    (!seccionCambiada || catalogoSecciones.length > 0);
 
   async function guardar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -140,6 +189,11 @@ function HojaEditarPersona({
       telefono_raw: telefonoLimpio || null,
       calle: calle.trim() || null,
       colonia_id: coloniaId,
+      seccion_clave: seccionClave,
+      demarcacion_id: demarcacionId,
+      lat: punto?.lat ?? null,
+      lng: punto?.lng ?? null,
+      origen_ubicacion: punto ? origen : seccionClave ? "manual" : null,
       quiere_participar: quiereParticipar,
       quiere_info: quiereInfo,
       quiere_ser_representante: quiereSerRepresentante,
@@ -161,7 +215,8 @@ function HojaEditarPersona({
   }
 
   return (
-    <Hoja titulo="Editar datos" abierta alCerrar={alCerrar}>
+    // Con el mapa abierto, Escape cierra el mapa y no la hoja con todo lo que ya se corrigió.
+    <Hoja titulo="Editar datos" abierta alCerrar={abrirMapa ? () => setAbrirMapa(false) : alCerrar}>
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
         <Campo etiqueta="Nombre(s)">
           <input
@@ -236,6 +291,40 @@ function HojaEditarPersona({
           </Campo>
         </div>
 
+        <div className="flex flex-col gap-3 rounded-control bg-superficie-hundida p-3.5">
+          <p className="text-sm">
+            <span className="cifras block font-semibold text-tinta">
+              {seccionClave ? `Sección ${seccionClave}` : "Sin sección"}
+              {nombreDemarcacion && (
+                <span className="font-normal text-tinta-suave"> · {nombreDemarcacion}</span>
+              )}
+            </span>
+            <span className="block text-xs text-tinta-suave">
+              {punto ? "Con punto en el mapa" : "Sin punto en el mapa"}
+              {seccionCambiada && p.seccion_clave && ` · antes ${p.seccion_clave}`}
+            </span>
+          </p>
+          <button type="button" onClick={() => setAbrirMapa(true)} className="boton min-h-12">
+            <MapPin className="size-4" aria-hidden />
+            {punto ? "Mover el punto en el mapa" : "Marcar en el mapa"}
+          </button>
+          {catalogoSecciones.length > 0 && (
+            <label className="flex flex-col gap-1.5 text-sm text-tinta-suave">
+              O corregir la sección a mano
+              <SelectorSeccion
+                opciones={catalogoSecciones}
+                valor={seccionClave ?? ""}
+                onCambiar={corregirSeccionAMano}
+              />
+            </label>
+          )}
+          {seccionCambiada && !punto && p.lat != null && (
+            <p className="text-xs text-tinta-suave">
+              El punto anterior no cae en esta sección, así que se guarda sin punto.
+            </p>
+          )}
+        </div>
+
         <Campo etiqueta="Calle">
           <input
             value={calle}
@@ -282,10 +371,6 @@ function HojaEditarPersona({
           />
         </div>
 
-        <p className="medida text-sm text-tinta-suave">
-          La ubicación y la sección no se cambian aquí: la sección sale del punto en el mapa.
-        </p>
-
         <button
           type="submit"
           disabled={!listo || guardando}
@@ -300,6 +385,25 @@ function HojaEditarPersona({
           </p>
         )}
       </form>
+
+      {/* A document.body y no adentro de la hoja: la hoja tiene su propio apilamiento y el mapa a
+          pantalla completa quedaría atrapado en él. */}
+      {abrirMapa &&
+        createPortal(
+          <SelectorPunto
+            inicial={punto ? [punto.lng, punto.lat] : null}
+            alCancelar={() => setAbrirMapa(false)}
+            alConfirmar={(nuevo, clave) => {
+              if (clave) {
+                setPunto({ lng: nuevo[0], lat: nuevo[1] });
+                setOrigen("mapa");
+                cambiarSeccion(clave);
+              }
+              setAbrirMapa(false);
+            }}
+          />,
+          document.body,
+        )}
     </Hoja>
   );
 }
