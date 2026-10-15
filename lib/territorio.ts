@@ -318,6 +318,24 @@ export function seccionPorPunto(
   return null;
 }
 
+/**
+ * Tamaño de la celda con que se difumina el punto de un contacto sin datos, en grados. En Oaxaca
+ * son unos 220 × 210 m: cualquier punto de la celda queda a unos 150 m de su centro.
+ */
+export const CELDA_DIFUMINADO = 0.002;
+/** Lo que se le dice a quien captura: hasta dónde se aleja el punto guardado del real. */
+export const RADIO_DIFUMINADO_M = 150;
+
+/**
+ * Centro de la celda que contiene al punto. Es lo único que se guarda de la ubicación de un
+ * contacto sin datos: el punto exacto no sale del celular. Misma cuenta que `privado.difuminar`
+ * de supabase/seguridad.sql, que la vuelve a aplicar del lado de la base.
+ */
+export function difuminarPunto(lng: number, lat: number): { lng: number; lat: number } {
+  const centro = (v: number) => (Math.floor(v / CELDA_DIFUMINADO) + 0.5) * CELDA_DIFUMINADO;
+  return { lng: centro(lng), lat: centro(lat) };
+}
+
 /** Rasgo de una sección por su clave, o null si no existe en la colección. */
 export function rasgoPorClave(
   clave: string,

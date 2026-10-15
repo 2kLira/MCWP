@@ -238,7 +238,8 @@ grant execute on function public.guardar_conclusion_actividad(uuid, text) to aut
 -- Qué se borra:
 --   · la actividad, sus invitaciones y sus fotos (las dos últimas en cascada);
 --   · todas las participaciones en ella, sus menciones (cascada) y sus solicitudes;
---   · las personas que se registraron por primera vez en ella (`actividad_origen`).
+--   · las personas que se registraron por primera vez en ella (`actividad_origen`);
+--   · los contactos sin datos que se hicieron en ella, con sus menciones (cascada).
 -- Qué NO se borra, aunque se haya registrado ahí: una persona que además participó en otra
 -- actividad, que tiene seguimientos o que es representante de casilla. Esa persona ya es de otro
 -- trabajo; se conserva y solo se le quita el vínculo de origen. Borrarla se llevaría datos de
@@ -301,6 +302,7 @@ begin
                         or persona_id = any(v_borrar)),
     'fotos', (select count(*) from public.fotos where actividad_id = a_id),
     'invitaciones', (select count(*) from public.actividad_brigadistas where actividad_id = a_id),
+    'contactos_anonimos', (select count(*) from public.contactos_anonimos where actividad_id = a_id),
     'rutas', to_jsonb(v_rutas)
   );
 
@@ -408,7 +410,7 @@ begin
     'usuarios','asignaciones_responsable','importaciones','personas','actividades',
     'actividad_brigadistas','participaciones','problematicas','menciones_problematica',
     'solicitudes','seguimientos','fotos','casillas','representantes_casilla',
-    'resultados_historicos','reportes_territorio'
+    'resultados_historicos','reportes_territorio','contactos_anonimos','menciones_anonimas'
   ]
   loop
     execute format('alter table public.%I enable row level security', t);
@@ -1197,4 +1199,100 @@ create policy reportes_territorio_insert on reportes_territorio for insert to au
 create policy reportes_territorio_update on reportes_territorio for update to authenticated
   using ((select privado.es_admin())) with check ((select privado.es_admin()));
 create policy reportes_territorio_delete on reportes_territorio for delete to authenticated
+  using ((select privado.es_admin()));
+
+-- ---------------------------------------------------------------------------
+-- 12. Contactos sin datos
+-- ---------------------------------------------------------------------------
+-- Mismo modelo que personas: el administrador ve todo; el brigadista captura y ve los de su
+-- actividad mientras siga abierta. Corregir y borrar, solo el administrador. Ver la nota de la
+-- tabla en schema.sql para por qué esto es anónimo y por qué va aparte.
+
+-- Centro de la celda de 0.002° que contiene al punto. Misma cuenta que difuminarPunto de
+-- lib/territorio.ts: las dos rutas tienen que dar el mismo número, o la base movería cada punto
+-- que ya le llegó difuminado. Aplicarla dos veces da lo mismo que una, porque el centro queda a
+-- media celda de cualquier borde.
+create or replace function privado.difuminar(v double precision)
+returns double precision language sql immutable set search_path = '' as $$
+  select (floor(v / 0.002) + 0.5) * 0.002;
+$$;
+
+create or replace function privado.sellar_contacto_anonimo()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if new.lat is not null and new.lng is not null then
+    new.lat := privado.difuminar(new.lat);
+    new.lng := privado.difuminar(new.lng);
+    -- La sección la resuelve el celular con el punto exacto, antes de difuminarlo: cerca de un
+    -- límite el centro de la celda puede caer en la sección vecina. Se le cree mientras el
+    -- polígono quede a menos de 200 m del centro (la celda mide 150 del centro a la esquina).
+    -- Si no, manda el centro de la celda.
+    if new.seccion_clave is null or not exists (
+      select 1 from public.secciones_geom g
+      where g.clave = new.seccion_clave
+        and extensions.st_dwithin(
+              g.geom::extensions.geography,
+              extensions.st_setsrid(extensions.st_point(new.lng, new.lat), 4326)::extensions.geography,
+              200)
+    ) then
+      new.seccion_clave := coalesce(public.seccion_por_punto(new.lng, new.lat), new.seccion_clave);
+    end if;
+  end if;
+  new.demarcacion_id := (select s.demarcacion_id from public.secciones s
+                          where s.clave = new.seccion_clave);
+  new.peticion   := nullif(btrim(new.peticion), '');
+  new.comentario := nullif(btrim(new.comentario), '');
+
+  if tg_op = 'INSERT' then
+    if auth.uid() is not null then
+      new.registrado_por := auth.uid();
+      new.created_at     := now();
+    end if;
+    return new;
+  end if;
+
+  new.id             := old.id;
+  new.actividad_id   := old.actividad_id;
+  new.registrado_por := old.registrado_por;
+  new.created_at     := old.created_at;
+  return new;
+end $$;
+
+revoke all on function privado.difuminar(double precision) from public;
+revoke all on function privado.sellar_contacto_anonimo() from public;
+
+drop trigger if exists sellar_contacto_anonimo on public.contactos_anonimos;
+create trigger sellar_contacto_anonimo before insert or update on public.contactos_anonimos
+  for each row execute function privado.sellar_contacto_anonimo();
+
+alter table public.contactos_anonimos enable row level security;
+alter table public.menciones_anonimas enable row level security;
+revoke all on public.contactos_anonimos from anon;
+revoke all on public.menciones_anonimas from anon;
+
+create policy contactos_anonimos_select on contactos_anonimos for select to authenticated
+  using ((select privado.es_admin()) or privado.actividad_abierta_mia(actividad_id));
+create policy contactos_anonimos_insert on contactos_anonimos for insert to authenticated
+  with check ((select privado.es_admin())
+              or (registrado_por = (select auth.uid())
+                  and privado.actividad_abierta_mia(actividad_id)));
+create policy contactos_anonimos_update on contactos_anonimos for update to authenticated
+  using ((select privado.es_admin())) with check ((select privado.es_admin()));
+create policy contactos_anonimos_delete on contactos_anonimos for delete to authenticated
+  using ((select privado.es_admin()));
+
+create policy menciones_anonimas_select on menciones_anonimas for select to authenticated
+  using ((select privado.es_admin())
+         or exists (select 1 from contactos_anonimos ca
+                    where ca.id = contacto_id
+                      and privado.actividad_abierta_mia(ca.actividad_id)));
+create policy menciones_anonimas_insert on menciones_anonimas for insert to authenticated
+  with check ((select privado.es_admin())
+              or exists (select 1 from contactos_anonimos ca
+                         where ca.id = contacto_id
+                           and ca.registrado_por = (select auth.uid())
+                           and privado.actividad_abierta_mia(ca.actividad_id)));
+create policy menciones_anonimas_update on menciones_anonimas for update to authenticated
+  using ((select privado.es_admin())) with check ((select privado.es_admin()));
+create policy menciones_anonimas_delete on menciones_anonimas for delete to authenticated
   using ((select privado.es_admin()));

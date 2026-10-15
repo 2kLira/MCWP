@@ -11,13 +11,21 @@ import type {
 import { useActuante } from "@/components/proveedor-actuante";
 import { MUNICIPIO } from "@/lib/demarcaciones";
 import { avanceDeCasilla, type CasillaConRepresentantes } from "@/lib/datos/casillas";
+import type { CeldaSinDatos } from "@/lib/datos/contactos-anonimos";
 import type { ReporteTerritorio } from "@/lib/datos/reportes-territorio";
-import { bboxDeRasgo, rasgoPorClave, type ColeccionSecciones, type RasgoSeccion } from "@/lib/territorio";
+import {
+  bboxDeRasgo,
+  RADIO_DIFUMINADO_M,
+  rasgoPorClave,
+  type ColeccionSecciones,
+  type RasgoSeccion,
+} from "@/lib/territorio";
 import {
   calcularPasosDeVista,
   esVistaDeCasillas,
   esVistaDePuntos,
   esVistaDeReportes,
+  esVistaDeSinDatos,
   grupoDePrioritarias,
   type DatosMapa,
   type VistaMapa,
@@ -66,6 +74,41 @@ const PROP_PRIORITARIA_RECORRIDA = "prioritariaRecorrida";
 const FUENTE_CASILLAS_ID = "casillas-en-mapa-principal";
 const CAPA_CASILLA_TRAZO = "casillas-en-mapa-principal-trazo";
 const CAPA_CASILLA_PUNTO = "casillas-en-mapa-principal-punto";
+
+// Contactos sin datos: un círculo por celda. Son polígonos y no una capa `circle` porque el radio
+// de una `circle` es en píxeles, y aquí lo que importa es que mida 150 metros de verdad a cualquier
+// zoom: es la incertidumbre del punto, no un adorno.
+const FUENTE_SIN_DATOS_ID = "contactos-sin-datos";
+const CAPA_SIN_DATOS_RELLENO = "contactos-sin-datos-relleno";
+const CAPA_SIN_DATOS_BORDE = "contactos-sin-datos-borde";
+const VERTICES_CIRCULO = 40;
+
+/** Círculo de `radioM` metros alrededor del punto, como polígono. Plano local: a 150 m sobra. */
+function circuloEnMetros(lng: number, lat: number, radioM: number): [number, number][] {
+  const dLat = radioM / 111_320;
+  const dLng = radioM / (111_320 * Math.cos((lat * Math.PI) / 180));
+  const anillo: [number, number][] = [];
+  for (let i = 0; i <= VERTICES_CIRCULO; i++) {
+    const angulo = (i / VERTICES_CIRCULO) * 2 * Math.PI;
+    anillo.push([lng + dLng * Math.cos(angulo), lat + dLat * Math.sin(angulo)]);
+  }
+  return anillo;
+}
+
+function coleccionSinDatos(celdas: readonly CeldaSinDatos[]): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: celdas.map((celda) => ({
+      type: "Feature",
+      geometry: { type: "Polygon", coordinates: [circuloEnMetros(celda.lng, celda.lat, RADIO_DIFUMINADO_M)] },
+      properties: {
+        id: celda.id,
+        total: celda.contactos.length,
+        conPeticion: celda.conPeticion > 0,
+      },
+    })),
+  } as GeoJSON.FeatureCollection;
+}
 
 /** "vacia" -> 0, "parcial" -> 1, "completa" -> 2, igual que en mapa-casillas.tsx: nada más para
  *  poder usar un match de MapLibre (line-dasharray y compañía no aceptan strings de dato). */
@@ -232,6 +275,10 @@ export type MapaLienzoProps = {
   reportes: readonly ReporteTerritorio[];
   reporteSeleccionadoId: string | null;
   onClicReporte: (id: string, origen: { x: number; y: number }) => void;
+  /** Contactos sin datos agrupados por celda. Solo se pintan en la vista "sin_datos". */
+  celdasSinDatos: readonly CeldaSinDatos[];
+  celdaSeleccionadaId: string | null;
+  onClicCelda: (id: string, origen: { x: number; y: number }) => void;
 };
 
 /**
@@ -252,6 +299,9 @@ export function MapaLienzo({
   reportes,
   reporteSeleccionadoId,
   onClicReporte,
+  celdasSinDatos,
+  celdaSeleccionadaId,
+  onClicCelda,
 }: MapaLienzoProps) {
   const { actuante } = useActuante();
   const contenedorRef = useRef<HTMLDivElement>(null);
@@ -270,6 +320,9 @@ export function MapaLienzo({
   const casillasRef = useRef(casillas);
   const casillaSeleccionadaIdRef = useRef(casillaSeleccionadaId);
   const onClicCasillaRef = useRef(onClicCasilla);
+  const celdasSinDatosRef = useRef(celdasSinDatos);
+  const celdaSeleccionadaIdRef = useRef(celdaSeleccionadaId);
+  const onClicCeldaRef = useRef(onClicCelda);
 
   // Los espejos se actualizan después de pintar, no durante el render.
   useEffect(() => {
@@ -280,9 +333,25 @@ export function MapaLienzo({
     casillasRef.current = casillas;
     casillaSeleccionadaIdRef.current = casillaSeleccionadaId;
     onClicCasillaRef.current = onClicCasilla;
+    celdasSinDatosRef.current = celdasSinDatos;
+    celdaSeleccionadaIdRef.current = celdaSeleccionadaId;
+    onClicCeldaRef.current = onClicCelda;
   });
   const claveResaltadaRef = useRef<string | null>(null);
   const casillaResaltadaRef = useRef<number | null>(null);
+  const celdaResaltadaRef = useRef<string | null>(null);
+
+  /** Resalta el círculo de la celda elegida. Mismo patrón que aplicarSeleccionCasilla. */
+  function aplicarSeleccionCelda(mapa: MapaLibreMap, id: string | null) {
+    const anterior = celdaResaltadaRef.current;
+    if (anterior != null && anterior !== id) {
+      mapa.setFeatureState({ source: FUENTE_SIN_DATOS_ID, id: anterior }, { seleccionada: false });
+    }
+    if (id != null) {
+      mapa.setFeatureState({ source: FUENTE_SIN_DATOS_ID, id }, { seleccionada: true });
+    }
+    celdaResaltadaRef.current = id;
+  }
 
   /** Aplica valor de vista, hueco y selección a todas las secciones. */
   function aplicarEstadoCompleto(mapa: MapaLibreMap) {
@@ -530,7 +599,61 @@ export function MapaLienzo({
       },
     });
 
+    // Círculos de contactos sin datos, encima de todo lo demás. Más gente en la celda, más
+    // intenso; si alguien dejó una petición, borde más grueso, porque ahí hay algo que atender.
+    mapa.addSource(FUENTE_SIN_DATOS_ID, {
+      type: "geojson",
+      data: coleccionSinDatos(celdasSinDatosRef.current),
+      promoteId: "id",
+    });
+    const esSinDatosInicial = esVistaDeSinDatos(estadoRef.current.vista);
+    mapa.addLayer({
+      id: CAPA_SIN_DATOS_RELLENO,
+      type: "fill",
+      source: FUENTE_SIN_DATOS_ID,
+      layout: { visibility: esSinDatosInicial ? "visible" : "none" },
+      paint: {
+        "fill-color": [
+          "interpolate",
+          ["linear"],
+          ["get", "total"],
+          1,
+          escala[2],
+          3,
+          escala[3],
+          6,
+          escala[4],
+        ],
+        "fill-opacity": ["case", ["boolean", ["feature-state", "seleccionada"], false], 0.7, 0.5],
+        "fill-opacity-transition": { duration: durUi, delay: 0 },
+      },
+    });
+    mapa.addLayer({
+      id: CAPA_SIN_DATOS_BORDE,
+      type: "line",
+      source: FUENTE_SIN_DATOS_ID,
+      layout: { visibility: esSinDatosInicial ? "visible" : "none" },
+      paint: {
+        "line-color": [
+          "case",
+          ["boolean", ["feature-state", "seleccionada"], false],
+          colorBordeSeleccion,
+          colorPrioritariaPendiente,
+        ],
+        "line-width": [
+          "case",
+          ["boolean", ["feature-state", "seleccionada"], false],
+          3,
+          ["get", "conPeticion"],
+          2.25,
+          1,
+        ],
+        "line-width-transition": { duration: durUi, delay: 0 },
+      },
+    });
+
     aplicarSeleccionCasilla(mapa, casillaSeleccionadaIdRef.current);
+    aplicarSeleccionCelda(mapa, celdaSeleccionadaIdRef.current);
 
     aplicarEstadoCompleto(mapa);
     mapa.setLayoutProperty(
@@ -630,6 +753,24 @@ export function MapaLienzo({
         if (id == null) return;
         const caja = mapa.getContainer().getBoundingClientRect();
         onClicCasillaRef.current(id, {
+          x: caja.left + evento.point.x,
+          y: caja.top + evento.point.y,
+        });
+      });
+
+      // Los círculos de contactos sin datos. Igual que las casillas: la capa solo es visible en su
+      // vista, y una capa oculta no dispara eventos.
+      mapa.on("mouseenter", [CAPA_SIN_DATOS_RELLENO], () => {
+        mapa.getCanvas().style.cursor = "pointer";
+      });
+      mapa.on("mouseleave", [CAPA_SIN_DATOS_RELLENO], () => {
+        mapa.getCanvas().style.cursor = "";
+      });
+      mapa.on("click", [CAPA_SIN_DATOS_RELLENO], (evento) => {
+        const id = evento.features?.[0]?.properties?.id as string | undefined;
+        if (!id) return;
+        const caja = mapa.getContainer().getBoundingClientRect();
+        onClicCeldaRef.current(id, {
           x: caja.left + evento.point.x,
           y: caja.top + evento.point.y,
         });
@@ -738,6 +879,12 @@ export function MapaLienzo({
     if (mapa.getLayer(CAPA_CASILLA_TRAZO)) {
       mapa.setLayoutProperty(CAPA_CASILLA_TRAZO, "visibility", esCasillas ? "visible" : "none");
     }
+    const esSinDatos = esVistaDeSinDatos(vista);
+    for (const capa of [CAPA_SIN_DATOS_RELLENO, CAPA_SIN_DATOS_BORDE]) {
+      if (mapa.getLayer(capa)) {
+        mapa.setLayoutProperty(capa, "visibility", esSinDatos ? "visible" : "none");
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vista]);
 
@@ -793,6 +940,28 @@ export function MapaLienzo({
   }, [casillas]);
 
   // ---------------------------------------------------------------------------
+  // Contactos sin datos: misma idea que las casillas. Se refresca la fuente cuando llega la lista
+  // (carga perezosa al entrar a la vista) y se resalta el círculo elegido.
+  // ---------------------------------------------------------------------------
+  const celdasAnterioresRef = useRef(celdasSinDatos);
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    const fuente = mapa?.getSource(FUENTE_SIN_DATOS_ID);
+    if (!mapa || !fuente || celdasAnterioresRef.current === celdasSinDatos) return;
+    celdasAnterioresRef.current = celdasSinDatos;
+    (fuente as GeoJSONSource).setData(coleccionSinDatos(celdasSinDatos));
+    aplicarSeleccionCelda(mapa, celdaSeleccionadaIdRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celdasSinDatos]);
+
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapa.getSource(FUENTE_SIN_DATOS_ID)) return;
+    aplicarSeleccionCelda(mapa, celdaSeleccionadaId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celdaSeleccionadaId]);
+
+  // ---------------------------------------------------------------------------
   // Casilla elegida: resalta su punto. A diferencia de una sección, no mueve la cámara (tampoco lo
   // hacía mapa-casillas.tsx al seleccionar: ahí la cámara solo se movía con el filtro de sección).
   // ---------------------------------------------------------------------------
@@ -815,7 +984,9 @@ export function MapaLienzo({
           ? "Mapa de casillas de Oaxaca de Juárez"
           : esVistaDeReportes(vista)
             ? "Mapa de reportes del territorio de Oaxaca de Juárez"
-            : "Mapa de secciones electorales de Oaxaca de Juárez"
+            : esVistaDeSinDatos(vista)
+              ? "Mapa de contactos sin datos de Oaxaca de Juárez"
+              : "Mapa de secciones electorales de Oaxaca de Juárez"
       }
     />
     <MarcadoresReportes

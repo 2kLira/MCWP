@@ -35,6 +35,7 @@ const ESTADOS: EstadoSeguimiento[] = ["pendiente"];
 const ETIQUETA_MOTIVO: Record<MotivoBandeja, string> = {
   participa: "Quiere participar",
   info: "Quiere información",
+  barda: "Barda o lona",
   solicitud: "Dejó una petición",
 };
 

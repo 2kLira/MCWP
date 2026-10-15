@@ -99,7 +99,7 @@ export function FichaActividad({ id }: { id: string }) {
 
   const consolidado = useConsulta<Consolidado>(
     () => consolidadoDeActividad(id),
-    { asistentes: 0, nuevas: 0, quierenParticipar: 0, quierenInfo: 0, menciones: [] },
+    { asistentes: 0, nuevas: 0, quierenParticipar: 0, quierenInfo: 0, sinDatos: 0, menciones: [] },
     [id, recargar],
   );
 
@@ -582,7 +582,7 @@ function ConclusionBrigadista({
   );
 }
 
-/** Los cuatro conteos que calcula el sistema. Nunca se teclean. */
+/** Los conteos que calcula el sistema. Nunca se teclean. */
 function ConsolidadoCifras({
   consolidado,
   cargando,
@@ -599,6 +599,23 @@ function ConsolidadoCifras({
       <Cifra etiqueta="Personas nuevas" valor={consolidado.nuevas} />
       <Cifra etiqueta="Quieren participar" valor={consolidado.quierenParticipar} />
       <Cifra etiqueta="Quieren información" valor={consolidado.quierenInfo} />
+      {consolidado.sinDatos > 0 && (
+        <>
+          <Cifra etiqueta="No quisieron dar datos" valor={consolidado.sinDatos} />
+          {/* De la gente nueva de esta actividad, cuánta sí dejó sus datos. Es la cifra que dice
+              qué brigada convence, por actividad y no por persona: medir a cada brigadista
+              empuja a inventar teléfonos. */}
+          <div>
+            <p className="text-xs text-tinta-suave">Dejaron sus datos</p>
+            <p className="cifras mt-0.5 text-sm font-semibold text-tinta">
+              {Math.round(
+                (consolidado.nuevas / (consolidado.nuevas + consolidado.sinDatos)) * 100,
+              )}
+              %
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

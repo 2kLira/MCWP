@@ -21,6 +21,10 @@ import {
 export type Persona = {
   id: string;
   nombre: string;
+  /** Las tres partes del nombre. Null en renglones viejos o de carga masiva: ahí solo hay `nombre`. */
+  nombres: string | null;
+  apellido_paterno: string | null;
+  apellido_materno: string | null;
   telefono_norm: string | null;
   telefono_raw: string | null;
   calle: string | null;
@@ -43,6 +47,8 @@ export type Persona = {
   promovido_en: string | null;
   promovido_por: string | null;
   quiere_ser_representante: boolean;
+  /** Ofrece su barda para pintar o su fachada para lona. */
+  quiere_barda_lona: boolean;
   /** Quien la registró. Null si RLS no deja leer a ese usuario (solo el admin ve a los demás). */
   registrador?: { nombre: string } | null;
   /**
@@ -223,6 +229,7 @@ export type EntradaPersona = {
   fecha_nacimiento?: string | null;
   es_promovido?: boolean;
   quiere_ser_representante?: boolean;
+  quiere_barda_lona?: boolean;
   /** Quién trajo a esta persona. Apunta a personas, no a usuarios. */
   promotor_id?: string | null;
 };

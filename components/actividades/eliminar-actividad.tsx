@@ -104,6 +104,7 @@ export function EliminarActividad({ actividadId }: { actividadId: string }) {
               </p>
               <ul className="mt-2 flex flex-col gap-1 text-sm text-tinta">
                 <Renglon n={resumen.personas_borradas} uno="persona registrada aquí" varios="personas registradas aquí" siempre />
+                <Renglon n={resumen.contactos_anonimos ?? 0} uno="contacto sin datos" varios="contactos sin datos" />
                 <Renglon n={resumen.participaciones} uno="registro de asistencia" varios="registros de asistencia" />
                 <Renglon n={resumen.menciones} uno="problemática mencionada" varios="problemáticas mencionadas" />
                 <Renglon n={resumen.solicitudes} uno="solicitud" varios="solicitudes" />

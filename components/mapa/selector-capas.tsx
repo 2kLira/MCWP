@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { VISTAS_MAPA, type VistaMapa } from "./datos-mapa";
 
 /**
- * Las nueve vistas del mapa, en una cápsula de vidrio flotante. No es un tablist: no hay paneles
+ * Las vistas del mapa, en una cápsula de vidrio flotante. No es un tablist: no hay paneles
  * asociados ni navegación con flechas, así que se marca como un grupo de botones de alternancia
  * (`role="group"` + `aria-pressed` por botón), que es lo que de verdad son. El paso activo se lee
  * como píldora blanca con su propio peso y un puntito naranja; el naranja no vive en el mapa de

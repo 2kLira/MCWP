@@ -64,6 +64,7 @@ export function RenglonBandeja({
           {fila.tiene_solicitud && <span className="font-medium text-tinta">Petición</span>}
           {fila.quiere_participar && <span>Quiere participar</span>}
           {fila.quiere_info && <span>Quiere información</span>}
+          {fila.quiere_barda_lona && <span>Barda o lona</span>}
         </p>
 
         {/* En celular, sección y espera comparten línea; en escritorio cada una es su columna. */}

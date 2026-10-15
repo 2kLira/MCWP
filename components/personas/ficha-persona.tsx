@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Caja } from "@/components/sistema/caja";
 import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
+import { EditarPersona } from "@/components/personas/editar-persona";
 import { EliminarPersona } from "@/components/personas/eliminar-persona";
 import { Estado } from "@/components/sistema/estado";
 import { useActuante } from "@/components/proveedor-actuante";
@@ -47,8 +48,8 @@ function fechaLarga(iso: string): string {
 
 export function FichaPersona({ id }: { id: string }) {
   const { actuante } = useActuante();
-  // recargar fuerza que obtenerPersona se vuelva a pedir después de marcar/desmarcar promovido,
-  // así la ficha refleja el estado nuevo sin recargar la página.
+  // recargar fuerza que obtenerPersona se vuelva a pedir después de marcar/desmarcar promovido o
+  // de editar los datos, así la ficha refleja el estado nuevo sin recargar la página.
   const [recargar, setRecargar] = useState(0);
   const persona = useConsulta<Persona | null>(() => obtenerPersona(actuante, id), null, [
     actuante.id,
@@ -99,7 +100,8 @@ export function FichaPersona({ id }: { id: string }) {
     p.quiere_info ||
     Boolean(p.aviso_version) ||
     p.es_promovido ||
-    p.quiere_ser_representante;
+    p.quiere_ser_representante ||
+    p.quiere_barda_lona;
 
   // Se guarda el valor aquí y no dentro de la función: el estrechamiento de `p` no sobrevive al
   // cierre de una función declarada, y adentro TypeScript vuelve a verlo como posiblemente nulo.
@@ -135,20 +137,23 @@ export function FichaPersona({ id }: { id: string }) {
         volver={{ href: "/personas", etiqueta: "Personas alcanzadas" }}
       />
 
-      {(cumple || p.telefono_norm) && (
+      {(cumple || p.telefono_norm || editable) && (
         <div className="flex flex-wrap items-center gap-2.5">
           {cumple && <Estado vivo>Hoy cumple años</Estado>}
-          {p.telefono_norm && (
-            <a
-              href={`https://wa.me/52${p.telefono_norm}`}
-              target="_blank"
-              rel="noreferrer"
-              className="boton ml-auto"
-            >
-              <MessageCircle className="size-4" aria-hidden />
-              WhatsApp
-            </a>
-          )}
+          <div className="ml-auto flex flex-wrap items-center gap-2.5">
+            {editable && <EditarPersona persona={p} alGuardar={() => setRecargar((v) => v + 1)} />}
+            {p.telefono_norm && (
+              <a
+                href={`https://wa.me/52${p.telefono_norm}`}
+                target="_blank"
+                rel="noreferrer"
+                className="boton"
+              >
+                <MessageCircle className="size-4" aria-hidden />
+                WhatsApp
+              </a>
+            )}
+          </div>
         </div>
       )}
 
@@ -207,6 +212,9 @@ export function FichaPersona({ id }: { id: string }) {
               )}
               {p.quiere_ser_representante && (
                 <Indicador etiqueta="Quiere ser representante de casilla" activo />
+              )}
+              {p.quiere_barda_lona && (
+                <Indicador etiqueta="Quiere que se pinte su barda o poner lona" activo />
               )}
             </ul>
           ) : (

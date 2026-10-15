@@ -938,3 +938,40 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
   · Sin actividad no hay participación, así que el comentario de un registro hecho fuera de una
     actividad (solo admin o responsables) sigue sin tener dónde guardarse. Pendiente decidir si
     se le da una columna en `personas`.
+- **Barda o lona (15 de octubre de 2026).** Pedido del cliente: en Intereses del registro, un
+  interruptor "Quiere que se pinte su barda o poner lona", filtrable en Seguimiento.
+  · Columna nueva `personas.quiere_barda_lona`, una sola marca para las dos cosas.
+  · **Extiende la regla del spec de la bandeja de seguimiento**: quien ofrece barda o lona entra
+    a `v_bandeja_seguimiento` igual que quien quiere participar o información, porque alguien
+    tiene que ir a pintarla o a colgarla. En Seguimiento es el motivo "Barda o lona".
+  · Se ve en la ficha, se corrige desde "Editar datos" y sale como columna en la exportación.
+- **Contactos sin datos (15 de octubre de 2026).** Pedido del cliente: mucha gente no quiere dejar
+  sus datos y ese contacto se perdía. El spec no lo cubre; se decidió así:
+  · El registro abre con "Con sus datos" / "No quiso dar sus datos". Sin datos se guarda en
+    `contactos_anonimos` (tabla aparte, no en `personas`): sección, colonia, género, rango de edad,
+    problemáticas (`menciones_anonimas`), petición y comentario. Nada de nombre, teléfono, calle ni
+    fecha de nacimiento.
+  · **El punto se difumina** al centro de una celda de 0.002° (unos 220 × 210 m; a unos 150 m del
+    punto real como mucho). El cliente lo pidió más fino que la sección, que es demasiado grande
+    para que una petición sirva. El celular lo difumina antes de mandarlo y la base lo vuelve a
+    difuminar (`privado.difuminar`), así que el punto exacto no se guarda nunca.
+  · Al no identificar a nadie, no lleva aviso de privacidad. **Pendiente de confirmar con el
+    abogado** junto con el aviso: que la celda, el género y el rango de edad juntos no vuelvan
+    identificable a alguien en zonas poco pobladas.
+  · Cuentan como gente alcanzada (tablero: "· N sin datos"; cierre de actividad: "No quisieron dar
+    datos" y "Dejaron sus datos: %"), y sus problemáticas suman en `v_problematicas_por_seccion`,
+    en el mapa y en reportes. No entran a la bandeja de seguimiento: no hay a quién llamar.
+  · Para empujar a que sí dejen sus datos, el formulario dice en el momento por qué: al pedir algo
+    ("para avisarle cuando se atienda, basta su nombre y un WhatsApp") y donde irían los intereses.
+    Un toque pasa a la captura normal sin perder lo anotado.
+  · El apellido paterno dejó de ser obligatorio: "solo nombre y WhatsApp" es el escalón entre no
+    dar nada y darlo todo. El consentimiento sigue siendo obligatorio con datos.
+  · **Apagado por ahora** (15 de octubre de 2026, pedido del cliente): no se ve la opción en el
+    registro ni la vista en el mapa. El código, las tablas y las políticas siguen en su lugar; se
+    prende con `MOSTRAR_CONTACTOS_SIN_DATOS` en lib/puertas-ui.ts. El apellido opcional y las
+    cifras de "sin datos" del tablero y la actividad no dependen de eso: las cifras solo aparecen
+    si hay contactos, y hoy hay cero.
+  · En el mapa es la vista "Sin datos": un círculo de 150 m por celda (polígono en metros, no
+    `circle` en píxeles), más intenso con más gente y con borde grueso si hay petición. Al tocarlo
+    se abre la lista de lo que dijo cada contacto de esa zona. Se pide la lista completa de una vez:
+    si un día pasa de mil contactos, el tope de PostgREST la corta y habrá que agregarla en la base.

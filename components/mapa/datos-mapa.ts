@@ -5,15 +5,16 @@
  * vista. Este módulo no decide quién ve qué, solo
  * convierte lo que la base ya recortó en un paso de 0 a 4 por sección. Cinco vistas usan cortes por
  * cuantiles sobre los valores presentes; las dos de prioritarias no, ver `calcularPasosPrioritarias`.
- * Las dos últimas, casillas y reportes, no pintan polígono por dato: pintan puntos, ver
- * `esVistaDePuntos`.
+ * Las tres últimas, casillas, reportes y sin datos, no pintan polígono por dato: pintan puntos o
+ * círculos encima, ver `esVistaDePuntos`.
  */
 
 import { seccionesResumen, type SeccionResumen } from "@/lib/datos/catalogos";
+import { MOSTRAR_CONTACTOS_SIN_DATOS } from "@/lib/puertas-ui";
 import type { ColeccionSecciones } from "@/lib/territorio";
 import type { UsuarioActuante } from "@/lib/tipos";
 
-/** Las nueve vistas del mapa, en el orden en que aparecen en el selector. */
+/** Las vistas del mapa, en el orden en que aparecen en el selector. */
 export type VistaMapa =
   | "estructura"
   | "personas"
@@ -23,7 +24,8 @@ export type VistaMapa =
   | "prioritarias_a"
   | "prioritarias_b"
   | "casillas"
-  | "reportes";
+  | "reportes"
+  | "sin_datos";
 
 export const VISTAS_MAPA: ReadonlyArray<{ id: VistaMapa; etiqueta: string }> = [
   { id: "estructura", etiqueta: "Estructura" },
@@ -35,7 +37,13 @@ export const VISTAS_MAPA: ReadonlyArray<{ id: VistaMapa; etiqueta: string }> = [
   { id: "prioritarias_b", etiqueta: "Prioritarias B" },
   { id: "casillas", etiqueta: "Casillas" },
   { id: "reportes", etiqueta: "Reportes" },
-];
+  { id: "sin_datos", etiqueta: "Sin datos" },
+  // Apagada con MOSTRAR_CONTACTOS_SIN_DATOS: fuera de esta lista no sale en el selector y
+  // `?vista=sin_datos` cae a la vista por defecto.
+].filter((v) => v.id !== "sin_datos" || MOSTRAR_CONTACTOS_SIN_DATOS) as ReadonlyArray<{
+  id: VistaMapa;
+  etiqueta: string;
+}>;
 
 /** El grupo de prioridad que pinta una vista, o null si no es una vista de prioritarias. */
 export function grupoDePrioritarias(vista: VistaMapa): "A" | "B" | null {
@@ -63,11 +71,20 @@ export function esVistaDeReportes(vista: VistaMapa): boolean {
 }
 
 /**
- * Si la vista pinta puntos encima del territorio en vez de colorear secciones: casillas o
- * reportes. En ambas las secciones quedan de fondo, atenuadas parejo y sin responder al clic.
+ * Si la vista pinta los contactos que no quisieron dar sus datos: un círculo de unos 150 m por
+ * celda, que es todo lo que se sabe de dónde estaban (ver lib/datos/contactos-anonimos.ts).
+ */
+export function esVistaDeSinDatos(vista: VistaMapa): boolean {
+  return vista === "sin_datos";
+}
+
+/**
+ * Si la vista pinta puntos encima del territorio en vez de colorear secciones: casillas,
+ * reportes o sin datos. En todas las secciones quedan de fondo, atenuadas parejo y sin responder
+ * al clic.
  */
 export function esVistaDePuntos(vista: VistaMapa): boolean {
-  return esVistaDeCasillas(vista) || esVistaDeReportes(vista);
+  return esVistaDeCasillas(vista) || esVistaDeReportes(vista) || esVistaDeSinDatos(vista);
 }
 
 /**
@@ -209,6 +226,7 @@ function metricaDeVista(vista: VistaMapa, dato: DatoSeccion | undefined): number
       return null; // no son de cuantiles, ver calcularPasosPrioritarias.
     case "casillas":
     case "reportes":
+    case "sin_datos":
       return null; // no pintan polígono por dato: caen en paso 0 parejo, ver calcularPasosDeVista.
   }
 }

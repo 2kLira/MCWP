@@ -11,6 +11,11 @@ import {
   type CasillaConRepresentantes,
   type RepresentanteCasilla,
 } from "@/lib/datos/casillas";
+import {
+  agruparPorCelda,
+  listarContactosAnonimos,
+  type CeldaSinDatos,
+} from "@/lib/datos/contactos-anonimos";
 import { reportesPendientes, type ReporteTerritorio } from "@/lib/datos/reportes-territorio";
 import { esAdmin } from "@/lib/puertas-ui";
 import { cargarSecciones, type ColeccionSecciones, type RasgoSeccion } from "@/lib/territorio";
@@ -23,6 +28,7 @@ import {
   esIdentificadorDeVista,
   esVistaDeCasillas,
   esVistaDeReportes,
+  esVistaDeSinDatos,
   grupoDePrioritarias,
   type DatosMapa,
   type VistaMapa,
@@ -30,6 +36,7 @@ import {
 import { EsqueletoMapa } from "./esqueleto-mapa";
 import { FichaReporte } from "./ficha-reporte";
 import { FichaSeccion } from "./ficha-seccion";
+import { FichaSinDatos } from "./ficha-sin-datos";
 import { LeyendaMapa } from "./leyenda-mapa";
 import { MapaLienzo } from "./mapa-lienzo";
 import { ResumenPrioritarias } from "./resumen-prioritarias";
@@ -153,6 +160,31 @@ export function MapaPagina({
   }, [actuante]);
 
   const vistaEsCasillas = esVistaDeCasillas(vista);
+  const vistaEsSinDatos = esVistaDeSinDatos(vista);
+
+  // Contactos sin datos, agrupados por celda. Carga perezosa como las casillas: no se piden hasta
+  // entrar a su vista, y se vuelven a pedir si cambió el actuante. RLS decide cuáles llegan.
+  const [celdasSinDatos, setCeldasSinDatos] = useState<CeldaSinDatos[]>([]);
+  const [seleccionCelda, setSeleccionCelda] = useState<{
+    id: string;
+    origen: { x: number; y: number };
+  } | null>(null);
+  const celdaSeleccionada = seleccionCelda
+    ? (celdasSinDatos.find((c) => c.id === seleccionCelda.id) ?? null)
+    : null;
+  const sinDatosActuanteCargadoRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!vistaEsSinDatos) return;
+    if (sinDatosActuanteCargadoRef.current === actuante.id) return;
+    let cancelado = false;
+    sinDatosActuanteCargadoRef.current = actuante.id;
+    listarContactosAnonimos().then((r) => {
+      if (!cancelado) setCeldasSinDatos(agruparPorCelda(r.datos));
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [vistaEsSinDatos, actuante.id]);
 
   // Carga perezosa: las casillas no se piden hasta entrar a su vista, igual que el resto del mapa
   // evita pedir de más al arrancar. Se vuelve a pedir si el actuante cambió de territorio mientras
@@ -255,6 +287,14 @@ export function MapaPagina({
               setSeleccionCasilla(null);
               setSeleccionReporte({ id, origen });
             }}
+            celdasSinDatos={celdasSinDatos}
+            celdaSeleccionadaId={seleccionCelda?.id ?? null}
+            onClicCelda={(id, origen) => {
+              setSeleccion(null);
+              setSeleccionCasilla(null);
+              setSeleccionReporte(null);
+              setSeleccionCelda({ id, origen });
+            }}
           />
 
           {/* Arriba a la izquierda: municipio y territorio del actuante, y debajo el resumen que
@@ -307,6 +347,7 @@ export function MapaPagina({
                 if (!esVistaDeCasillas(nueva)) setSeleccionCasilla(null);
                 // Igual con el reporte: sus marcadores solo existen en la vista de reportes.
                 if (!esVistaDeReportes(nueva)) setSeleccionReporte(null);
+                if (!esVistaDeSinDatos(nueva)) setSeleccionCelda(null);
               }}
               enMovimiento={enMovimiento}
               className="pointer-events-auto max-w-full"
@@ -316,6 +357,7 @@ export function MapaPagina({
           <LeyendaMapa
             vista={vista}
             reportes={reportes}
+            celdasSinDatos={celdasSinDatos}
             enMovimiento={enMovimiento}
             sangradoIzquierdo={sangradoIzquierdo}
           />
@@ -339,6 +381,16 @@ export function MapaPagina({
               enMovimiento={enMovimiento}
               onCerrar={() => setSeleccionCasilla(null)}
               onGuardado={alGuardarRepresentanteCasilla}
+            />
+          )}
+
+          {seleccionCelda && celdaSeleccionada && (
+            <FichaSinDatos
+              key={celdaSeleccionada.id}
+              celda={celdaSeleccionada}
+              origen={seleccionCelda.origen}
+              enMovimiento={enMovimiento}
+              onCerrar={() => setSeleccionCelda(null)}
             />
           )}
 

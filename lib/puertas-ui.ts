@@ -157,6 +157,13 @@ export function puedeEditarPersona(
   return persona.registrada_por === usuario.id;
 }
 
+/**
+ * Contactos sin datos ("No quiso dar sus datos" en el registro y la vista "Sin datos" del mapa).
+ * Apagado a pedido del cliente el 15 de octubre de 2026: todo sigue construido y en la base, solo
+ * no se pinta. Para prenderlo basta cambiar esto a `true`. Ver PENDIENTES.md.
+ */
+export const MOSTRAR_CONTACTOS_SIN_DATOS = false;
+
 export function esAdmin(usuario: UsuarioActuante | null): boolean {
   return usuario?.rol === "admin" && usuario.activo;
 }

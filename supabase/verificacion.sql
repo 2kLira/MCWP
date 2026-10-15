@@ -87,7 +87,8 @@ where n.nspname = 'storage' and c.relname = 'objects' and p.polcmd = 'a';
 select t.tabla as tabla_sin_sellado
 from (values ('personas'), ('participaciones'), ('fotos'), ('actividades'),
              ('representantes_casilla'), ('importaciones'), ('seguimientos'),
-             ('solicitudes'), ('casillas'), ('usuarios'), ('reportes_territorio')) as t(tabla)
+             ('solicitudes'), ('casillas'), ('usuarios'), ('reportes_territorio'),
+             ('contactos_anonimos')) as t(tabla)
 where not exists (
   select 1 from pg_trigger g
   join pg_class c on c.oid = g.tgrelid

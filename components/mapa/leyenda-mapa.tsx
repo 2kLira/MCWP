@@ -3,11 +3,14 @@
 import { useId, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { CATEGORIAS_REPORTE } from "@/components/reportes/categorias";
+import type { CeldaSinDatos } from "@/lib/datos/contactos-anonimos";
 import type { ReporteTerritorio } from "@/lib/datos/reportes-territorio";
+import { RADIO_DIFUMINADO_M } from "@/lib/territorio";
 import { cn } from "@/lib/utils";
 import {
   esVistaDeCasillas,
   esVistaDeReportes,
+  esVistaDeSinDatos,
   grupoDePrioritarias,
   VISTAS_MAPA,
   type VistaMapa,
@@ -114,6 +117,37 @@ function LeyendaReportes({ reportes }: { reportes: readonly ReporteTerritorio[] 
 }
 
 /**
+ * Contactos sin datos: cuántos hay y cómo leer los círculos. Las muestras imitan la capa de
+ * mapa-lienzo.tsx: relleno más intenso con más gente, borde grueso si hay petición.
+ */
+function LeyendaSinDatos({ celdas }: { celdas: readonly CeldaSinDatos[] }) {
+  const total = celdas.reduce((suma, c) => suma + c.contactos.length, 0);
+  if (total === 0) {
+    return <p className="text-xs text-tinta-suave">Todavía no hay contactos sin datos.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-[11px] text-tinta-suave">
+        {total === 1 ? "1 contacto" : `${total.toLocaleString("es-MX")} contactos`}
+      </p>
+      <div className="flex items-center gap-2 text-xs text-tinta">
+        <span aria-hidden className="size-3.5 shrink-0 rounded-full border border-naranja-texto bg-mapa-2/60" />
+        Una o dos personas
+      </div>
+      <div className="flex items-center gap-2 text-xs text-tinta">
+        <span aria-hidden className="size-3.5 shrink-0 rounded-full border border-naranja-texto bg-mapa-4/60" />
+        Seis o más
+      </div>
+      <div className="flex items-center gap-2 text-xs text-tinta">
+        <span aria-hidden className="size-3.5 shrink-0 rounded-full border-[2.5px] border-naranja-texto" />
+        Con petición
+      </div>
+      <p className="text-[11px] text-tinta-suave">Cada círculo mide {RADIO_DIFUMINADO_M} m: no es la casa.</p>
+    </div>
+  );
+}
+
+/**
  * Leyenda de la vista activa. Flota en vidrio sobre el mapa, esquina inferior izquierda: ahí no
  * choca con la barra superior, el resumen de prioritarias ni el selector de capas (los tres viven
  * arriba), ni con la ficha de sección (a la derecha en escritorio, hoja de abajo en celular) ni con
@@ -124,12 +158,14 @@ function LeyendaReportes({ reportes }: { reportes: readonly ReporteTerritorio[] 
 export function LeyendaMapa({
   vista,
   reportes,
+  celdasSinDatos,
   enMovimiento,
   sangradoIzquierdo = false,
   className,
 }: {
   vista: VistaMapa;
   reportes: readonly ReporteTerritorio[];
+  celdasSinDatos: readonly CeldaSinDatos[];
   enMovimiento: boolean;
   sangradoIzquierdo?: boolean;
   className?: string;
@@ -200,6 +236,8 @@ export function LeyendaMapa({
         )}
 
         {esVistaDeReportes(vista) && <LeyendaReportes reportes={reportes} />}
+
+        {esVistaDeSinDatos(vista) && <LeyendaSinDatos celdas={celdasSinDatos} />}
 
         {VISTAS_DE_ESCALA.has(vista) && (
           <div className="flex flex-col gap-1">

@@ -69,6 +69,21 @@ export const ETIQUETA_GENERO: Record<Genero, string> = {
   no_especifica: "Prefiere no decir",
 };
 
+/**
+ * Edad de un contacto sin datos. Va en rango y no en fecha porque la fecha de nacimiento, junto
+ * con el punto y el género, ya alcanza para señalar a alguien.
+ */
+export type RangoEdad = "18_29" | "30_44" | "45_59" | "60_mas";
+
+export const RANGOS_EDAD: readonly RangoEdad[] = ["18_29", "30_44", "45_59", "60_mas"];
+
+export const ETIQUETA_RANGO_EDAD: Record<RangoEdad, string> = {
+  "18_29": "18 a 29",
+  "30_44": "30 a 44",
+  "45_59": "45 a 59",
+  "60_mas": "60 o más",
+};
+
 export type TipoActividad = "reunion" | "activismo" | "recorrido" | "crucero";
 export type EstatusActividad =
   | "programada"

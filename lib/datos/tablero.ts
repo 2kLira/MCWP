@@ -25,6 +25,8 @@ export type ResumenTablero = {
   porCerrar: number;
   promovidos: number;
   aspirantesRepresentante: number;
+  /** Contactos que no quisieron dar sus datos. Gente alcanzada que no está en el padrón. */
+  sinDatos: number;
 };
 
 const VACIO: ResumenTablero = {
@@ -42,6 +44,7 @@ const VACIO: ResumenTablero = {
   porCerrar: 0,
   promovidos: 0,
   aspirantesRepresentante: 0,
+  sinDatos: 0,
 };
 
 function haceDias(dias: number): string {
@@ -85,6 +88,7 @@ export async function resumenTablero(
     porAtender,
     promovidos,
     aspirantes,
+    sinDatos,
   ] = await Promise.all([
     contar(usuario, "personas"),
     contar(usuario, "personas", (c) => c.gte("created_at", haceDias(7))),
@@ -101,6 +105,7 @@ export async function resumenTablero(
     totalBandeja(usuario),
     contar(usuario, "personas", (c) => c.eq("es_promovido", true)),
     contar(usuario, "personas", (c) => c.eq("quiere_ser_representante", true)),
+    contar(usuario, "contactos_anonimos"),
   ]);
 
   // Las secciones ya vienen recortadas al territorio del actuante, así que aquí solo se separan
@@ -127,6 +132,7 @@ export async function resumenTablero(
       porCerrar: porCerrar.total,
       promovidos: promovidos.total,
       aspirantesRepresentante: aspirantes.total,
+      sinDatos: sinDatos.total,
     },
     sinEsquema: false,
     aviso: null,

@@ -85,6 +85,7 @@ type FilaPersona = {
   es_promovido: boolean | null;
   promovido_en: string | null;
   quiere_ser_representante: boolean | null;
+  quiere_barda_lona: boolean | null;
   created_at: string;
   colonias: Nombre;
   registrador: Nombre;
@@ -95,7 +96,7 @@ export async function hojaPersonas(): Promise<Hoja> {
   const filas = await todas<FilaPersona>(
     "personas",
     "id, nombre, nombres, apellido_paterno, apellido_materno, telefono_norm, calle, seccion_clave, demarcacion_id, genero, fecha_nacimiento, " +
-      "quiere_participar, quiere_info, es_promovido, promovido_en, quiere_ser_representante, " +
+      "quiere_participar, quiere_info, es_promovido, promovido_en, quiere_ser_representante, quiere_barda_lona, " +
       "created_at, colonias(nombre), " +
       "registrador:usuarios!personas_registrada_por_fkey(nombre), " +
       "origen:actividades!personas_actividad_origen_fkey(nombre)",
@@ -136,6 +137,7 @@ export async function hojaPersonas(): Promise<Hoja> {
       { titulo: "Promovido", ancho: 10 },
       { titulo: "Promovido desde", formato: "fechaHora", ancho: 17 },
       { titulo: "Quiere ser representante", ancho: 10 },
+      { titulo: "Barda o lona", ancho: 10 },
       { titulo: "Registrada en la actividad" },
       { titulo: "Registrada por" },
       { titulo: "Fecha de registro", formato: "fechaHora", ancho: 17 },
@@ -156,6 +158,7 @@ export async function hojaPersonas(): Promise<Hoja> {
       p.es_promovido,
       momento(p.promovido_en),
       p.quiere_ser_representante,
+      p.quiere_barda_lona,
       p.origen?.nombre,
       p.registrador?.nombre,
       momento(p.created_at),

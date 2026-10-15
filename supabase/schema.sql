@@ -174,6 +174,10 @@ create table personas (
 
   quiere_ser_representante boolean not null default false,
 
+  -- Ofrece su barda para pintar o su fachada para poner lona. Lo pidió el cliente el 14 de octubre
+  -- de 2026. Una sola marca para las dos cosas: en campo se ofrecen juntas.
+  quiere_barda_lona  boolean not null default false,
+
   -- Quién trajo a esta persona. Se elige de entre la gente ya registrada, así que apunta a
   -- personas y no a usuarios.
   promotor_id        uuid references personas(id),
@@ -390,6 +394,7 @@ create index personas_promotor_idx         on personas (promotor_id) where promo
 create index personas_importacion_idx      on personas (importacion_id) where importacion_id is not null;
 create index personas_representante_idx    on personas (quiere_ser_representante)
   where quiere_ser_representante;
+create index personas_barda_lona_idx       on personas (quiere_barda_lona) where quiere_barda_lona;
 -- Estos dos los pide RLS, no el tablero: las políticas del brigadista filtran por ahí.
 create index personas_registrada_por_idx   on personas (registrada_por);
 create index personas_actividad_origen_idx on personas (actividad_origen)
@@ -470,6 +475,61 @@ create table reportes_territorio (
 create index reportes_territorio_pendientes on reportes_territorio (created_at desc)
   where not atendido;
 create index reportes_territorio_levantado_por on reportes_territorio (levantado_por);
+
+-- ---------------------------------------------------------------------------
+-- Contactos sin datos
+-- ---------------------------------------------------------------------------
+-- Pedido del cliente (15 de octubre de 2026): mucha gente no quiere dejar sus datos, y sin datos
+-- no había registro posible, así que ese contacto se perdía con todo y su problemática. Ahora se
+-- guarda como contacto sin datos: cuenta en la actividad, en la sección y en las problemáticas,
+-- pero no es una persona del padrón.
+--
+-- Va en tabla aparte y no en `personas` a propósito. Si fueran renglones de personas con una
+-- marca, el padrón, la deduplicación por teléfono, la bandeja de seguimiento, la exportación y
+-- cada conteo tendrían que acordarse de excluirlos, y basta un lugar que se olvide para que el
+-- padrón mienta.
+--
+-- **Anónimo de verdad**, que es lo que permite guardarlo sin aviso de privacidad:
+--   · Nada que nombre a la persona: ni nombre, ni teléfono, ni calle, ni fecha de nacimiento.
+--     La edad va en rango.
+--   · El punto nunca es la casa. Se guarda el centro de una celda de 0.002° (unos 220 × 210 m en
+--     Oaxaca, dos o tres manzanas por lado): cualquier punto de la celda queda a unos 150 m del
+--     centro. La aplicación ya lo manda difuminado y la base lo vuelve a difuminar
+--     (privado.sellar_contacto_anonimo), así que un cliente que mande el punto exacto no logra
+--     guardarlo.
+create type rango_edad as enum ('18_29','30_44','45_59','60_mas');
+
+create table contactos_anonimos (
+  id              uuid primary key default gen_random_uuid(),
+  -- La actividad donde se hizo el contacto. Al borrar la actividad se borran sus contactos, igual
+  -- que la gente que se registró por primera vez en ella (eliminar_actividad los cuenta).
+  actividad_id    uuid references actividades(id) on delete cascade,
+  seccion_clave   text references secciones(clave),
+  demarcacion_id  integer references demarcaciones(id),
+  colonia_id      integer references colonias(id),
+  -- Centro de la celda, nunca el punto capturado.
+  lat             double precision check (lat is null or lat between -90 and 90),
+  lng             double precision check (lng is null or lng between -180 and 180),
+  genero          genero_persona,
+  rango_edad      rango_edad,
+  peticion        text check (peticion is null or char_length(peticion) <= 2000),
+  comentario      text check (comentario is null or char_length(comentario) <= 2000),
+  registrado_por  uuid references usuarios(id),
+  created_at      timestamptz not null default now()
+);
+
+-- Las problemáticas de un contacto sin datos. No caben en `menciones_problematica`, que cuelga
+-- de una participación, y la participación necesita una persona.
+create table menciones_anonimas (
+  contacto_id     uuid not null references contactos_anonimos(id) on delete cascade,
+  problematica_id integer not null references problematicas(id),
+  primary key (contacto_id, problematica_id)
+);
+
+create index contactos_anonimos_actividad_idx on contactos_anonimos (actividad_id);
+create index contactos_anonimos_seccion_idx   on contactos_anonimos (seccion_clave);
+create index contactos_anonimos_registro_idx  on contactos_anonimos (registrado_por);
+create index menciones_anonimas_problematica_idx on menciones_anonimas (problematica_id);
 
 -- ---------------------------------------------------------------------------
 -- Vistas
@@ -577,16 +637,24 @@ join colonias co on co.id = pe.colonia_id
 where pe.colonia_id is not null
 group by pe.colonia_id, co.nombre, pe.demarcacion_id, pe.seccion_clave;
 
+-- Las menciones de los contactos sin datos cuentan igual que las de las personas: la
+-- problemática existe aunque quien la dijo no haya dejado su nombre.
 create view v_problematicas_por_seccion with (security_invoker = true) as
-select
-  pe.seccion_clave as clave, pe.demarcacion_id,
-  pr.id as problematica_id, pr.nombre as problematica, count(*) as menciones
-from menciones_problematica m
-join problematicas pr    on pr.id = m.problematica_id
-join participaciones par on par.id = m.participacion_id
-join personas pe         on pe.id = par.persona_id
-where pe.seccion_clave is not null
-group by pe.seccion_clave, pe.demarcacion_id, pr.id, pr.nombre;
+select m.clave, m.demarcacion_id, pr.id as problematica_id, pr.nombre as problematica,
+  count(*) as menciones
+from (
+  select pe.seccion_clave as clave, pe.demarcacion_id, mp.problematica_id
+  from menciones_problematica mp
+  join participaciones par on par.id = mp.participacion_id
+  join personas pe         on pe.id = par.persona_id
+  union all
+  select ca.seccion_clave, ca.demarcacion_id, ma.problematica_id
+  from menciones_anonimas ma
+  join contactos_anonimos ca on ca.id = ma.contacto_id
+) m
+join problematicas pr on pr.id = m.problematica_id
+where m.clave is not null
+group by m.clave, m.demarcacion_id, pr.id, pr.nombre;
 
 create view v_historial_persona with (security_invoker = true) as
 select par.persona_id, 'participacion'::text as evento, par.tipo as detalle,
@@ -601,8 +669,10 @@ select sg.persona_id, 'seguimiento'::text, sg.tipo::text, sg.fecha,
 from seguimientos sg
 left join usuarios ur on ur.id = sg.responsable_id;
 
--- La bandeja de seguimiento no es una tabla, es una consulta: personas con quiere_participar
--- o quiere_info cuyo último seguimiento esté pendiente o no exista.
+-- La bandeja de seguimiento no es una tabla, es una consulta: personas con quiere_participar,
+-- quiere_info o quiere_barda_lona cuyo último seguimiento esté pendiente o no exista.
+-- `quiere_barda_lona` va al final de la lista de columnas: `create or replace view` solo deja
+-- agregar columnas al final, y así el cambio se aplica sin tirar la vista.
 create view v_bandeja_seguimiento with (security_invoker = true) as
 select
   p.id as persona_id, p.nombre, p.telefono_norm, p.seccion_clave, p.demarcacion_id,
@@ -611,13 +681,14 @@ select
   ult.estado as ultimo_seguimiento_estado,
   ult.tipo   as ultimo_seguimiento_tipo,
   exists (select 1 from solicitudes so
-          where so.persona_id = p.id and so.requiere_seguimiento) as tiene_solicitud
+          where so.persona_id = p.id and so.requiere_seguimiento) as tiene_solicitud,
+  p.quiere_barda_lona
 from personas p
 left join lateral (
   select s.fecha, s.estado, s.tipo from seguimientos s
   where s.persona_id = p.id order by s.fecha desc, s.created_at desc limit 1
 ) ult on true
-where (p.quiere_participar or p.quiere_info
+where (p.quiere_participar or p.quiere_info or p.quiere_barda_lona
        or exists (select 1 from solicitudes so
                   where so.persona_id = p.id and so.requiere_seguimiento))
   and (ult.estado is null or ult.estado = 'pendiente');

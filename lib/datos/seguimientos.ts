@@ -1,7 +1,7 @@
 /**
  * Seguimiento. La bandeja no es una tabla: es la vista v_bandeja_seguimiento, que resuelve en la
- * base la regla del spec (quiere participar, quiere información o dejó una solicitud que requiere
- * seguimiento, y su último seguimiento está pendiente o no existe).
+ * base la regla del spec (quiere participar, quiere información, ofrece barda o lona, o dejó una
+ * solicitud que requiere seguimiento, y su último seguimiento está pendiente o no existe).
  */
 
 import { normalizarTelefono } from "@/lib/territorio";
@@ -44,10 +44,14 @@ export type FilaBandeja = {
   ultimo_seguimiento_tipo: TipoSeguimiento | null;
   /** Verdadero si tiene al menos una solicitud con requiere_seguimiento. La marca dura del renglón. */
   tiene_solicitud: boolean;
+  quiere_barda_lona: boolean;
 };
 
-/** Por qué cayó en la bandeja: quiere participar, quiere información, o dejó una solicitud. */
-export type MotivoBandeja = "participa" | "info" | "solicitud";
+/**
+ * Por qué cayó en la bandeja: quiere participar, quiere información, ofrece barda o lona, o dejó
+ * una solicitud.
+ */
+export type MotivoBandeja = "participa" | "info" | "barda" | "solicitud";
 
 export type FiltrosBandeja = {
   demarcacionId?: number | null;
@@ -86,6 +90,8 @@ function aplicarFiltrosBandeja<
     resultado = resultado.eq("quiere_participar", true) as Q;
   } else if (filtros.motivo === "info") {
     resultado = resultado.eq("quiere_info", true) as Q;
+  } else if (filtros.motivo === "barda") {
+    resultado = resultado.eq("quiere_barda_lona", true) as Q;
   } else if (filtros.motivo === "solicitud") {
     resultado = resultado.eq("tiene_solicitud", true) as Q;
   }

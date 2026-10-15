@@ -155,7 +155,10 @@ function TableroCompleto() {
             etiqueta="Personas alcanzadas"
             valor={r.personas ?? 0}
             apoyo={`en ${secciones.toLocaleString("es-MX")} secciones`}
-            nota={`${(r.nuevasSemana ?? 0).toLocaleString("es-MX")} nuevas esta semana`}
+            nota={
+              `${(r.nuevasSemana ?? 0).toLocaleString("es-MX")} nuevas esta semana` +
+              (r.sinDatos ? ` · ${r.sinDatos.toLocaleString("es-MX")} sin datos` : "")
+            }
             href="/personas"
             cargando={cargando}
             className="col-span-2 lg:col-span-1"

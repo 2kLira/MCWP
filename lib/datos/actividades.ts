@@ -7,6 +7,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { estatusVisibles, puedeEditar } from "@/lib/puertas-ui";
 import type { EstatusActividad, TipoActividad, UsuarioActuante } from "@/lib/tipos";
 import { db, lista, resultado, uno, type Resultado } from "@/lib/datos/cliente";
+import { totalContactosAnonimos } from "@/lib/datos/contactos-anonimos";
 
 export type Actividad = {
   id: string;
@@ -208,6 +209,8 @@ export type Consolidado = {
   nuevas: number;
   quierenParticipar: number;
   quierenInfo: number;
+  /** Contactos que no quisieron dar sus datos. No son personas, pero sí gente alcanzada. */
+  sinDatos: number;
   menciones: { problematica: string; menciones: number }[];
 };
 
@@ -220,6 +223,7 @@ export async function consolidadoDeActividad(id: string): Promise<Resultado<Cons
     nuevas: 0,
     quierenParticipar: 0,
     quierenInfo: 0,
+    sinDatos: 0,
     menciones: [],
   };
 
@@ -238,8 +242,18 @@ export async function consolidadoDeActividad(id: string): Promise<Resultado<Cons
     .select("problematicas!inner(nombre), participaciones!inner(actividad_id)")
     .eq("participaciones.actividad_id", id);
 
+  // Lo que dijeron los contactos sin datos cuenta igual: la problemática existe aunque quien la
+  // mencionó no haya dejado su nombre.
+  const [sinDatos, mencionesAnonimas] = await Promise.all([
+    totalContactosAnonimos({ actividadId: id }),
+    db()
+      .from("menciones_anonimas")
+      .select("problematicas!inner(nombre), contactos_anonimos!inner(actividad_id)")
+      .eq("contactos_anonimos.actividad_id", id),
+  ]);
+
   const conteo = new Map<string, number>();
-  for (const fila of (menciones.data ?? []) as unknown as {
+  for (const fila of [...(menciones.data ?? []), ...(mencionesAnonimas.data ?? [])] as unknown as {
     problematicas: { nombre: string };
   }[]) {
     const nombre = fila.problematicas.nombre;
@@ -252,6 +266,7 @@ export async function consolidadoDeActividad(id: string): Promise<Resultado<Cons
       nuevas: filas.filter((f) => f.tipo === "registro").length,
       quierenParticipar: filas.filter((f) => f.personas?.quiere_participar).length,
       quierenInfo: filas.filter((f) => f.personas?.quiere_info).length,
+      sinDatos,
       menciones: [...conteo.entries()]
         .map(([problematica, menciones]) => ({ problematica, menciones }))
         .sort((a, b) => b.menciones - a.menciones),
@@ -484,6 +499,7 @@ export type ResumenEliminacion = {
   solicitudes: number;
   fotos: number;
   invitaciones: number;
+  contactos_anonimos: number;
   rutas: string[];
 };
 
