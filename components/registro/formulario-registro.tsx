@@ -40,7 +40,7 @@ import {
   type Persona,
   type PersonaEnLista,
 } from "@/lib/datos/personas";
-import { registrarParticipacion } from "@/lib/datos/actividades";
+import { obtenerActividad, registrarParticipacion } from "@/lib/datos/actividades";
 import { crearContactoAnonimo } from "@/lib/datos/contactos-anonimos";
 import { crearSeguimiento } from "@/lib/datos/seguimientos";
 import { ElegirActividad } from "@/components/registro/elegir-actividad";
@@ -143,6 +143,13 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const [ubicando, setUbicando] = useState(true);
   const [errorGps, setErrorGps] = useState<string | null>(null);
   const [abrirMapa, setAbrirMapa] = useState(false);
+  /**
+   * La actividad no tiene sección: un desayuno o una rueda de prensa en el centro, con gente de
+   * todos lados. Ahí el GPS da el salón, no la casa, y meter a todos en la sección del salón es
+   * justo lo que no se quiere. Así que no se pide el GPS: se marca dónde vive cada quien o se
+   * elige su sección, y se vuelve a pedir con cada persona.
+   */
+  const [eventoSinSeccion, setEventoSinSeccion] = useState(false);
   // La clave que dio el GPS, aparte de `ubicacion`, para poder avisar si la corrección a mano
   // termina en otra sección. Una vez que el GPS contesta, esta clave ya no cambia.
   const [claveGps, setClaveGps] = useState<string | null>(null);
@@ -185,9 +192,24 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
       if (vigente) setCatalogoSecciones(catalogo);
     });
 
-    cargarSecciones()
-      .then((coleccion) => {
-        if (vigente) setColeccionSecciones(coleccion);
+    // Si la actividad no tiene sección, el GPS no sirve (ver eventoSinSeccion). Si no se alcanza a
+    // leer la actividad, se sigue como siempre, con GPS.
+    const sinSeccion: Promise<boolean> = actividadId
+      ? obtenerActividad(actuante, actividadId).then(
+          (r) => r.datos != null && !r.datos.seccion_clave,
+        )
+      : Promise.resolve(false);
+
+    Promise.all([cargarSecciones(), sinSeccion])
+      .then(([coleccion, esSinSeccion]) => {
+        if (vigente) {
+          setColeccionSecciones(coleccion);
+          setEventoSinSeccion(esSinSeccion);
+        }
+        if (esSinSeccion) {
+          if (vigente) setUbicando(false);
+          return;
+        }
         if (!vigente || !navigator.geolocation) {
           if (vigente) {
             setUbicando(false);
@@ -233,6 +255,8 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     return () => {
       vigente = false;
     };
+    // Una sola vez al montar: la actividad viene de la URL y no cambia con la página abierta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Las colonias del autocompletado salen de la sección resuelta, no al revés.
@@ -388,9 +412,17 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
   // El apellido no se exige: "solo mi nombre y mi WhatsApp" es el escalón entre no dar nada y
   // darlo todo, y exigir el apellido empujaba a la gente al "mejor no".
+  // A quien ya está registrado solo se le agrega la participación: su sección ya se conoce y la
+  // ubicación no se usa. Importa en los eventos sin sección, donde la ubicación se marca a mano y
+  // pedírsela a alguien que ya existe sería trabajo de más.
+  const agregaAExistente = !!duplicada && caminoDuplicado === "agregar";
   const listo = sinDatos
     ? !!ubicacion && requierePeticion
-    : nombres.trim().length > 1 && consiente && !!ubicacion && requierePeticion && requierePromotor;
+    : nombres.trim().length > 1 &&
+      consiente &&
+      (!!ubicacion || agregaAExistente) &&
+      requierePeticion &&
+      requierePromotor;
 
   /** Del contacto sin datos a la captura normal, sin perder lo que ya se anotó. */
   function pasarAConDatos() {
@@ -423,12 +455,12 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
   async function guardar(evento: React.FormEvent) {
     evento.preventDefault();
-    if (!listo || !ubicacion) return;
+    if (!listo) return;
     setEstado("guardando");
     setError(null);
 
     if (sinDatos) {
-      await guardarSinDatos(ubicacion);
+      if (ubicacion) await guardarSinDatos(ubicacion);
       return;
     }
 
@@ -439,6 +471,11 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     let personaId = duplicada?.id ?? null;
 
     if (!agregarAExistente) {
+      // `listo` ya lo exige para una persona nueva; esto solo se lo dice a TypeScript.
+      if (!ubicacion) {
+        setEstado("capturando");
+        return;
+      }
       const r = await crearPersona({
         // La base vuelve a armar `nombre` con las tres partes; se manda igual porque la columna
         // es obligatoria y así el renglón nunca depende de que el trigger exista.
@@ -537,6 +574,9 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
 
   function otraCaptura() {
     setFaltantes([]);
+    // En un evento sin sección cada quien vive en otro lado: la ubicación de la persona anterior
+    // no le sirve a la siguiente. En uno normal todos están en el mismo punto y se conserva.
+    if (eventoSinSeccion) setUbicacion(null);
     setSinDatos(false);
     setRangoEdad(null);
     setNombres("");
@@ -585,7 +625,11 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
             {sinDatos ? "Contacto registrado sin datos" : "Persona registrada"}
           </p>
           <p className="cifras mt-1 text-sm text-tinta-suave">
-            Sección {ubicacion?.clave} · {demarcacionNombre}
+            {ubicacion
+              ? `Sección ${ubicacion.clave} · ${demarcacionNombre ?? ""}`
+              : duplicada?.seccion_clave
+                ? `Sección ${duplicada.seccion_clave}`
+                : null}
           </p>
         </div>
         {faltantes.length > 0 && (
@@ -642,6 +686,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm">
                   <span className="block text-tinta-suave">
+                    {eventoSinSeccion && "Dónde vive · "}
                     {ETIQUETA_ORIGEN_UBICACION[ubicacion.origen]}
                   </span>
                   <span className="cifras block text-lg font-semibold text-tinta">
@@ -684,7 +729,9 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
             <div className="flex flex-col gap-3.5">
               <p className="flex items-start gap-2 text-sm text-tinta-suave">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-                {errorGps ?? "Sin ubicación."}
+                {eventoSinSeccion
+                  ? "Este evento no tiene sección. Marca dónde vive la persona o elige su sección: el lugar del evento no cuenta."
+                  : (errorGps ?? "Sin ubicación.")}
               </p>
               <button
                 type="button"

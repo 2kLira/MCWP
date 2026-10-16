@@ -975,3 +975,16 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     `circle` en píxeles), más intenso con más gente y con borde grueso si hay petición. Al tocarlo
     se abre la lista de lo que dijo cada contacto de esa zona. Se pide la lista completa de una vez:
     si un día pasa de mil contactos, el tope de PostgREST la corta y habrá que agregarla en la base.
+- **Actividades sin sección (16 de octubre de 2026).** Pedido del cliente: programar un evento sin
+  ligarlo a una sección, pero con los asistentes ligados a la suya. La columna ya era opcional en
+  la base; solo el formulario la exigía. Ahora es opcional en el alta, y el administrador la
+  cambia o la quita desde la ficha ("Cambiar sección"). Los asistentes ya contaban en la sección
+  de su propio punto, no en la de la actividad; la lista de participaciones ahora la muestra.
+  · Ejemplo del cliente: un desayuno o una rueda de prensa en el centro con gente de todos lados.
+    Ahí el GPS da el salón y no la casa, así que **en una actividad sin sección el registro no
+    pide el GPS**: se marca en el mapa dónde vive cada quien o se elige su sección, y se vuelve a
+    pedir con cada persona. A quien ya está registrado (teléfono reconocido, "agregar esta
+    participación") no se le pide ubicación: se queda con la suya.
+  Consecuencia: una actividad sin sección no suma en las cifras por sección (reuniones,
+  recorridos, "recorrida", mapa de actividad) ni por demarcación. Si se quiere que cuente en las
+  secciones de sus asistentes, es otra regla y hay que decidirla.

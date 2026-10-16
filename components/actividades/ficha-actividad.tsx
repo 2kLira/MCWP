@@ -16,6 +16,7 @@ import {
 import { useActuante } from "@/components/proveedor-actuante";
 import { InvitarBrigadistas } from "@/components/actividades/invitar-brigadistas";
 import { EliminarActividad } from "@/components/actividades/eliminar-actividad";
+import { EditarSeccionActividad } from "@/components/actividades/editar-seccion-actividad";
 import { Caja } from "@/components/sistema/caja";
 import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
 import { Estado } from "@/components/sistema/estado";
@@ -256,6 +257,12 @@ export function FichaActividad({ id }: { id: string }) {
               {a.notas && <Dato etiqueta="Notas" valor={a.notas} ancho />}
             </div>
 
+            {esAdmin(actuante) && (
+              <div className="mt-3.5">
+                <EditarSeccionActividad actividad={a} alGuardar={() => setRecargar((v) => v + 1)} />
+              </div>
+            )}
+
             {/* Nota discreta, no un error: encabezar una actividad de otra sección pasa todo el
                 tiempo en campo y no se marca como falla. */}
             {responsable.datos?.seccion_clave &&
@@ -291,6 +298,12 @@ export function FichaActividad({ id }: { id: string }) {
                     <span className="min-w-0">
                       <span className="block truncate text-sm text-tinta">
                         {p.personas?.nombre ?? "Persona sin nombre"}
+                        {/* La sección de quien asistió, no la de la actividad: es en la que cuenta. */}
+                        {p.personas?.seccion_clave && (
+                          <span className="cifras ml-2 text-xs text-tinta-suave">
+                            Sección {p.personas.seccion_clave}
+                          </span>
+                        )}
                       </span>
                       {/* Quién la capturó. Solo sale si la base entrega el nombre: RLS sobre
                           `usuarios` solo le deja ver nombres ajenos al administrador. */}

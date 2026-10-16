@@ -18,7 +18,9 @@ const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
  * Alta de actividad. No se pregunta quién la crea ni cuándo se captura: el sistema lo pone solo.
  *
  * La sección se elige aquí, con su propio buscador, y la demarcación se resuelve sola a partir
- * de ella: nunca es un campo que alguien tenga que llenar. El responsable es una pregunta
+ * de ella: nunca es un campo que alguien tenga que llenar. Es opcional desde el 16 de octubre de
+ * 2026: un evento puede juntar gente de varias secciones. Los asistentes cuentan siempre en la
+ * sección de cada quien, que sale de su propio punto al registrarlos. El responsable es una pregunta
  * aparte, sin relación con esa sección: cualquier persona activa que pueda encabezar actividades
  * puede quedar al frente, sea o no de ese territorio.
  */
@@ -69,7 +71,7 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
     !!seccionClave &&
     responsable.seccion_clave !== seccionClave;
 
-  const listo = nombre.trim().length > 1 && fecha.length > 0 && seccionClave.length > 0;
+  const listo = nombre.trim().length > 1 && fecha.length > 0;
 
   async function guardar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -86,7 +88,7 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
       objetivo: objetivo.trim() || null,
       notas: notas.trim() || null,
       responsable_id: responsableId || null,
-      seccion_clave: seccionClave,
+      seccion_clave: seccionClave || null,
       demarcacion_id: demarcacionId,
       created_by: actuante.id,
       estatus: "programada",
@@ -173,7 +175,7 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
         </Campo>
       </div>
 
-      <Campo etiqueta="Sección">
+      <Campo etiqueta="Sección" apoyo="Opcional. Vacía si junta gente de varias secciones.">
         <CampoSeccion valor={seccionClave} onCambiar={setSeccionClave} />
       </Campo>
 

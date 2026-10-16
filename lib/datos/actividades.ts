@@ -280,7 +280,7 @@ export type ParticipacionEnLista = {
   id: string;
   tipo: "registro" | "asistencia";
   persona_id: string;
-  personas: { nombre: string; telefono_norm: string | null } | null;
+  personas: { nombre: string; telefono_norm: string | null; seccion_clave: string | null } | null;
   /** Quien la capturó. Null si RLS no deja leer a ese usuario (solo el admin ve a los demás). */
   registrador: { nombre: string } | null;
 };
@@ -292,7 +292,7 @@ export function participacionesDeActividad(
   const consulta = db()
     .from("participaciones")
     .select(
-      "id, tipo, persona_id, personas(nombre, telefono_norm), registrador:usuarios!participaciones_registrada_por_fkey(nombre)",
+      "id, tipo, persona_id, personas(nombre, telefono_norm, seccion_clave), registrador:usuarios!participaciones_registrada_por_fkey(nombre)",
     )
     .eq("actividad_id", actividadId)
     .order("created_at") as unknown as PromiseLike<{
