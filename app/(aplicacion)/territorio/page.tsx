@@ -414,7 +414,7 @@ export default function Territorio() {
           {cargando ? (
             <div className="tarjeta flex flex-col gap-2 p-4">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-11 animate-pulse rounded-control bg-superficie-hundida" />
+                <div key={i} className="h-11 esqueleto rounded-control" />
               ))}
             </div>
           ) : demarcaciones.datos.length === 0 ? (
@@ -613,7 +613,7 @@ export default function Territorio() {
         {cargando ? (
           <div className="flex flex-col gap-4">
             {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="h-24 animate-pulse rounded-tarjeta bg-superficie-hundida" />
+              <div key={i} className="h-24 esqueleto rounded-tarjeta" />
             ))}
           </div>
         ) : (

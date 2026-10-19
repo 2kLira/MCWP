@@ -1296,3 +1296,158 @@ create policy menciones_anonimas_update on menciones_anonimas for update to auth
   using ((select privado.es_admin())) with check ((select privado.es_admin()));
 create policy menciones_anonimas_delete on menciones_anonimas for delete to authenticated
   using ((select privado.es_admin()));
+
+-- ---------------------------------------------------------------------------
+-- 13. Bitácora de cambios y candados contra el borrado en masa
+-- ---------------------------------------------------------------------------
+-- Pedido del cliente (16 de octubre de 2026): "lo más importante de este sistema son los datos".
+-- Tres piezas, contra tres formas distintas de perderlos:
+--
+--   1. **Bitácora.** Antes de que un renglón de las tablas con datos de trabajo se edite o se
+--      borre, queda una copia de cómo estaba, con quién lo hizo y cuándo. Si alguien borra algo por
+--      error o con una sesión robada, ese renglón se recupera sin restaurar la base entera y sin
+--      perder lo capturado después.
+--   2. **Sin borrado directo.** `authenticated` ya no tiene DELETE en las tablas de trabajo. Borrar
+--      una persona o una actividad pasa por `eliminar_persona` y `eliminar_actividad`, de una en
+--      una; nadie puede vaciar `personas` con una sola petición a la API, ni siendo administrador.
+--   3. **Sin TRUNCATE.** Vaciar una tabla completa no pasa por RLS. Supabase se lo daba a
+--      `authenticated` en todas las tablas; no era alcanzable por la API, pero no tenía por qué estar.
+--
+-- Lo que esto NO cubre: que se borre el proyecto de Supabase (se llevaría la bitácora y los
+-- respaldos diarios). Para eso hace falta una copia fuera de Supabase. Ver PENDIENTES.md.
+
+-- ---- 13.1 Bitácora ----
+-- En `privado`, que no está entre los esquemas expuestos: ninguna petición a la API la alcanza, y
+-- `authenticated` no tiene ningún permiso sobre ella. Se consulta desde el editor SQL.
+create table if not exists privado.bitacora (
+  id         bigint generated always as identity primary key,
+  en         timestamptz not null default now(),
+  tabla      text not null,
+  operacion  text not null check (operacion in ('UPDATE', 'DELETE')),
+  registro_id text,
+  -- Quién, según la sesión de la API. Null si fue desde el editor SQL o con la llave secreta.
+  usuario_id uuid,
+  -- 'authenticated' si vino de la aplicación, 'service_role' si de un handler con la llave
+  -- secreta, o el rol de la base si fue directo por SQL.
+  rol        text,
+  antes      jsonb not null,
+  -- Solo en UPDATE. Así se ve qué cambió sin tener que adivinarlo.
+  despues    jsonb
+);
+
+create index if not exists bitacora_tabla_registro_idx on privado.bitacora (tabla, registro_id);
+create index if not exists bitacora_en_idx on privado.bitacora (en desc);
+
+revoke all on privado.bitacora from public;
+revoke all on privado.bitacora from authenticated;
+revoke all on privado.bitacora from anon;
+
+-- AFTER, para guardar lo que de verdad se escribió (ya sellado por los triggers BEFORE). Corre
+-- también en los borrados en cascada: borrar una actividad deja en la bitácora cada invitación,
+-- foto y contacto que se fue con ella.
+create or replace function privado.registrar_bitacora()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  v_antes   jsonb := to_jsonb(old);
+  v_despues jsonb := case when tg_op = 'UPDATE' then to_jsonb(new) end;
+begin
+  -- Un upsert que no cambia nada (recapturar a alguien en la misma actividad) no es un cambio.
+  if tg_op = 'UPDATE' and v_antes = v_despues then
+    return null;
+  end if;
+  insert into privado.bitacora (tabla, operacion, registro_id, usuario_id, rol, antes, despues)
+  values (
+    tg_table_name,
+    tg_op,
+    v_antes ->> 'id',
+    auth.uid(),
+    coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', session_user),
+    v_antes,
+    v_despues
+  );
+  return null;
+end $$;
+
+-- La bitácora solo crece. Corregirla o vaciarla exige quitar este trigger a propósito, desde el
+-- editor SQL, y eso ya es una decisión, no un accidente.
+create or replace function privado.bitacora_inmutable()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  raise exception 'La bitácora no se modifica ni se borra.';
+end $$;
+
+revoke all on function privado.registrar_bitacora() from public;
+revoke all on function privado.bitacora_inmutable() from public;
+
+drop trigger if exists bitacora_inmutable on privado.bitacora;
+create trigger bitacora_inmutable before update or delete on privado.bitacora
+  for each row execute function privado.bitacora_inmutable();
+drop trigger if exists bitacora_sin_truncate on privado.bitacora;
+create trigger bitacora_sin_truncate before truncate on privado.bitacora
+  for each statement execute function privado.bitacora_inmutable();
+
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'personas', 'participaciones', 'menciones_problematica', 'solicitudes', 'seguimientos',
+    'actividades', 'actividad_brigadistas', 'fotos', 'usuarios', 'asignaciones_responsable',
+    'casillas', 'representantes_casilla', 'reportes_territorio', 'contactos_anonimos',
+    'menciones_anonimas'
+  ]
+  loop
+    execute format('drop trigger if exists bitacora on public.%I', t);
+    execute format(
+      'create trigger bitacora after update or delete on public.%I '
+      'for each row execute function privado.registrar_bitacora()', t);
+  end loop;
+end $$;
+
+-- Recuperar un renglón borrado, desde el editor SQL (ahí auth.uid() es null, así que los triggers
+-- de sellado respetan la autoría y la fecha originales):
+--
+--   insert into public.personas
+--   select * from jsonb_populate_record(null::public.personas,
+--     (select antes from privado.bitacora
+--       where tabla = 'personas' and operacion = 'DELETE' and registro_id = '<id>'
+--       order by en desc limit 1));
+--
+-- Si la persona tenía participaciones, se recuperan igual, después de ella (y sus menciones
+-- después de las participaciones), porque la llave foránea exige ese orden.
+
+-- ---- 13.2 Sin borrado directo ----
+-- Solo dos tablas conservan DELETE, porque la aplicación borra ahí directo y no hay nada que
+-- perder: quitar una invitación (`quitarBrigadista`) y borrar un reporte del territorio
+-- (`borrarReporte`). Las dos siguen cubiertas por sus políticas y por la bitácora.
+--
+-- Las funciones de borrado (`eliminar_persona`, `eliminar_actividad`) son SECURITY DEFINER y las
+-- cascadas de llave foránea corren con permisos del dueño de la tabla: ninguna de las dos
+-- depende de este permiso. La llave secreta (service_role) tampoco.
+do $$
+declare t text;
+begin
+  for t in
+    select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind in ('r', 'v', 'm', 'p')
+      and c.relname not in ('actividad_brigadistas', 'reportes_territorio')
+  loop
+    execute format('revoke delete on public.%I from authenticated', t);
+  end loop;
+end $$;
+
+-- ---- 13.3 Sin TRUNCATE ----
+do $$
+declare t text;
+begin
+  for t in
+    select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind in ('r', 'v', 'm', 'p')
+  loop
+    execute format('revoke truncate on public.%I from authenticated', t);
+  end loop;
+end $$;
+
+-- Y para las tablas que se creen después: sin TRUNCATE ni DELETE de entrada. Una tabla nueva que
+-- necesite borrado directo desde la aplicación tiene que pedirlo con un grant explícito aquí, y
+-- agregarse a la lista de 13.2 y a la comprobación 1k de verificacion.sql.
+alter default privileges in schema public revoke truncate, delete on tables from authenticated;

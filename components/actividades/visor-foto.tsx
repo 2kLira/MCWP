@@ -50,7 +50,7 @@ export function VisorFoto({
             No se pudo cargar esta foto.
           </p>
         ) : (
-          <div className="aspect-[4/3] w-full animate-pulse rounded-control bg-superficie-hundida" />
+          <div className="aspect-[4/3] w-full esqueleto rounded-control" />
         )}
 
         {firmada && (

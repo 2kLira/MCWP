@@ -18,7 +18,7 @@ export function ListaPorDia({
     return (
       <ul className="tarjeta flex flex-col gap-2 p-[1.125rem]">
         {Array.from({ length: 5 }).map((_, i) => (
-          <li key={i} className="h-12 animate-pulse rounded-control bg-superficie-hundida" />
+          <li key={i} className="h-12 esqueleto rounded-control" />
         ))}
       </ul>
     );

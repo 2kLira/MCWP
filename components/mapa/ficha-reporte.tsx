@@ -217,7 +217,7 @@ export function FichaReporte({
               />
             </a>
           ) : (
-            <div className="aspect-[4/3] w-full animate-pulse rounded-control bg-superficie-hundida" />
+            <div className="aspect-[4/3] w-full esqueleto rounded-control" />
           ))}
 
         <p className="whitespace-pre-line text-sm text-tinta">{reporte.descripcion}</p>

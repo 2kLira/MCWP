@@ -27,8 +27,8 @@ export function ElegirActividad() {
   if (actividades.cargando) {
     return (
       <div className="flex max-w-[47.5rem] flex-col gap-2">
-        <div className="h-16 animate-pulse rounded-tarjeta bg-superficie-hundida" />
-        <div className="h-16 animate-pulse rounded-tarjeta bg-superficie-hundida" />
+        <div className="h-16 esqueleto rounded-tarjeta" />
+        <div className="h-16 esqueleto rounded-tarjeta" />
       </div>
     );
   }

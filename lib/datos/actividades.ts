@@ -153,7 +153,11 @@ export async function actualizarActividad(
 const TRANSICIONES: Record<EstatusActividad, readonly EstatusActividad[]> = {
   programada: ["en_curso", "realizada", "cancelada"],
   en_curso: ["realizada", "cancelada"],
-  realizada: [],
+  // Reabrir una actividad cerrada (16 de octubre de 2026): vuelve a en curso, para que se pueda
+  // seguir capturando. Solo el administrador, porque `actividades_update` no se lo permite a nadie
+  // más. La base limpia `cerrada_en` y `cerrada_por` al salir de realizada; la conclusión se queda
+  // y se puede reescribir al volver a cerrar.
+  realizada: ["en_curso"],
   cancelada: ["programada"],
 };
 

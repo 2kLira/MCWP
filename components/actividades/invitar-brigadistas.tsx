@@ -107,7 +107,7 @@ export function InvitarBrigadistas({
     <>
       <div className="flex flex-col gap-3">
         {cargando ? (
-          <div className="h-8 animate-pulse rounded-control bg-superficie-hundida" />
+          <div className="h-8 esqueleto rounded-control" />
         ) : invitados.length === 0 ? (
           <p className="flex items-start gap-2 text-sm text-alerta">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />

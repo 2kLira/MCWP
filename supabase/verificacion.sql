@@ -124,6 +124,37 @@ select
 --   update public.usuarios set activo = false where id = '<ese mismo id>';
 -- rollback;
 
+-- 1m. `authenticated` solo borra directo donde la aplicación lo necesita. Debe devolver CERO.
+-- Todo lo demás se borra por eliminar_persona / eliminar_actividad, de uno en uno.
+select table_name as tabla_con_delete_directo
+from information_schema.role_table_grants
+where grantee = 'authenticated' and table_schema = 'public' and privilege_type = 'DELETE'
+  and table_name not in ('actividad_brigadistas', 'reportes_territorio');
+
+-- 1n. Nadie de la aplicación puede vaciar una tabla con TRUNCATE. Debe devolver CERO.
+select table_name as tabla_con_truncate
+from information_schema.role_table_grants
+where grantee = 'authenticated' and table_schema = 'public' and privilege_type = 'TRUNCATE';
+
+-- 1o. Toda tabla con datos de trabajo deja copia en la bitácora antes de editarse o borrarse.
+-- Debe devolver CERO.
+select t.tabla as tabla_sin_bitacora
+from (values ('personas'), ('participaciones'), ('menciones_problematica'), ('solicitudes'),
+             ('seguimientos'), ('actividades'), ('actividad_brigadistas'), ('fotos'),
+             ('usuarios'), ('asignaciones_responsable'), ('casillas'),
+             ('representantes_casilla'), ('reportes_territorio'), ('contactos_anonimos'),
+             ('menciones_anonimas')) as t(tabla)
+where not exists (
+  select 1 from pg_trigger g
+  join pg_class c on c.oid = g.tgrelid
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relname = t.tabla and g.tgname = 'bitacora');
+
+-- 1p. La bitácora no es alcanzable por la aplicación. Debe devolver CERO.
+select privilege_type as permiso_de_authenticated_en_bitacora
+from information_schema.role_table_grants
+where grantee in ('authenticated', 'anon') and table_schema = 'privado' and table_name = 'bitacora';
+
 -- ===========================================================================
 -- 2. Comprobaciones con identidad simulada.
 -- ===========================================================================

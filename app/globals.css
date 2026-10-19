@@ -616,6 +616,32 @@
   }
 }
 
+/* Esqueleto de carga: un bloque hundido con una franja de luz que lo cruza, como en las páginas
+   que la gente ya conoce. Dice "esto viene" sin indicadores giratorios. El brillo se arma con el
+   mismo color de superficie, así que funciona igual en claro y en oscuro. Con movimiento
+   reducido, la regla general de arriba lo deja quieto. */
+@keyframes esqueleto-brillo {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@utility esqueleto {
+  background-color: var(--superficie-hundida);
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in oklab, var(--superficie) 70%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: esqueleto-brillo 1.4s var(--curva) infinite;
+}
+
 /* ===========================================================================
    Piezas del rediseño de octubre de 2026: tinta para la jerarquía, naranja para señalar.
    Las utilidades de vidrio de arriba (vidrio, capsula, dock…) no se tocaron porque el mapa las

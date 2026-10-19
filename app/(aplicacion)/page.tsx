@@ -383,7 +383,7 @@ function ListaActividades({
     return (
       <div className="flex flex-col gap-3">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-8 animate-pulse rounded bg-superficie-hundida" />
+          <div key={i} className="h-8 esqueleto rounded" />
         ))}
       </div>
     );
@@ -442,7 +442,7 @@ function Pendiente({
       >
         <span className="min-w-0 flex-1 text-tinta-suave">{etiqueta}</span>
         {cargando ? (
-          <span className="h-4 w-8 animate-pulse rounded bg-superficie-hundida" />
+          <span className="h-4 w-8 esqueleto rounded" />
         ) : (
           <span className="cifras font-semibold text-tinta">
             {(valor ?? 0).toLocaleString("es-MX")}

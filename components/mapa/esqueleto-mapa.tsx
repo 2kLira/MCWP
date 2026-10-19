@@ -47,7 +47,7 @@ export function EsqueletoMapa({ listo }: { listo: boolean }) {
           {Array.from({ length: 9 }).map((_, i) => (
             <div
               key={i}
-              className="aspect-square animate-pulse rounded-tarjeta bg-superficie-hundida"
+              className="aspect-square esqueleto rounded-tarjeta"
               style={{ animationDelay: `${i * 70}ms` }}
             />
           ))}

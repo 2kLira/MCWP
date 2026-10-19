@@ -988,3 +988,27 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
   Consecuencia: una actividad sin sección no suma en las cifras por sección (reuniones,
   recorridos, "recorrida", mapa de actividad) ni por demarcación. Si se quiere que cuente en las
   secciones de sus asistentes, es otra regla y hay que decidirla.
+- **Protección de los datos (16 de octubre de 2026).** Pedido del cliente. En `seguridad.sql`,
+  sección 13:
+  · **Bitácora** (`privado.bitacora`): antes de editar o borrar un renglón de las tablas de
+    trabajo queda una copia de cómo estaba, con quién y cuándo. No la alcanza la API, no se puede
+    editar ni borrar, y desde ahí se recupera un renglón borrado sin restaurar la base.
+  · `authenticated` ya no tiene DELETE salvo en `actividad_brigadistas` y `reportes_territorio`,
+    ni TRUNCATE en ninguna tabla. Nadie puede vaciar `personas` con una sola petición.
+  · **Pendiente, y entra en la política de retención:** la bitácora guarda copias de datos
+    personales para siempre. Si alguien pide que se borren sus datos (derechos ARCO), hay que
+    borrarlo también de ahí, quitando el candado a propósito. Hay que decidir cuánto tiempo se
+    guarda.
+  · **Pendiente:** copia diaria fuera de Supabase, cifrada. Si se borra el proyecto se borran sus
+    respaldos y la bitácora con él. Requiere decidir dónde se guarda y quién tiene la llave.
+  · Lo que hacen ellos en los paneles: verificación en dos pasos en Supabase, Vercel y GitHub;
+    activar la protección contra contraseñas filtradas en Auth; probar una restauración en un
+    proyecto nuevo.
+- **Reabrir una actividad cerrada (16 de octubre de 2026).** Pedido del cliente. El administrador
+  ve "Reabrir" en una actividad realizada y la regresa a en curso: los brigadistas invitados la
+  vuelven a ver y pueden seguir capturando. La base limpia la fecha y el autor del cierre; la
+  conclusión se conserva. Queda en la bitácora.
+- **Esqueletos de carga (16 de octubre de 2026).** `app/(aplicacion)/loading.tsx` (y uno propio
+  del mapa) da respuesta inmediata al cambiar de pantalla; el proveedor de identidad pinta la
+  aplicación completa en esqueleto mientras confirma la sesión. Todos los bloques de carga usan la
+  utilidad `esqueleto` (brillo que cruza), definida en globals.css.

@@ -122,9 +122,9 @@ export function FichaActividad({ id }: { id: string }) {
   if (actividad.cargando) {
     return (
       <div className="flex flex-col gap-5">
-        <div className="h-9 w-56 animate-pulse rounded-control bg-superficie-hundida" />
-        <div className="h-40 animate-pulse rounded-tarjeta bg-superficie-hundida" />
-        <div className="h-40 animate-pulse rounded-tarjeta bg-superficie-hundida" />
+        <div className="h-9 w-56 esqueleto rounded-control" />
+        <div className="h-40 esqueleto rounded-tarjeta" />
+        <div className="h-40 esqueleto rounded-tarjeta" />
       </div>
     );
   }
@@ -195,6 +195,13 @@ export function FichaActividad({ id }: { id: string }) {
 
       <div className="flex flex-wrap items-center gap-2.5">
         <Estado vivo={a.estatus === "en_curso"}>{ETIQUETA_ESTATUS[a.estatus]}</Estado>
+        {/* Reabrir: solo el administrador y solo una actividad ya cerrada. Vuelve a en curso, y
+            con eso los brigadistas invitados la vuelven a ver y pueden seguir capturando. */}
+        {a.estatus === "realizada" && esAdmin(actuante) && (
+          <div className="ml-auto">
+            <BotonEstatus etiqueta="Reabrir" onClick={() => moverA("en_curso")} deshabilitado={moviendo} />
+          </div>
+        )}
         {conAccionesDeEstatus && (
           <div className="ml-auto flex flex-wrap items-center gap-2.5">
             {/* La única naranja de la ficha mientras exista: el cierre baja a secundario. */}
@@ -232,7 +239,7 @@ export function FichaActividad({ id }: { id: string }) {
           />
         </div>
       )}
-      {conAccionesDeEstatus && avisoEstatus && (
+      {(conAccionesDeEstatus || a.estatus === "realizada") && avisoEstatus && (
         <p className="text-sm text-alerta">{avisoEstatus}</p>
       )}
 
@@ -288,7 +295,7 @@ export function FichaActividad({ id }: { id: string }) {
             }
           >
             {participaciones.cargando ? (
-              <div className="h-16 animate-pulse rounded-control bg-superficie-hundida" />
+              <div className="h-16 esqueleto rounded-control" />
             ) : participaciones.datos.length === 0 ? (
               <p className="text-sm text-tinta-suave">Todavía nadie se ha registrado aquí.</p>
             ) : (
@@ -604,7 +611,7 @@ function ConsolidadoCifras({
   cargando: boolean;
 }) {
   if (cargando) {
-    return <div className="h-24 animate-pulse rounded-control bg-superficie-hundida" />;
+    return <div className="h-24 esqueleto rounded-control" />;
   }
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">

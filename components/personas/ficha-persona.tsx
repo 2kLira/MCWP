@@ -78,7 +78,7 @@ export function FichaPersona({ id }: { id: string }) {
   }, [persona.datos?.seccion_clave]);
 
   if (persona.cargando) {
-    return <div className="h-64 animate-pulse rounded-tarjeta bg-superficie-hundida" />;
+    return <div className="h-64 esqueleto rounded-tarjeta" />;
   }
 
   const p = persona.datos;
@@ -248,7 +248,7 @@ export function FichaPersona({ id }: { id: string }) {
 
           <Caja icono={History} titulo="Historial">
             {historial.cargando ? (
-              <div className="h-24 animate-pulse rounded-control bg-superficie-hundida" />
+              <div className="h-24 esqueleto rounded-control" />
             ) : historial.datos.length === 0 ? (
               <p className="text-sm text-tinta-suave">Todavía no tiene eventos.</p>
             ) : (

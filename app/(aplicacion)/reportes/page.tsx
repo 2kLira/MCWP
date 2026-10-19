@@ -88,7 +88,7 @@ export default function Reportes() {
             }
           >
             {semanal.cargando ? (
-              <div className="h-64 animate-pulse rounded-control bg-superficie-hundida" />
+              <div className="h-64 esqueleto rounded-control" />
             ) : (
               <GraficaSemanal datos={semanal.datos} />
             )}
@@ -110,7 +110,7 @@ export default function Reportes() {
             }
           >
             {menciones.cargando ? (
-              <div className="h-64 animate-pulse rounded-control bg-superficie-hundida" />
+              <div className="h-64 esqueleto rounded-control" />
             ) : (
               <Grafica
                 datos={porProblematica.map((p) => ({ nombre: p.problematica, valor: p.total }))}
@@ -138,7 +138,7 @@ export default function Reportes() {
             }
           >
             {demarcaciones.cargando ? (
-              <div className="h-64 animate-pulse rounded-control bg-superficie-hundida" />
+              <div className="h-64 esqueleto rounded-control" />
             ) : (
               <Grafica
                 datos={conDatos.map((d) => ({ nombre: d.demarcacion, valor: d.personas }))}

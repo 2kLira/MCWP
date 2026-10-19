@@ -1,6 +1,7 @@
 "use client";
 
 import { TriangleAlert } from "lucide-react";
+import { EsqueletoAplicacion } from "@/components/sistema/esqueleto";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { alcanceDe, type Alcance } from "@/lib/puertas-ui";
@@ -150,7 +151,7 @@ export function ProveedorActuante({ children }: { children: React.ReactNode }) {
   // Los hijos no se montan hasta que el actuante es el definitivo. Eso es lo que hace que cada
   // useConsulta arranque con el actuante.id final y dispare una sola ronda de consultas.
   if (estado === "cargando" || estado === "sin_sesion") {
-    return <Esqueleto />;
+    return <EsqueletoAplicacion />;
   }
 
   if (estado === "sin_configuracion") {
@@ -175,16 +176,6 @@ export function ProveedorActuante({ children }: { children: React.ReactNode }) {
     <Puerta titulo="Tu cuenta está desactivada" conSalida>
       Si crees que es un error, avísale al administrador general.
     </Puerta>
-  );
-}
-
-/** Esqueleto que se disuelve en el contenido. Nada de indicadores giratorios. */
-function Esqueleto() {
-  return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-tope flex-col gap-4 px-4 py-6">
-      <div className="h-8 w-48 animate-pulse rounded-control bg-superficie-hundida" />
-      <div className="h-64 animate-pulse rounded-tarjeta bg-superficie-hundida" />
-    </div>
   );
 }
 

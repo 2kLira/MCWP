@@ -210,7 +210,7 @@ export default function Seguimiento() {
         <ul className="tarjeta overflow-hidden">
           {Array.from({ length: 6 }).map((_, i) => (
             <li key={i} className="border-t border-separador px-4 py-3 first:border-t-0">
-              <div className="h-10 animate-pulse rounded-control bg-superficie-hundida" />
+              <div className="h-10 esqueleto rounded-control" />
             </li>
           ))}
         </ul>
