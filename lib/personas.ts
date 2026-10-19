@@ -3,6 +3,8 @@
  * la edad sale de la fecha de nacimiento, y el cumpleaños sale de la misma fecha.
  */
 
+import { ETIQUETA_RANGO_EDAD, RANGOS_EDAD, type RangoEdad } from "@/lib/tipos";
+
 /** Convierte lo que venga de la base (date de Postgres, cadena o Date) a una fecha local. */
 function aFecha(valor: string | Date | null | undefined): Date | null {
   if (!valor) return null;
@@ -80,4 +82,49 @@ export function compararPadron(a: PartesNombre, b: PartesNombre): number {
     if (c !== 0) return c;
   }
   return 0;
+}
+
+/**
+ * Rangos del filtro de edad de la lista de personas: los mismos de los contactos sin datos, más
+ * los menores de 18, porque el sistema registra gente en general y no solo a quien vota.
+ */
+export type RangoEdadFiltro = RangoEdad | "menor_18";
+
+export const RANGOS_EDAD_FILTRO: readonly RangoEdadFiltro[] = ["menor_18", ...RANGOS_EDAD];
+
+export const ETIQUETA_RANGO_EDAD_FILTRO: Record<RangoEdadFiltro, string> = {
+  menor_18: "Menores de 18",
+  ...ETIQUETA_RANGO_EDAD,
+};
+
+const EDADES: Record<RangoEdadFiltro, [number, number | null]> = {
+  menor_18: [0, 17],
+  "18_29": [18, 29],
+  "30_44": [30, 44],
+  "45_59": [45, 59],
+  "60_mas": [60, null],
+};
+
+/** Hoy menos tantos años, como 'AAAA-MM-DD' local. El 29 de febrero cae al 1 de marzo. */
+function haceAnios(anios: number): string {
+  const hoy = new Date();
+  const fecha = new Date(hoy.getFullYear() - anios, hoy.getMonth(), hoy.getDate());
+  const dosDigitos = (n: number) => String(n).padStart(2, "0");
+  return `${fecha.getFullYear()}-${dosDigitos(fecha.getMonth() + 1)}-${dosDigitos(fecha.getDate())}`;
+}
+
+/**
+ * Un rango de edad traducido a fechas de nacimiento, para que lo filtre la base y no la pantalla.
+ * Tener entre `min` y `max` años cumplidos es haber nacido a lo más hace `min` años y después de
+ * hace `max + 1` años. Quien no tiene fecha de nacimiento no cae en ningún rango.
+ */
+export function nacimientoParaRango(rango: RangoEdadFiltro): {
+  nacidoHasta: string;
+  nacidoDespuesDe: string | null;
+} {
+  const [min, max] = EDADES[rango];
+  return {
+    nacidoHasta: haceAnios(min),
+    nacidoDespuesDe: max === null ? null : haceAnios(max + 1),
+  };
 }

@@ -1020,3 +1020,8 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
   compartido con /exportar). Quien no tiene apellidos separados sale con el nombre completo en
   Nombre(s). Antes la consulta tenía `limit(5000)`, pero PostgREST corta en 1000; ahora pide por
   páginas.
+- **Filtro por edad en Personas (20 de octubre de 2026).** Pedido del cliente. Selector con los
+  rangos de los contactos sin datos (18 a 29, 30 a 44, 45 a 59, 60 o más) más "Menores de 18",
+  porque se registra gente de cualquier edad. La edad no se guarda: el rango se traduce a fechas de
+  nacimiento (`nacimientoParaRango` en `lib/personas.ts`) y lo filtra la base. Quien no tiene fecha
+  de nacimiento no cae en ningún rango. La exportación respeta el filtro.

@@ -7,6 +7,7 @@
 
 import type { PostgrestError } from "@supabase/supabase-js";
 import { puedeEditarPersona } from "@/lib/puertas-ui";
+import { nacimientoParaRango, type RangoEdadFiltro } from "@/lib/personas";
 import { normalizarTelefono } from "@/lib/territorio";
 import type { Genero, UsuarioActuante } from "@/lib/tipos";
 import {
@@ -87,6 +88,7 @@ export type FiltrosPersonas = {
   promovido?: boolean;
   representante?: boolean;
   genero?: Genero | null;
+  rangoEdad?: RangoEdadFiltro | null;
 };
 
 const COLUMNAS_LISTA =
@@ -112,6 +114,11 @@ export async function listarPersonas(
   if (filtros.promovido) consulta = consulta.eq("es_promovido", true);
   if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
   if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
+  if (filtros.rangoEdad) {
+    const { nacidoHasta, nacidoDespuesDe } = nacimientoParaRango(filtros.rangoEdad);
+    consulta = consulta.lte("fecha_nacimiento", nacidoHasta);
+    if (nacidoDespuesDe) consulta = consulta.gt("fecha_nacimiento", nacidoDespuesDe);
+  }
 
   // textoDeBusqueda quita comodines y lo que rompe la gramática del filtro. Ver cliente.ts.
   const texto = textoDeBusqueda(filtros.texto ?? "");
@@ -403,6 +410,11 @@ export async function listarPersonasExportar(
     if (filtros.promovido) consulta = consulta.eq("es_promovido", true);
     if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
     if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
+    if (filtros.rangoEdad) {
+      const { nacidoHasta, nacidoDespuesDe } = nacimientoParaRango(filtros.rangoEdad);
+      consulta = consulta.lte("fecha_nacimiento", nacidoHasta);
+      if (nacidoDespuesDe) consulta = consulta.gt("fecha_nacimiento", nacidoDespuesDe);
+    }
 
     // textoDeBusqueda quita comodines y lo que rompe la gramática del filtro. Ver cliente.ts.
     const texto = textoDeBusqueda(filtros.texto ?? "");

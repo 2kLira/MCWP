@@ -10,7 +10,14 @@ import { Estado } from "@/components/sistema/estado";
 import { useActuante } from "@/components/proveedor-actuante";
 import { DEMARCACIONES, demarcacionPorId } from "@/lib/demarcaciones";
 import { alcanceDe, puedeVerListadosGenerales } from "@/lib/puertas-ui";
-import { compararPadron, edadDesde, etiquetaEdad } from "@/lib/personas";
+import {
+  compararPadron,
+  edadDesde,
+  ETIQUETA_RANGO_EDAD_FILTRO,
+  etiquetaEdad,
+  RANGOS_EDAD_FILTRO,
+  type RangoEdadFiltro,
+} from "@/lib/personas";
 import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido, useNavegarConTransicion } from "@/lib/transicion";
 import { descargarXlsx, type Hoja } from "@/lib/xlsx";
@@ -96,6 +103,7 @@ export default function Personas() {
   const [promovido, setPromovido] = useState(false);
   const [representante, setRepresentante] = useState(false);
   const [genero, setGenero] = useState<Genero | null>(null);
+  const [rangoEdad, setRangoEdad] = useState<RangoEdadFiltro | null>(null);
 
   const [filas, setFilas] = useState<PersonaEnLista[]>([]);
   const [total, setTotal] = useState(0);
@@ -129,8 +137,19 @@ export default function Personas() {
       promovido: promovido || undefined,
       representante: representante || undefined,
       genero,
+      rangoEdad,
     }),
-    [textoDiferido, demarcacionId, seccionClave, participar, info, promovido, representante, genero],
+    [
+      textoDiferido,
+      demarcacionId,
+      seccionClave,
+      participar,
+      info,
+      promovido,
+      representante,
+      genero,
+      rangoEdad,
+    ],
   );
 
   useEffect(() => {
@@ -260,6 +279,20 @@ export default function Personas() {
             {GENEROS.map((g) => (
               <option key={g} value={g}>
                 {ETIQUETA_GENERO[g]}
+              </option>
+            ))}
+          </select>
+          {/* Quien no tiene fecha de nacimiento no cae en ningún rango. */}
+          <select
+            value={rangoEdad ?? ""}
+            onChange={(e) => setRangoEdad((e.target.value || null) as RangoEdadFiltro | null)}
+            aria-label="Filtrar por edad"
+            className="campo w-auto max-w-full"
+          >
+            <option value="">Todas las edades</option>
+            {RANGOS_EDAD_FILTRO.map((r) => (
+              <option key={r} value={r}>
+                {ETIQUETA_RANGO_EDAD_FILTRO[r]}
               </option>
             ))}
           </select>
