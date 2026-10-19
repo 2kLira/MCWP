@@ -354,55 +354,75 @@ export function solicitudesDePersona(
  * Exportación
  * ------------------------------------------------------------------------- */
 
-export type PromovidoExportable = {
+export type PersonaExportable = {
+  id: string;
   nombre: string;
+  nombres: string | null;
+  apellido_paterno: string | null;
+  apellido_materno: string | null;
   telefono_norm: string | null;
   seccion_clave: string | null;
   demarcacion_id: number | null;
   genero: Genero | null;
   fecha_nacimiento: string | null;
+  quiere_participar: boolean | null;
+  quiere_info: boolean | null;
+  es_promovido: boolean | null;
   promovido_en: string | null;
+  quiere_ser_representante: boolean | null;
   // Embed de la colonia por su relación con colonia_id. Objeto y no arreglo: cada persona tiene
   // cuando mucho una colonia.
   colonias: { nombre: string } | null;
 };
 
+/** PostgREST corta en 1000 renglones por petición; se pide por páginas hasta agotar. */
+const PAGINA_EXPORTAR = 1000;
+
 /**
- * Promovidos listos para exportar, con los mismos filtros que la lista de personas y siempre con
- * es_promovido en verdadero: lo que se ve en pantalla es lo que se descarga. Sin límite de página
- * porque el CSV se arma de una sola vez, no se pagina.
+ * Personas listas para exportar, con los mismos filtros que la lista: lo que se ve en pantalla es
+ * lo que se descarga. Con el filtro "Promovido" salen solo los promovidos; sin él, todas las
+ * alcanzadas. Se pide por páginas porque el archivo se arma de una sola vez.
  */
-export async function listarPromovidosExportar(
+export async function listarPersonasExportar(
   usuario: UsuarioActuante | null,
   filtros: FiltrosPersonas = {},
-): Promise<Resultado<PromovidoExportable[]>> {
-  let consulta = db()
-    .from("personas")
-    .select(
-      "nombre, telefono_norm, seccion_clave, demarcacion_id, genero, fecha_nacimiento, promovido_en, colonias(nombre)",
-    );
+): Promise<Resultado<PersonaExportable[]>> {
+  const filas: PersonaExportable[] = [];
+  for (let desde = 0; ; desde += PAGINA_EXPORTAR) {
+    let consulta = db()
+      .from("personas")
+      .select(
+        "id, nombre, nombres, apellido_paterno, apellido_materno, telefono_norm, seccion_clave, demarcacion_id, genero, fecha_nacimiento, " +
+          "quiere_participar, quiere_info, es_promovido, promovido_en, quiere_ser_representante, colonias(nombre)",
+      );
 
-  consulta = consulta.eq("es_promovido", true);
+    if (filtros.demarcacionId) consulta = consulta.eq("demarcacion_id", filtros.demarcacionId);
+    if (filtros.seccionClave) consulta = consulta.eq("seccion_clave", filtros.seccionClave);
+    if (filtros.quiereParticipar) consulta = consulta.eq("quiere_participar", true);
+    if (filtros.quiereInfo) consulta = consulta.eq("quiere_info", true);
+    if (filtros.promovido) consulta = consulta.eq("es_promovido", true);
+    if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
+    if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
 
-  if (filtros.demarcacionId) consulta = consulta.eq("demarcacion_id", filtros.demarcacionId);
-  if (filtros.seccionClave) consulta = consulta.eq("seccion_clave", filtros.seccionClave);
-  if (filtros.quiereParticipar) consulta = consulta.eq("quiere_participar", true);
-  if (filtros.quiereInfo) consulta = consulta.eq("quiere_info", true);
-  if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
-  if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
+    // textoDeBusqueda quita comodines y lo que rompe la gramática del filtro. Ver cliente.ts.
+    const texto = textoDeBusqueda(filtros.texto ?? "");
+    if (texto) {
+      const digitos = texto.replace(/\D/g, "");
+      consulta =
+        digitos.length >= 4
+          ? consulta.or(`nombre.ilike.%${texto}%,telefono_norm.ilike.%${digitos}%`)
+          : consulta.ilike("nombre", `%${texto}%`);
+    }
 
-  // textoDeBusqueda quita comodines y lo que rompe la gramática del filtro. Ver cliente.ts.
-  const texto = textoDeBusqueda(filtros.texto ?? "");
-  if (texto) {
-    const digitos = texto.replace(/\D/g, "");
-    consulta =
-      digitos.length >= 4
-        ? consulta.or(`nombre.ilike.%${texto}%,telefono_norm.ilike.%${digitos}%`)
-        : consulta.ilike("nombre", `%${texto}%`);
+    const { data, error } = await consulta
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(desde, desde + PAGINA_EXPORTAR - 1);
+    // Un archivo a medias se confundiría con el completo: si falla una página, no se baja nada.
+    if (error) return resultado<PersonaExportable[]>([], error, []);
+    filas.push(...((data ?? []) as unknown as PersonaExportable[]));
+    if (!data || data.length < PAGINA_EXPORTAR) return resultado(filas, null, filas);
   }
-
-  const { data, error } = await consulta.order("promovido_en", { ascending: false }).limit(5000);
-  return resultado((data ?? []) as unknown as PromovidoExportable[], error, []);
 }
 
 /**

@@ -10,15 +10,15 @@ import { Estado } from "@/components/sistema/estado";
 import { useActuante } from "@/components/proveedor-actuante";
 import { DEMARCACIONES, demarcacionPorId } from "@/lib/demarcaciones";
 import { alcanceDe, puedeVerListadosGenerales } from "@/lib/puertas-ui";
-import { edadDesde, etiquetaEdad } from "@/lib/personas";
+import { compararPadron, edadDesde, etiquetaEdad } from "@/lib/personas";
 import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido, useNavegarConTransicion } from "@/lib/transicion";
-import { descargarCsv } from "@/lib/csv";
+import { descargarXlsx, type Hoja } from "@/lib/xlsx";
 import {
   listarPersonas,
-  listarPromovidosExportar,
+  listarPersonasExportar,
   type PersonaEnLista,
-  type PromovidoExportable,
+  type PersonaExportable,
 } from "@/lib/datos/personas";
 import { ETIQUETA_GENERO, GENEROS, type Genero } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
@@ -36,29 +36,50 @@ const ALTO_RENGLON = 56;
 const REJILLA =
   "gap-x-4 lg:grid-cols-[minmax(0,1.5fr)_7.5rem_4.5rem_minmax(0,1fr)_minmax(0,1fr)_14.5rem] xl:grid-cols-[minmax(0,1.5fr)_7.5rem_4.5rem_minmax(0,1fr)_minmax(0,1fr)_4.5rem_14.5rem]";
 
-/** Columnas del CSV de promovidos, en el orden que pidió el cliente. */
-const COLUMNAS_PROMOVIDOS = [
-  { llave: "nombre", etiqueta: "Nombre" },
-  { llave: "telefono", etiqueta: "Teléfono" },
-  { llave: "seccion", etiqueta: "Sección" },
-  { llave: "colonia", etiqueta: "Colonia" },
-  { llave: "demarcacion", etiqueta: "Demarcación" },
-  { llave: "genero", etiqueta: "Género" },
-  { llave: "edad", etiqueta: "Edad" },
-  { llave: "promovido_desde", etiqueta: "Fecha en que se marcó como promovido" },
-];
-
-/** Fila cruda de la exportación, ya con nombres de columna en español y nada por calcular en Excel. */
-function filaPromovidoExportable(p: PromovidoExportable) {
+/**
+ * Hoja de Excel con lo que está filtrado en pantalla. El nombre va en tres columnas, como en
+ * /exportar, y en orden de padrón. Quien se registró antes de las tres partes (o por carga masiva)
+ * trae su nombre completo en "Nombre(s)" y los apellidos vacíos.
+ *
+ * Excel y no CSV: el CSV dejaba que la hoja de cálculo convirtiera la sección en número y se
+ * perdía el cero de adelante (0551 salía como 551).
+ */
+function hojaPersonasFiltradas(personas: PersonaExportable[], soloPromovidos: boolean): Hoja {
+  const ordenadas = [...personas].sort(compararPadron);
   return {
-    nombre: p.nombre,
-    telefono: formatearTelefono(p.telefono_norm),
-    seccion: p.seccion_clave ?? "",
-    colonia: p.colonias?.nombre ?? "",
-    demarcacion: demarcacionPorId(p.demarcacion_id)?.nombre ?? "",
-    genero: p.genero ? ETIQUETA_GENERO[p.genero] : "",
-    edad: edadDesde(p.fecha_nacimiento) ?? "",
-    promovido_desde: p.promovido_en ? format(new Date(p.promovido_en), "dd/MM/yyyy") : "",
+    nombre: soloPromovidos ? "Promovidos" : "Personas alcanzadas",
+    columnas: [
+      { titulo: "Nombre(s)" },
+      { titulo: "Apellido paterno" },
+      { titulo: "Apellido materno" },
+      { titulo: "Teléfono", ancho: 14 },
+      { titulo: "Sección", ancho: 9 },
+      { titulo: "Colonia" },
+      { titulo: "Demarcación" },
+      { titulo: "Género", ancho: 14 },
+      { titulo: "Edad", ancho: 7 },
+      { titulo: "Quiere participar", ancho: 10 },
+      { titulo: "Quiere información", ancho: 10 },
+      { titulo: "Promovido", ancho: 10 },
+      { titulo: "Promovido desde", formato: "fecha", ancho: 12 },
+      { titulo: "Quiere ser representante", ancho: 10 },
+    ],
+    filas: ordenadas.map((p) => [
+      p.apellido_paterno ? p.nombres : p.nombre,
+      p.apellido_paterno,
+      p.apellido_materno,
+      formatearTelefono(p.telefono_norm),
+      p.seccion_clave,
+      p.colonias?.nombre,
+      demarcacionPorId(p.demarcacion_id)?.nombre,
+      p.genero ? ETIQUETA_GENERO[p.genero] : null,
+      edadDesde(p.fecha_nacimiento),
+      p.quiere_participar,
+      p.quiere_info,
+      p.es_promovido,
+      p.promovido_en ? new Date(p.promovido_en) : null,
+      p.quiere_ser_representante,
+    ]),
   };
 }
 
@@ -80,6 +101,7 @@ export default function Personas() {
   const [total, setTotal] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [exportando, setExportando] = useState(false);
+  const [avisoExportar, setAvisoExportar] = useState<string | null>(null);
 
   const contenedor = useRef<HTMLDivElement>(null);
 
@@ -142,12 +164,20 @@ export default function Personas() {
     return [];
   }, [alcance]);
 
-  // Descarga los promovidos con los mismos filtros que están activos en pantalla: lo que se ve
-  // es lo que se baja. es_promovido siempre en verdadero, lo pida o no el filtro "Promovido".
-  async function exportarPromovidos() {
+  // Descarga lo que está filtrado en pantalla: con "Promovido" activo, los promovidos; sin él,
+  // todas las alcanzadas.
+  async function exportar() {
     setExportando(true);
-    const r = await listarPromovidosExportar(actuante, filtrosActivos);
-    descargarCsv("promovidos", COLUMNAS_PROMOVIDOS, r.datos.map(filaPromovidoExportable));
+    setAvisoExportar(null);
+    const r = await listarPersonasExportar(actuante, filtrosActivos);
+    if (r.aviso) {
+      setAvisoExportar(r.aviso);
+    } else {
+      const nombre = promovido ? "promovidos" : "personas-alcanzadas";
+      descargarXlsx(`${nombre}-${format(new Date(), "yyyy-MM-dd")}`, [
+        hojaPersonasFiltradas(r.datos, promovido),
+      ]);
+    }
     setExportando(false);
   }
 
@@ -187,14 +217,15 @@ export default function Personas() {
           </div>
           <button
             type="button"
-            onClick={exportarPromovidos}
+            onClick={exportar}
             disabled={exportando}
             className="boton"
           >
             <Download className="size-4" aria-hidden />
-            {exportando ? "Exportando…" : "Exportar promovidos"}
+            {exportando ? "Exportando…" : promovido ? "Exportar promovidos" : "Exportar alcanzadas"}
           </button>
         </div>
+        {avisoExportar && <p className="text-sm text-alerta">{avisoExportar}</p>}
 
         <div className="flex flex-wrap gap-2.5">
           {demarcacionesVisibles.length > 1 && (

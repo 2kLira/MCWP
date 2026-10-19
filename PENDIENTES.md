@@ -1012,3 +1012,11 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
   del mapa) da respuesta inmediata al cambiar de pantalla; el proveedor de identidad pinta la
   aplicación completa en esqueleto mientras confirma la sesión. Todos los bloques de carga usan la
   utilidad `esqueleto` (brillo que cruza), definida en globals.css.
+- **Exportar desde Personas (20 de octubre de 2026).** Pedido del cliente. El botón de la lista
+  ya no baja solo promovidos: baja lo que está filtrado en pantalla ("Exportar alcanzadas", o
+  "Exportar promovidos" con ese filtro activo). Pasó de CSV a Excel con `lib/xlsx.ts`, porque el CSV
+  perdía el cero de la sección (0551 salía 551). El nombre va en tres columnas —Nombre(s),
+  Apellido paterno, Apellido materno— y en orden de padrón (`compararPadron` en `lib/personas.ts`,
+  compartido con /exportar). Quien no tiene apellidos separados sale con el nombre completo en
+  Nombre(s). Antes la consulta tenía `limit(5000)`, pero PostgREST corta en 1000; ahora pide por
+  páginas.

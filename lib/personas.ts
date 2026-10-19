@@ -56,3 +56,28 @@ export function etiquetaEdad(
   if (edad === null) return "";
   return `${edad} ${edad === 1 ? "año" : "años"}`;
 }
+
+type PartesNombre = {
+  nombre: string;
+  nombres: string | null;
+  apellido_paterno: string | null;
+  apellido_materno: string | null;
+};
+
+/**
+ * Orden de padrón: apellido paterno, materno y nombre, con reglas del español (á = a, ñ después
+ * de n). Quien se registró antes de las tres partes (o por carga masiva) no tiene apellidos
+ * separados: va con su nombre completo en "Nombre(s)" y se ordena al final, no al principio.
+ */
+const ORDEN_ES = new Intl.Collator("es", { sensitivity: "base" });
+
+export function compararPadron(a: PartesNombre, b: PartesNombre): number {
+  if (!a.apellido_paterno !== !b.apellido_paterno) return a.apellido_paterno ? -1 : 1;
+  const ka = [a.apellido_paterno, a.apellido_materno, a.nombres ?? a.nombre];
+  const kb = [b.apellido_paterno, b.apellido_materno, b.nombres ?? b.nombre];
+  for (let i = 0; i < ka.length; i++) {
+    const c = ORDEN_ES.compare(ka[i] ?? "", kb[i] ?? "");
+    if (c !== 0) return c;
+  }
+  return 0;
+}

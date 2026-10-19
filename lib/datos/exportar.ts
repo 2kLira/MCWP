@@ -9,6 +9,7 @@
  */
 
 import { demarcacionPorId } from "@/lib/demarcaciones";
+import { compararPadron } from "@/lib/personas";
 import { formatearTelefono } from "@/lib/territorio";
 import {
   ETIQUETA_ESTATUS,
@@ -103,21 +104,7 @@ export async function hojaPersonas(): Promise<Hoja> {
     "created_at",
   );
 
-  // Orden de padrón: apellido paterno, materno y nombre, con reglas del español (á = a, ñ después
-  // de n). Quien se registró antes de las tres partes (o por carga masiva) no tiene apellidos
-  // separados: va con su nombre completo en "Nombre(s)" y se ordena al final, no al principio.
-  const orden = new Intl.Collator("es", { sensitivity: "base" });
-  const llave = (p: FilaPersona) => [p.apellido_paterno, p.apellido_materno, p.nombres ?? p.nombre];
-  filas.sort((a, b) => {
-    if (!a.apellido_paterno !== !b.apellido_paterno) return a.apellido_paterno ? -1 : 1;
-    const ka = llave(a);
-    const kb = llave(b);
-    for (let i = 0; i < ka.length; i++) {
-      const c = orden.compare(ka[i] ?? "", kb[i] ?? "");
-      if (c !== 0) return c;
-    }
-    return 0;
-  });
+  filas.sort(compararPadron);
 
   return {
     nombre: "Personas",
