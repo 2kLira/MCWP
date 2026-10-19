@@ -1025,3 +1025,17 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
   porque se registra gente de cualquier edad. La edad no se guarda: el rango se traduce a fechas de
   nacimiento (`nacimientoParaRango` en `lib/personas.ts`) y lo filtra la base. Quien no tiene fecha
   de nacimiento no cae en ningún rango. La exportación respeta el filtro.
+- **Urgente contactar (20 de octubre de 2026).** Pedido del cliente: en Intereses del registro, un
+  interruptor "Urgente contactar" que al encenderse abre "Por qué es urgente" (obligatorio).
+  · Columnas nuevas `personas.urgente_contactar` y `personas.urgente_motivo` (migración
+    `personas_urgente_contactar`). La base exige motivo con la marca encendida y `sellar_persona`
+    lo vacía al apagarla: un "urgente" viejo no se queda leyéndose como vigente.
+  · **Extiende la regla del spec de la bandeja de seguimiento**, igual que barda o lona: quien es
+    urgente entra a `v_bandeja_seguimiento` y sale **primero**. En Seguimiento es el motivo
+    "Urgente".
+  · Se ve primero en Intereses de la ficha con su motivo, se corrige desde "Editar datos", se
+    filtra en Personas y sale en las dos exportaciones.
+  · Como los demás intereses, solo se guarda en una ficha nueva. Si el teléfono ya existe y se
+    elige agregar la participación, el interruptor no aparece: a esa persona no se le escribe la
+    ficha (el brigadista no puede editarla). Lo urgente de alguien ya registrado va por
+    "¿Pidió algo en particular?", que sí llega a Seguimiento. **Falta decidir** si eso basta.

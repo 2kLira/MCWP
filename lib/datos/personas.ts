@@ -50,6 +50,9 @@ export type Persona = {
   quiere_ser_representante: boolean;
   /** Ofrece su barda para pintar o su fachada para lona. */
   quiere_barda_lona: boolean;
+  /** Hay que buscarla pronto. El motivo solo existe con la marca encendida; la base lo vacía al apagarla. */
+  urgente_contactar: boolean;
+  urgente_motivo: string | null;
   /** Quien la registró. Null si RLS no deja leer a ese usuario (solo el admin ve a los demás). */
   registrador?: { nombre: string } | null;
   /**
@@ -76,6 +79,7 @@ export type PersonaEnLista = Pick<
   | "fecha_nacimiento"
   | "es_promovido"
   | "quiere_ser_representante"
+  | "urgente_contactar"
   | "registrador"
 >;
 
@@ -87,12 +91,13 @@ export type FiltrosPersonas = {
   texto?: string;
   promovido?: boolean;
   representante?: boolean;
+  urgente?: boolean;
   genero?: Genero | null;
   rangoEdad?: RangoEdadFiltro | null;
 };
 
 const COLUMNAS_LISTA =
-  "id, nombre, telefono_norm, calle, colonia_id, seccion_clave, demarcacion_id, quiere_participar, quiere_info, created_at, genero, fecha_nacimiento, es_promovido, quiere_ser_representante, registrador:usuarios!personas_registrada_por_fkey(nombre)";
+  "id, nombre, telefono_norm, calle, colonia_id, seccion_clave, demarcacion_id, quiere_participar, quiere_info, created_at, genero, fecha_nacimiento, es_promovido, quiere_ser_representante, urgente_contactar, registrador:usuarios!personas_registrada_por_fkey(nombre)";
 
 export async function listarPersonas(
   usuario: UsuarioActuante | null,
@@ -113,6 +118,7 @@ export async function listarPersonas(
   if (filtros.quiereInfo) consulta = consulta.eq("quiere_info", true);
   if (filtros.promovido) consulta = consulta.eq("es_promovido", true);
   if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
+  if (filtros.urgente) consulta = consulta.eq("urgente_contactar", true);
   if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
   if (filtros.rangoEdad) {
     const { nacidoHasta, nacidoDespuesDe } = nacimientoParaRango(filtros.rangoEdad);
@@ -237,6 +243,8 @@ export type EntradaPersona = {
   es_promovido?: boolean;
   quiere_ser_representante?: boolean;
   quiere_barda_lona?: boolean;
+  urgente_contactar?: boolean;
+  urgente_motivo?: string | null;
   /** Quién trajo a esta persona. Apunta a personas, no a usuarios. */
   promotor_id?: string | null;
 };
@@ -377,6 +385,8 @@ export type PersonaExportable = {
   es_promovido: boolean | null;
   promovido_en: string | null;
   quiere_ser_representante: boolean | null;
+  urgente_contactar: boolean | null;
+  urgente_motivo: string | null;
   // Embed de la colonia por su relación con colonia_id. Objeto y no arreglo: cada persona tiene
   // cuando mucho una colonia.
   colonias: { nombre: string } | null;
@@ -400,7 +410,7 @@ export async function listarPersonasExportar(
       .from("personas")
       .select(
         "id, nombre, nombres, apellido_paterno, apellido_materno, telefono_norm, seccion_clave, demarcacion_id, genero, fecha_nacimiento, " +
-          "quiere_participar, quiere_info, es_promovido, promovido_en, quiere_ser_representante, colonias(nombre)",
+          "quiere_participar, quiere_info, es_promovido, promovido_en, quiere_ser_representante, urgente_contactar, urgente_motivo, colonias(nombre)",
       );
 
     if (filtros.demarcacionId) consulta = consulta.eq("demarcacion_id", filtros.demarcacionId);
@@ -409,6 +419,7 @@ export async function listarPersonasExportar(
     if (filtros.quiereInfo) consulta = consulta.eq("quiere_info", true);
     if (filtros.promovido) consulta = consulta.eq("es_promovido", true);
     if (filtros.representante) consulta = consulta.eq("quiere_ser_representante", true);
+    if (filtros.urgente) consulta = consulta.eq("urgente_contactar", true);
     if (filtros.genero) consulta = consulta.eq("genero", filtros.genero);
     if (filtros.rangoEdad) {
       const { nacidoHasta, nacidoDespuesDe } = nacimientoParaRango(filtros.rangoEdad);

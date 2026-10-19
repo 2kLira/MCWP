@@ -1,7 +1,8 @@
 /**
  * Seguimiento. La bandeja no es una tabla: es la vista v_bandeja_seguimiento, que resuelve en la
- * base la regla del spec (quiere participar, quiere información, ofrece barda o lona, o dejó una
- * solicitud que requiere seguimiento, y su último seguimiento está pendiente o no existe).
+ * base la regla del spec (quiere participar, quiere información, ofrece barda o lona, está marcada
+ * como urgente, o dejó una solicitud que requiere seguimiento, y su último seguimiento está
+ * pendiente o no existe).
  */
 
 import { normalizarTelefono } from "@/lib/territorio";
@@ -45,13 +46,15 @@ export type FilaBandeja = {
   /** Verdadero si tiene al menos una solicitud con requiere_seguimiento. La marca dura del renglón. */
   tiene_solicitud: boolean;
   quiere_barda_lona: boolean;
+  urgente_contactar: boolean;
+  urgente_motivo: string | null;
 };
 
 /**
  * Por qué cayó en la bandeja: quiere participar, quiere información, ofrece barda o lona, o dejó
  * una solicitud.
  */
-export type MotivoBandeja = "participa" | "info" | "barda" | "solicitud";
+export type MotivoBandeja = "urgente" | "participa" | "info" | "barda" | "solicitud";
 
 export type FiltrosBandeja = {
   demarcacionId?: number | null;
@@ -86,7 +89,9 @@ function aplicarFiltrosBandeja<
 
   if (filtros.tipo) resultado = resultado.eq("ultimo_seguimiento_tipo", filtros.tipo) as Q;
 
-  if (filtros.motivo === "participa") {
+  if (filtros.motivo === "urgente") {
+    resultado = resultado.eq("urgente_contactar", true) as Q;
+  } else if (filtros.motivo === "participa") {
     resultado = resultado.eq("quiere_participar", true) as Q;
   } else if (filtros.motivo === "info") {
     resultado = resultado.eq("quiere_info", true) as Q;
@@ -116,8 +121,12 @@ export function bandeja(
 ): Promise<Resultado<FilaBandeja[]>> {
   let consulta = db().from("v_bandeja_seguimiento").select("*");
   consulta = aplicarFiltrosBandeja(consulta, filtros);
-  // Lo más viejo sin atender sale primero.
-  return lista<FilaBandeja>(consulta.order("created_at", { ascending: true }));
+  // Lo urgente arriba; dentro de cada grupo, lo más viejo sin atender sale primero.
+  return lista<FilaBandeja>(
+    consulta
+      .order("urgente_contactar", { ascending: false })
+      .order("created_at", { ascending: true }),
+  );
 }
 
 /**

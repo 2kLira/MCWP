@@ -836,6 +836,13 @@ begin
     new.nombre := concat_ws(' ', new.nombres, new.apellido_paterno, new.apellido_materno);
   end if;
 
+  -- Urgente contactar (20 de octubre de 2026): el motivo vive solo con la marca encendida. Al
+  -- apagarla se vacía, para que no quede un "urgente" viejo leyéndose como vigente.
+  new.urgente_motivo := nullif(btrim(new.urgente_motivo), '');
+  if not new.urgente_contactar then
+    new.urgente_motivo := null;
+  end if;
+
   -- "La sección electoral es la única unidad territorial exacta" y "nada de pedir la sección
   -- cuando hay coordenada". Si hay punto, el punto manda y lo que mandó el cliente no cuenta.
   -- Si el punto cae fuera de toda geometría se respeta lo que venga: las seis secciones

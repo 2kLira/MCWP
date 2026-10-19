@@ -101,7 +101,8 @@ export function FichaPersona({ id }: { id: string }) {
     Boolean(p.aviso_version) ||
     p.es_promovido ||
     p.quiere_ser_representante ||
-    p.quiere_barda_lona;
+    p.quiere_barda_lona ||
+    p.urgente_contactar;
 
   // Se guarda el valor aquí y no dentro de la función: el estrechamiento de `p` no sobrevive al
   // cierre de una función declarada, y adentro TypeScript vuelve a verlo como posiblemente nulo.
@@ -198,6 +199,14 @@ export function FichaPersona({ id }: { id: string }) {
           {/* Solo los encendidos, como antes del rediseño: un interés apagado no es un dato. */}
           {hayIntereses ? (
             <ul className="flex flex-col gap-3">
+              {/* Primero: es lo único de la lista que pide que alguien haga algo pronto. */}
+              {p.urgente_contactar && (
+                <Indicador
+                  etiqueta="Urgente contactar"
+                  activo
+                  nota={p.urgente_motivo ?? undefined}
+                />
+              )}
               {p.quiere_participar && <Indicador etiqueta="Quiere participar" activo />}
               {p.quiere_info && <Indicador etiqueta="Quiere información" activo />}
               {p.aviso_version && (
@@ -392,7 +401,11 @@ function Indicador({
           {etiqueta}
           <span className="sr-only">{activo ? ": sí" : ": no"}</span>
         </span>
-        {nota && <span className="cifras block text-xs text-tinta-tenue">{nota}</span>}
+        {nota && (
+          <span className="cifras block whitespace-pre-line text-xs text-tinta-tenue [overflow-wrap:anywhere]">
+            {nota}
+          </span>
+        )}
       </span>
     </li>
   );

@@ -178,6 +178,11 @@ create table personas (
   -- de 2026. Una sola marca para las dos cosas: en campo se ofrecen juntas.
   quiere_barda_lona  boolean not null default false,
 
+  -- Hay que buscarla pronto, y por qué. Lo pidió el cliente el 20 de octubre de 2026. El motivo
+  -- solo existe con la marca encendida: al apagarla, sellar_persona lo vacía.
+  urgente_contactar  boolean not null default false,
+  urgente_motivo     text check (char_length(urgente_motivo) <= 1000),
+
   -- Quién trajo a esta persona. Se elige de entre la gente ya registrada, así que apunta a
   -- personas y no a usuarios.
   promotor_id        uuid references personas(id),
@@ -191,7 +196,8 @@ create table personas (
   -- es la llave con la que el brigadista alcanza o no alcanza a la persona.
   actividad_origen   uuid,                      -- fk agregada abajo, actividades nace después
   created_at         timestamptz not null default now(),
-  constraint personas_promotor_distinto_check check (promotor_id is null or promotor_id <> id)
+  constraint personas_promotor_distinto_check check (promotor_id is null or promotor_id <> id),
+  constraint personas_urgente_con_motivo_check check (not urgente_contactar or urgente_motivo is not null)
 );
 
 -- Deduplicación: el teléfono normalizado es la llave. Normalizar es quedarse con los
@@ -395,6 +401,7 @@ create index personas_importacion_idx      on personas (importacion_id) where im
 create index personas_representante_idx    on personas (quiere_ser_representante)
   where quiere_ser_representante;
 create index personas_barda_lona_idx       on personas (quiere_barda_lona) where quiere_barda_lona;
+create index personas_urgente_idx          on personas (urgente_contactar) where urgente_contactar;
 -- Estos dos los pide RLS, no el tablero: las políticas del brigadista filtran por ahí.
 create index personas_registrada_por_idx   on personas (registrada_por);
 create index personas_actividad_origen_idx on personas (actividad_origen)
@@ -670,8 +677,8 @@ from seguimientos sg
 left join usuarios ur on ur.id = sg.responsable_id;
 
 -- La bandeja de seguimiento no es una tabla, es una consulta: personas con quiere_participar,
--- quiere_info o quiere_barda_lona cuyo último seguimiento esté pendiente o no exista.
--- `quiere_barda_lona` va al final de la lista de columnas: `create or replace view` solo deja
+-- quiere_info, quiere_barda_lona o urgente_contactar cuyo último seguimiento esté pendiente o no
+-- exista. Las columnas nuevas van al final de la lista: `create or replace view` solo deja
 -- agregar columnas al final, y así el cambio se aplica sin tirar la vista.
 create view v_bandeja_seguimiento with (security_invoker = true) as
 select
@@ -682,13 +689,15 @@ select
   ult.tipo   as ultimo_seguimiento_tipo,
   exists (select 1 from solicitudes so
           where so.persona_id = p.id and so.requiere_seguimiento) as tiene_solicitud,
-  p.quiere_barda_lona
+  p.quiere_barda_lona,
+  p.urgente_contactar,
+  p.urgente_motivo
 from personas p
 left join lateral (
   select s.fecha, s.estado, s.tipo from seguimientos s
   where s.persona_id = p.id order by s.fecha desc, s.created_at desc limit 1
 ) ult on true
-where (p.quiere_participar or p.quiere_info or p.quiere_barda_lona
+where (p.quiere_participar or p.quiere_info or p.quiere_barda_lona or p.urgente_contactar
        or exists (select 1 from solicitudes so
                   where so.persona_id = p.id and so.requiere_seguimiento))
   and (ult.estado is null or ult.estado = 'pendiente');

@@ -33,6 +33,7 @@ const TIPOS: TipoSeguimiento[] = ["llamada", "whatsapp", "invitacion", "reunion"
 const ESTADOS: EstadoSeguimiento[] = ["pendiente"];
 
 const ETIQUETA_MOTIVO: Record<MotivoBandeja, string> = {
+  urgente: "Urgente",
   participa: "Quiere participar",
   info: "Quiere información",
   barda: "Barda o lona",

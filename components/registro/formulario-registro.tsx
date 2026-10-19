@@ -119,6 +119,8 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const [esPromovido, setEsPromovido] = useState(false);
   const [quiereSerRepresentante, setQuiereSerRepresentante] = useState(false);
   const [quiereBardaLona, setQuiereBardaLona] = useState(false);
+  const [urgente, setUrgente] = useState(false);
+  const [motivoUrgente, setMotivoUrgente] = useState("");
   const [elegidas, setElegidas] = useState<number[]>([]);
   const [comentario, setComentario] = useState("");
   const [consiente, setConsiente] = useState(false);
@@ -408,6 +410,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   }
 
   const requierePeticion = !pidioAlgo || descripcionSolicitud.trim().length > 0;
+  const requiereMotivoUrgente = !urgente || motivoUrgente.trim().length > 0;
   const requierePromotor = !llegoPorPromotor || !!promotor;
 
   // El apellido no se exige: "solo mi nombre y mi WhatsApp" es el escalón entre no dar nada y
@@ -422,6 +425,8 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
       consiente &&
       (!!ubicacion || agregaAExistente) &&
       requierePeticion &&
+      // A una ficha existente no se le escribe la marca (ver el interruptor), así que no se exige.
+      (agregaAExistente || requiereMotivoUrgente) &&
       requierePromotor;
 
   /** Del contacto sin datos a la captura normal, sin perder lo que ya se anotó. */
@@ -502,6 +507,8 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         es_promovido: esPromovido,
         quiere_ser_representante: quiereSerRepresentante,
         quiere_barda_lona: quiereBardaLona,
+        urgente_contactar: urgente,
+        urgente_motivo: urgente ? motivoUrgente.trim() : null,
         aviso_version: AVISO_VERSION,
         consentimiento_en: new Date().toISOString(),
         registrada_por: actuante.id,
@@ -593,6 +600,8 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     setEsPromovido(false);
     setQuiereSerRepresentante(false);
     setQuiereBardaLona(false);
+    setUrgente(false);
+    setMotivoUrgente("");
     setElegidas([]);
     setComentario("");
     setConsiente(false);
@@ -1075,6 +1084,35 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
                   valor={quiereBardaLona}
                   alCambiar={setQuiereBardaLona}
                 />
+                {/* Igual que los demás intereses, solo se guarda en una ficha nueva: a una
+                    existente solo se le agrega la participación. Ahí, lo urgente va en "¿Pidió
+                    algo en particular?", que sí llega a Seguimiento. */}
+                {!agregaAExistente && (
+                  <>
+                    <Interruptor
+                      etiqueta="Urgente contactar"
+                      valor={urgente}
+                      alCambiar={(v) => {
+                        setUrgente(v);
+                        if (!v) setMotivoUrgente("");
+                      }}
+                    />
+                    {urgente && (
+                      <div className="pb-2">
+                        <Campo etiqueta="Por qué es urgente">
+                          <textarea
+                            value={motivoUrgente}
+                            onChange={(e) => setMotivoUrgente(e.target.value)}
+                            rows={2}
+                            maxLength={1000}
+                            required
+                            className="campo min-h-16 resize-y py-2"
+                          />
+                        </Campo>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </Caja>
           </>

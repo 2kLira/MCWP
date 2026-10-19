@@ -104,6 +104,8 @@ function HojaEditarPersona({
     p.quiere_ser_representante,
   );
   const [quiereBardaLona, setQuiereBardaLona] = useState(p.quiere_barda_lona);
+  const [urgente, setUrgente] = useState(p.urgente_contactar);
+  const [motivoUrgente, setMotivoUrgente] = useState(p.urgente_motivo ?? "");
 
   const [catalogoColonias, setCatalogoColonias] = useState<ColoniaCatalogo[]>([]);
   const [guardando, setGuardando] = useState(false);
@@ -166,6 +168,7 @@ function HojaEditarPersona({
   const listo =
     nombres.trim().length > 1 &&
     !motivoTelefono &&
+    (!urgente || motivoUrgente.trim().length > 0) &&
     (!seccionCambiada || catalogoSecciones.length > 0);
 
   async function guardar(evento: React.FormEvent) {
@@ -198,6 +201,8 @@ function HojaEditarPersona({
       quiere_info: quiereInfo,
       quiere_ser_representante: quiereSerRepresentante,
       quiere_barda_lona: quiereBardaLona,
+      urgente_contactar: urgente,
+      urgente_motivo: urgente ? motivoUrgente.trim() : null,
     });
 
     setGuardando(false);
@@ -369,6 +374,22 @@ function HojaEditarPersona({
             valor={quiereBardaLona}
             alCambiar={setQuiereBardaLona}
           />
+          {/* Apagarlo borra el motivo: la base no guarda un "urgente" que ya no lo es. */}
+          <Interruptor etiqueta="Urgente contactar" valor={urgente} alCambiar={setUrgente} />
+          {urgente && (
+            <div className="pb-2">
+              <Campo etiqueta="Por qué es urgente">
+                <textarea
+                  value={motivoUrgente}
+                  onChange={(e) => setMotivoUrgente(e.target.value)}
+                  rows={2}
+                  maxLength={1000}
+                  required
+                  className="campo min-h-16 resize-y py-2"
+                />
+              </Campo>
+            </div>
+          )}
         </div>
 
         <button

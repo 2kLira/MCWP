@@ -70,6 +70,8 @@ function hojaPersonasFiltradas(personas: PersonaExportable[], soloPromovidos: bo
       { titulo: "Promovido", ancho: 10 },
       { titulo: "Promovido desde", formato: "fecha", ancho: 12 },
       { titulo: "Quiere ser representante", ancho: 10 },
+      { titulo: "Urgente contactar", ancho: 10 },
+      { titulo: "Por qué es urgente", ancho: 40 },
     ],
     filas: ordenadas.map((p) => [
       p.apellido_paterno ? p.nombres : p.nombre,
@@ -86,6 +88,8 @@ function hojaPersonasFiltradas(personas: PersonaExportable[], soloPromovidos: bo
       p.es_promovido,
       p.promovido_en ? new Date(p.promovido_en) : null,
       p.quiere_ser_representante,
+      p.urgente_contactar,
+      p.urgente_motivo,
     ]),
   };
 }
@@ -102,6 +106,7 @@ export default function Personas() {
   const [info, setInfo] = useState(false);
   const [promovido, setPromovido] = useState(false);
   const [representante, setRepresentante] = useState(false);
+  const [urgente, setUrgente] = useState(false);
   const [genero, setGenero] = useState<Genero | null>(null);
   const [rangoEdad, setRangoEdad] = useState<RangoEdadFiltro | null>(null);
 
@@ -136,6 +141,7 @@ export default function Personas() {
       quiereInfo: info || undefined,
       promovido: promovido || undefined,
       representante: representante || undefined,
+      urgente: urgente || undefined,
       genero,
       rangoEdad,
     }),
@@ -147,6 +153,7 @@ export default function Personas() {
       info,
       promovido,
       representante,
+      urgente,
       genero,
       rangoEdad,
     ],
@@ -304,6 +311,7 @@ export default function Personas() {
             activo={representante}
             alCambiar={setRepresentante}
           />
+          <Filtro etiqueta="Urgente contactar" activo={urgente} alCambiar={setUrgente} />
         </div>
       </div>
 
@@ -352,6 +360,7 @@ export default function Personas() {
                 const edad = etiquetaEdad(persona.fecha_nacimiento);
                 const estatus = (
                   <>
+                    {persona.urgente_contactar && <Estado vivo>Urgente</Estado>}
                     {persona.es_promovido && <Estado vivo>Promovido</Estado>}
                     {persona.quiere_participar && <Estado>Participa</Estado>}
                     {persona.quiere_info && <Estado>Info</Estado>}

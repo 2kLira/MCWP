@@ -61,6 +61,11 @@ export function RenglonBandeja({
             esperando una respuesta concreta, no solo información. El naranja de esta lista se
             reserva para "Sin atender", así que aquí el peso lo da la tinta. */}
         <p className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5 text-sm text-tinta-suave">
+          {fila.urgente_contactar && (
+            <span className="font-medium text-alerta" title={fila.urgente_motivo ?? undefined}>
+              Urgente
+            </span>
+          )}
           {fila.tiene_solicitud && <span className="font-medium text-tinta">Petición</span>}
           {fila.quiere_participar && <span>Quiere participar</span>}
           {fila.quiere_info && <span>Quiere información</span>}
