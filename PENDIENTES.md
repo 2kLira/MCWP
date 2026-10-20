@@ -1039,3 +1039,16 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
     elige agregar la participación, el interruptor no aparece: a esa persona no se le escribe la
     ficha (el brigadista no puede editarla). Lo urgente de alguien ya registrado va por
     "¿Pidió algo en particular?", que sí llega a Seguimiento. **Falta decidir** si eso basta.
+- **"Cómo vamos" en el tablero (20 de octubre de 2026).** Pedido del cliente: gráficas que le
+  sirvan al administrador para dar seguimiento, hechas con lo que ya se captura. Debajo del mapa,
+  siete tarjetas de vidrio con una cifra y una micrográfica (`components/tablero/como-vamos.tsx`,
+  `micrograficas.tsx`, datos en `lib/datos/indicadores.ts`): ritmo de captura de 14 días,
+  compromiso (información, participar, promovidos, representantes sobre alcanzadas),
+  seguimiento pendiente por días de espera con urgentes, lo que más piden, equipo esta semana
+  (solo admin), secciones prioritarias recorridas y casillas con titular y suplente.
+  · Todo se cuenta en la base; RLS recorta al territorio de quien mira.
+  · **No se dibuja contra la meta de votos** porque `secciones.meta_votos` está vacía. Cuando se
+    cargue, "Compromiso" puede medir promovidos contra meta en vez de contra alcanzadas.
+  · Una sola serie naranja por gráfica y el resto en `--grafica-contexto` (token nuevo),
+    validado con el validador de dataviz. El naranja no llega a 3 a 1 contra la tarjeta clara:
+    por eso toda barra naranja lleva su número escrito.

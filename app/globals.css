@@ -50,6 +50,12 @@
   /* Una sola señal de alerta. */
   --alerta: #c0362c;
 
+  /* Micrográficas del tablero: una sola serie naranja (--naranja) y el resto en este neutro de
+     contexto. Validado con el validador de dataviz contra la tarjeta: el neutro da 3.0 a 1 y se
+     separa del naranja con ΔE 13 en protanopía. El naranja de relleno no llega a 3 a 1 contra la
+     tarjeta clara, así que toda barra naranja lleva su número escrito al lado. */
+  --grafica-contexto: #8f867e;
+
   /* Escala del mapa: cinco pasos del neutro al naranja pleno. */
   --mapa-0: #efedea;
   --mapa-1: #ffe0bf;
@@ -133,6 +139,7 @@
   --tinta-tenue: #6e6b66;
 
   --alerta: #ff6b5e;
+  --grafica-contexto: #8a847d;
 
   --vidrio-fondo: oklch(0.24 0.012 60 / 0.62);
   --vidrio-fondo-denso: oklch(0.24 0.012 60 / 0.88);
@@ -177,6 +184,7 @@
     --tinta-tenue: #6e6b66;
 
     --alerta: #ff6b5e;
+    --grafica-contexto: #8a847d;
 
     --vidrio-fondo: oklch(0.24 0.012 60 / 0.62);
     --vidrio-fondo-denso: oklch(0.24 0.012 60 / 0.88);
@@ -303,6 +311,7 @@
   --color-naranja-suave: var(--naranja-suave);
   --color-naranja-suave-fuerte: var(--naranja-suave-fuerte);
   --color-alerta: var(--alerta);
+  --color-grafica-contexto: var(--grafica-contexto);
   --color-mapa-0: var(--mapa-0);
   --color-mapa-1: var(--mapa-1);
   --color-mapa-2: var(--mapa-2);

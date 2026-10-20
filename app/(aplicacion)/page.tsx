@@ -17,6 +17,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { BarraAvance } from "@/components/sistema/barra-avance";
 import { Caja } from "@/components/sistema/caja";
+import { ComoVamos } from "@/components/tablero/como-vamos";
 import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
 import { TarjetaCifra } from "@/components/sistema/tarjeta-cifra";
 import { useActuante } from "@/components/proveedor-actuante";
@@ -322,6 +323,9 @@ function TableroCompleto() {
           </div>
         </div>
       </div>
+
+      {/* Debajo de la primera pantalla: el mapa dice dónde, esto dice cómo va el trabajo. */}
+      <ComoVamos resumen={r} cargandoResumen={cargando} />
 
       {/* Zona de apoyo, no protagonista: por eso va al final y desaparece por completo si hoy
           no cumple nadie, en vez de dejar una tarjeta vacía ocupando lugar. */}
