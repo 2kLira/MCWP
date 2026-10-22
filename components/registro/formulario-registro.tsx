@@ -837,7 +837,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
                 <SelectorGenero valor={genero} alCambiar={setGenero} />
               </div>
 
-              <Campo etiqueta="Fecha de nacimiento">
+              <Campo etiqueta="Fecha de nacimiento" apoyo="Opcional.">
                 <input
                   type="date"
                   value={fechaNacimiento}

@@ -276,7 +276,7 @@ function HojaEditarPersona({
         </div>
 
         <div className="grid gap-3.5 sm:grid-cols-2">
-          <Campo etiqueta="Fecha de nacimiento">
+          <Campo etiqueta="Fecha de nacimiento" apoyo="Opcional.">
             <input
               type="date"
               value={fechaNacimiento}
