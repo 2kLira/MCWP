@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
-import { Download } from "lucide-react";
+import { CalendarDays, Download } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -68,6 +69,13 @@ export default function Reportes() {
   return (
     <div className="flex flex-col gap-5">
       <EncabezadoPagina titulo="Reportes" apoyo="Calculados en vivo sobre lo capturado." />
+
+      <div>
+        <Link href={"/reportes/diario" as never} className="boton-primario">
+          <CalendarDays className="size-4" aria-hidden />
+          Reporte del día
+        </Link>
+      </div>
 
       {/* Semanal y menciones lado a lado en escritorio; los dos de demarcación a todo el ancho.
           El min-w-0 deja que las gráficas se encojan dentro de la rejilla. */}

@@ -1052,3 +1052,24 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
   · Una sola serie naranja por gráfica y el resto en `--grafica-contexto` (token nuevo),
     validado con el validador de dataviz. El naranja no llega a 3 a 1 contra la tarjeta clara:
     por eso toda barra naranja lleva su número escrito.
+
+- **Reporte del día (22 de octubre de 2026).** Pedido del cliente. Pantalla `/reportes/diario`,
+  con acceso desde Reportes y el mismo portón (`puedeVerListadosGenerales`). Se elige una fecha y
+  muestra actividades y recorridos, secciones, personas alcanzadas por categoría, quién capturó,
+  problemáticas y urgentes; se descarga en Excel con una hoja por corte. Decisiones propias:
+  · "Alcanzada ese día" = registrada ese día o con una participación anotada ese día; se cuenta
+    una vez. Las categorías (promovido, quiere información…) son las marcas que tiene hoy.
+  · Aparte se cuenta a quien se marcó como promovido ese día (`promovido_en`), aunque se
+    hubiera registrado antes.
+  · Entran las actividades con fecha de ese día y las que recibieron capturas ese día.
+  · El día se corta a medianoche de la hora del navegador.
+  · No se envía solo por correo o WhatsApp: haría falta un servicio de envío y un cron. Si el
+    cliente lo quiere, se decide aparte.
+  · (22 de octubre de 2026) **Librerías nuevas: `jspdf` 4.2.1 y `jspdf-autotable` 5.0.9**, fuera
+    de la pila del CLAUDE.md. El cliente pidió que el reporte del día sea un PDF fácil de
+    compartir. Se cargan solo en `/reportes/diario` (import dinámico en
+    `lib/pdf-reporte-diario.ts`). En el teléfono el botón abre el menú de compartir con el PDF
+    adjunto; en la computadora lo abre en otra pestaña.
+  · El PDF lleva cifras, secciones, actividades y nombres de quienes capturaron, pero **no**
+    nombres de personas alcanzadas ni la lista de urgentes: se reenvía por WhatsApp y ya no se
+    puede recoger. La lista con nombres queda en pantalla y en el Excel.
