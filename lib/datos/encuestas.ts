@@ -4,6 +4,7 @@
  * pasa por /api/encuestas/[codigo].
  */
 
+import type { PostgrestError } from "@supabase/supabase-js";
 import { esAdmin } from "@/lib/puertas-ui";
 import type { UsuarioActuante } from "@/lib/tipos";
 import type { OpcionPregunta, PreguntaEncuesta, TipoPregunta, ValorRespuesta } from "@/lib/encuestas";
@@ -133,17 +134,20 @@ export function respuestasDeEncuesta(
   if (!esAdmin(usuario)) {
     return Promise.resolve({ datos: [], sinEsquema: false, aviso: SOLO_ADMIN });
   }
-  return lista<RespuestaEncuesta>(
-    db()
-      .from("encuesta_respuestas")
-      .select(
-        "id, created_at, respuestas, seccion_clave, telefono_ya_registrado, " +
-          "persona:personas(id, nombre, telefono_norm)",
-      )
-      .eq("encuesta_id", id)
-      .order("created_at", { ascending: false })
-      .limit(TOPE_RESPUESTAS),
-  );
+  // Mismo caso que participacionesDeActividad: supabase-js tipa la relación a-uno como arreglo;
+  // en tiempo de ejecución llega un objeto.
+  const consulta = db()
+    .from("encuesta_respuestas")
+    .select(
+      "id, created_at, respuestas, seccion_clave, telefono_ya_registrado, persona:personas(id, nombre, telefono_norm)",
+    )
+    .eq("encuesta_id", id)
+    .order("created_at", { ascending: false })
+    .limit(TOPE_RESPUESTAS) as unknown as PromiseLike<{
+    data: RespuestaEncuesta[] | null;
+    error: PostgrestError | null;
+  }>;
+  return lista<RespuestaEncuesta>(consulta);
 }
 
 export async function guardarEncuesta(entrada: EntradaEncuesta): Promise<Resultado<string | null>> {

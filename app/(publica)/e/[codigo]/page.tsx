@@ -24,8 +24,7 @@ const leerEncuesta = cache(async (codigo: string): Promise<EncuestaPublica | nul
   const { data, error } = await supabase
     .from("encuestas")
     .select(
-      "codigo, titulo, descripcion, incluye_registro, mensaje_final, " +
-        "preguntas:encuesta_preguntas(id, orden, tipo, texto, obligatoria, opciones)",
+      "codigo, titulo, descripcion, incluye_registro, mensaje_final, preguntas:encuesta_preguntas(id, orden, tipo, texto, obligatoria, opciones)",
     )
     .eq("codigo", codigo)
     .eq("activa", true)
