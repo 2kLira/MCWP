@@ -1020,3 +1020,170 @@
 .maplibregl-ctrl-attrib a {
   color: var(--tinta-suave);
 }
+
+/* ===========================================================================
+   Encuesta pública (/e/[codigo]). Una pregunta a la vez: entra desde el lado hacia el que se
+   avanza, las opciones son tarjetas que se tocan y la selección es naranja suave con filo naranja.
+   La regla general de movimiento reducido de arriba ya deja todo esto quieto.
+   =========================================================================== */
+
+@keyframes paso-desde-derecha {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes paso-desde-izquierda {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sello-listo {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.paso-adelante {
+  animation: paso-desde-derecha 340ms var(--curva) both;
+}
+
+.paso-atras {
+  animation: paso-desde-izquierda 340ms var(--curva) both;
+}
+
+.sello-listo {
+  animation: sello-listo 520ms var(--curva) both;
+}
+
+.opcion-tarjeta {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 0.875rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--borde);
+  background: var(--tarjeta-fondo-solido);
+  box-shadow: var(--sombra-apoyo);
+  color: var(--tinta);
+  font-size: 1rem;
+  line-height: 1.35;
+  text-align: left;
+  transition:
+    transform var(--dur-ui) var(--curva),
+    background-color var(--dur-ui) var(--curva),
+    border-color var(--dur-ui) var(--curva),
+    box-shadow var(--dur-ui) var(--curva);
+}
+
+.opcion-tarjeta:active {
+  transform: scale(0.98);
+}
+
+.opcion-tarjeta[aria-pressed="true"],
+.opcion-tarjeta[aria-checked="true"] {
+  border-color: var(--naranja);
+  background: var(--naranja-suave);
+  box-shadow: inset 0 0 0 1px var(--naranja), var(--sombra-apoyo);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .opcion-tarjeta:hover:not([aria-pressed="true"]):not([aria-checked="true"]) {
+    border-color: color-mix(in oklab, var(--naranja) 45%, var(--borde));
+  }
+}
+
+/* La marca de la tarjeta: círculo para una opción, cuadro para varias. */
+.opcion-marca {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--tinta-tenue);
+  color: var(--sobre-naranja);
+  transition: background-color var(--dur-ui) var(--curva), border-color var(--dur-ui) var(--curva);
+}
+
+.opcion-marca[data-forma="cuadro"] {
+  border-radius: 7px;
+}
+
+[aria-pressed="true"] > .opcion-marca,
+[aria-checked="true"] > .opcion-marca {
+  border-color: var(--naranja);
+  background: var(--naranja);
+}
+
+/* Punto de la escala: cuadros grandes en fila, cinco caben en 390 px. */
+.punto-escala {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-height: 3.5rem;
+  border-radius: 14px;
+  border: 1px solid var(--borde);
+  background: var(--tarjeta-fondo-solido);
+  box-shadow: var(--sombra-apoyo);
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: transform var(--dur-ui) var(--curva), background-color var(--dur-ui) var(--curva);
+}
+
+.punto-escala:active {
+  transform: scale(0.95);
+}
+
+.punto-escala[aria-checked="true"] {
+  background: var(--naranja);
+  border-color: var(--naranja);
+  color: var(--sobre-naranja);
+}
+
+/* Barra de progreso de la encuesta: un riel hundido y el avance naranja que se desliza. */
+.progreso-encuesta {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--superficie-hundida);
+  overflow: hidden;
+}
+
+.progreso-encuesta > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--naranja);
+  transform-origin: left;
+  transition: transform 420ms var(--curva);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paso-adelante,
+  .paso-atras,
+  .sello-listo {
+    animation: none;
+  }
+}

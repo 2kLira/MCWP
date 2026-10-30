@@ -747,3 +747,83 @@ on conflict (nombre) do nothing;
 -- Retirada del formulario el 9 de octubre de 2026 a petición del cliente. Se desactiva y no se
 -- borra: hay menciones que la referencian y deben seguir contándose en reportes.
 update problematicas set activa = false where nombre = 'Servicios públicos';
+
+-- ---------------------------------------------------------------------------
+-- Encuestas con QR (30 de octubre de 2026)
+-- ---------------------------------------------------------------------------
+-- Reemplazan al Google Form. Las arma el administrador; se contestan sin cuenta en /e/<codigo>.
+-- Permisos en supabase/seguridad.sql, sección 14.
+
+create type tipo_pregunta as enum ('opcion_unica', 'opcion_multiple', 'escala', 'texto');
+
+create table encuestas (
+  id               uuid primary key default gen_random_uuid(),
+  -- Lo que va en la URL pública. Lo pone guardar_encuesta; no se elige ni se cambia.
+  codigo           text not null unique check (codigo ~ '^[a-z0-9]{10}$'),
+  titulo           text not null check (length(btrim(titulo)) between 1 and 120),
+  descripcion      text check (descripcion is null or length(descripcion) <= 600),
+  -- Si pide los datos de la persona antes de las preguntas, como un registro de brigadista.
+  incluye_registro boolean not null default false,
+  mensaje_final    text check (mensaje_final is null or length(mensaje_final) <= 600),
+  -- La baja es cerrar la encuesta, no borrarla: sus respuestas se quedan.
+  activa           boolean not null default true,
+  creada_por       uuid references usuarios(id),
+  created_at       timestamptz not null default now()
+);
+
+create table encuesta_preguntas (
+  id           uuid primary key default gen_random_uuid(),
+  encuesta_id  uuid not null references encuestas(id) on delete cascade,
+  orden        integer not null,
+  tipo         tipo_pregunta not null,
+  texto        text not null check (length(btrim(texto)) between 1 and 300),
+  obligatoria  boolean not null default true,
+  -- [{ "id": "a1", "texto": "Agua", "mensaje": "…" }]. `mensaje` es opcional: se le muestra al
+  -- final a quien eligió esa opción. Vacío en escala y texto.
+  opciones     jsonb not null default '[]'::jsonb check (jsonb_typeof(opciones) = 'array'),
+  unique (encuesta_id, orden)
+);
+
+create table encuesta_respuestas (
+  id                     uuid primary key default gen_random_uuid(),
+  encuesta_id            uuid not null references encuestas(id),
+  -- Solo en encuestas con registro. Si el teléfono ya existía, apunta a esa persona pero su ficha
+  -- no se tocó: `telefono_ya_registrado` lo dice, porque nadie verificó que fuera ella.
+  persona_id             uuid references personas(id) on delete set null,
+  telefono_ya_registrado boolean not null default false,
+  -- { "<pregunta_id>": "a1" | ["a1","a3"] | 4 | "texto libre" }. Lo limpia responder_encuesta.
+  respuestas             jsonb not null check (jsonb_typeof(respuestas) = 'object'),
+  seccion_clave          text references secciones(clave),
+  created_at             timestamptz not null default now()
+);
+
+create index encuesta_preguntas_encuesta_idx on encuesta_preguntas (encuesta_id, orden);
+create index encuesta_respuestas_encuesta_idx on encuesta_respuestas (encuesta_id, created_at desc);
+create index encuesta_respuestas_persona_idx on encuesta_respuestas (persona_id);
+
+-- Cuántas respuestas trae cada encuesta. Con left join, para que una recién creada salga en cero.
+create view v_encuesta_resumen with (security_invoker = true) as
+select e.id as encuesta_id,
+  count(r.id)::int as respuestas,
+  (count(r.id) filter (where r.persona_id is not null))::int as con_datos,
+  (count(r.id) filter (where r.persona_id is not null and not r.telefono_ya_registrado))::int
+    as personas_nuevas,
+  max(r.created_at) as ultima_respuesta
+from encuestas e
+left join encuesta_respuestas r on r.encuesta_id = e.id
+group by e.id;
+
+-- Conteo por opción de cada pregunta cerrada. Las opciones que nadie eligió no salen: la pantalla
+-- las completa en cero con la lista de opciones de la pregunta, que ya tiene.
+create view v_encuesta_conteos with (security_invoker = true) as
+select p.encuesta_id, p.id as pregunta_id, v.valor, count(*)::int as total
+from encuesta_respuestas r
+join encuesta_preguntas p on p.encuesta_id = r.encuesta_id and p.tipo <> 'texto'
+cross join lateral (
+  select jsonb_array_elements_text(r.respuestas -> (p.id::text)) as valor
+   where jsonb_typeof(r.respuestas -> (p.id::text)) = 'array'
+  union all
+  select r.respuestas ->> (p.id::text)
+   where jsonb_typeof(r.respuestas -> (p.id::text)) in ('string', 'number')
+) v
+group by p.encuesta_id, p.id, v.valor;

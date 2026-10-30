@@ -10,6 +10,7 @@ import {
   ListChecks,
   Map,
   MapPinPlus,
+  QrCode,
   Upload,
   UserCog,
   UserPlus,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 import {
+  puedeAdministrarEncuestas,
   puedeCrear,
   puedeEncabezarActividad,
   puedeExportar,
@@ -76,6 +78,12 @@ export const DESTINOS: readonly Destino[] = [
     etiqueta: "Reportes",
     icono: ChartColumn,
     visible: puedeVerListadosGenerales,
+  },
+  {
+    href: "/encuestas",
+    etiqueta: "Encuestas",
+    icono: QrCode,
+    visible: puedeAdministrarEncuestas,
   },
   {
     href: "/registrar",

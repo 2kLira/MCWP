@@ -8,7 +8,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  *
  * Existe por una sola razón: `public.usuarios.id` referencia `auth.users(id)`, así que crear un
  * usuario son dos pasos y el primero —crear la cuenta de acceso— solo se puede hacer con la llave
- * secreta. Para todo lo demás se usa el cliente de la petición, que respeta las políticas.
+ * secreta. La segunda, desde el 30 de octubre de 2026: las encuestas con QR las contesta gente sin
+ * cuenta, y como anon no tiene acceso a nada, la página /e/[codigo] lee la encuesta y el handler
+ * /api/encuestas/[codigo] llama a `responder_encuesta` con esta llave. Para todo lo demás se usa
+ * el cliente de la petición, que respeta las políticas.
  *
  * Tres candados para que esta llave no llegue al navegador, porque uno solo no basta:
  *

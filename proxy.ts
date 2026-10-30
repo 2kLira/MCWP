@@ -81,7 +81,9 @@ export const proxy: NextProxy = async (peticion) => {
   const haySesion = Boolean(data?.claims);
 
   const ruta = peticion.nextUrl.pathname;
-  const esRutaPublica = ruta === "/entrar" || ruta === "/salir";
+  // /e/<codigo> es la encuesta que abre un QR: la contesta gente sin cuenta. Lo que sale de la
+  // base hacia esa página lo decide la página misma (app/(publica)/e/[codigo]/page.tsx).
+  const esRutaPublica = ruta === "/entrar" || ruta === "/salir" || ruta.startsWith("/e/");
 
   if (!haySesion && !esRutaPublica) {
     const destino = peticion.nextUrl.clone();

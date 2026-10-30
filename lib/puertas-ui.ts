@@ -173,6 +173,11 @@ export function puedeVerUsuarios(usuario: UsuarioActuante | null): boolean {
   return esAdmin(usuario);
 }
 
+/** Encuestas con QR. Espejo de las políticas de la sección 14 de seguridad.sql: solo admin. */
+export function puedeAdministrarEncuestas(usuario: UsuarioActuante | null): boolean {
+  return esAdmin(usuario);
+}
+
 /**
  * La carga masiva se restringe más que la captura de una persona. Un brigadista registra gente en
  * la calle de una en una, pero meter un archivo de miles de renglones cambia el padrón de golpe y

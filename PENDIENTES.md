@@ -1073,3 +1073,52 @@ mandó el cliente. El plan vigente es `PLAN-ELECTORAL.md`; `PLAN-ELECTORAL-v1.md
   · El PDF lleva cifras, secciones, actividades y nombres de quienes capturaron, pero **no**
     nombres de personas alcanzadas ni la lista de urgentes: se reenvía por WhatsApp y ya no se
     puede recoger. La lista con nombres queda en pantalla y en el Excel.
+
+## Encuestas con QR (30 de octubre de 2026)
+
+Reemplazan al Google Form. El administrador las arma en `/encuestas`, el sistema le da enlace y
+QR, y quien escanea contesta sin cuenta en `/e/<codigo>`, una pregunta a la vez. No estaban en el
+spec: lo pidió el cliente.
+
+74. **Primera entrada al sistema de gente sin cuenta.** No abre la sección 1 de `seguridad.sql`:
+    anon sigue sin acceso a nada. La página pública lee la encuesta en el servidor con la llave
+    secreta (solo título, descripción y preguntas de una encuesta abierta), y las respuestas entran
+    por `/api/encuestas/[codigo]`, que llama a `responder_encuesta` con la misma llave. Esa función
+    solo la puede ejecutar service_role y es la que valida todo. Es la segunda razón de existir de
+    `lib/supabase-administrador.ts`.
+
+75. **Sin límite por IP.** El handler descarta bots con un campo trampa y con un mínimo de tres
+    segundos de página abierta, pero alguien con un script puede llenar la base de respuestas o de
+    personas inventadas. **Falta**: una regla de límite de tasa en el firewall de Vercel sobre
+    `/api/encuestas/*` (por ejemplo, 10 por minuto por IP). No requiere código.
+
+76. **Un teléfono que ya existe no se sobrescribe.** Cualquiera puede escribir el número de otra
+    persona en un QR. Si el teléfono ya está en el padrón, la respuesta se cuelga de esa persona
+    marcada con `telefono_ya_registrado` y su ficha queda intacta; la pantalla de resultados lo
+    cuenta aparte. Misma regla que la entrada 23.
+
+77. **Las personas que llegan por QR no tienen capturista ni actividad.** `registrada_por` y
+    `actividad_origen` quedan en null, así que con las políticas de hoy solo las ve el
+    administrador. Su sección sale del GPS solo si la persona compartió su ubicación (y se le pide
+    solo si está en su casa); si no, queda sin sección. La colonia se guarda como referencia, no
+    se usa para deducir sección. **Falta decidir** si los responsables deben verlas.
+
+78. **El aviso de privacidad del QR es el mismo provisional del registro** (`provisional-1`). Esta
+    pantalla la ve el público directamente, sin un brigadista que explique, así que **es la que más
+    urge** cerrar con la revisión legal pendiente antes de imprimir el primer QR.
+
+79. **El QR se genera con código propio, sin librería.** `npm install qrcode` no se pudo correr en
+    el entorno de desarrollo y la pila no trae ninguna, así que se escribió `lib/qr.ts` (modo byte,
+    nivel M, versiones 1 a 10). Se verificó decodificando con el lector de macOS enlaces de 4 a
+    200 caracteres, con acentos. El QR apunta al origen desde el que se genera: para imprimir, hay
+    que bajarlo desde producción, no desde una vista previa.
+
+80. **Una encuesta con respuestas ya no cambia sus preguntas.** Las respuestas guardan los ids de
+    pregunta y de opción; editar las preguntas haría mentir a las gráficas. Se pueden cambiar
+    título, descripción, mensaje final y abrir o cerrar. Para preguntar otra cosa, encuesta nueva.
+    No se borran encuestas: se cierran.
+
+81. **El cierre es un mensaje general más uno por opción elegida.** Cada opción puede llevar un
+    mensaje que se le muestra al final a quien la eligió. No hay lógica de saltos entre preguntas
+    ni resultados calculados; si el cliente pide "según lo que contestó, ve a la pregunta X", es
+    otra fase.
