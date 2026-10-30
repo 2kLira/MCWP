@@ -118,6 +118,7 @@ export function EditorEncuesta({ inicial }: { inicial?: EncuestaCompleta }) {
       descripcion,
       incluye_registro: incluyeRegistro,
       mensaje_final: mensajeFinal,
+      congelada,
       preguntas: preguntas.map((p) => ({
         tipo: p.tipo,
         texto: p.texto,

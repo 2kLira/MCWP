@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 const GRUPOS = [
   ["/", "/mapa"],
   ["/personas", "/actividades", "/agenda"],
-  ["/territorio", "/seguimiento", "/reportes"],
+  ["/territorio", "/seguimiento", "/reportes", "/encuestas"],
   ["/registrar-representante", "/importar", "/exportar"],
   ["/usuarios"],
 ];

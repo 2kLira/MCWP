@@ -1526,6 +1526,12 @@ begin
     returning id into v_id;
   else
     v_con_resp := exists (select 1 from public.encuesta_respuestas where encuesta_id = v_id);
+    -- Si llegó la primera respuesta mientras el editor estaba abierto, las preguntas que manda ya
+    -- no se van a guardar. Se rechaza en lugar de contestar que sí y tirarlas sin avisar. Sin la
+    -- llave (un editor anterior a este cambio) se conserva el trato viejo.
+    if v_con_resp and (p ->> 'congelada')::boolean is false then
+      raise exception 'Esta encuesta recibió respuestas mientras la editabas, así que sus preguntas ya no se pueden cambiar. Recarga la página para ver cómo quedó.';
+    end if;
     update public.encuestas set
       titulo        = v_titulo,
       descripcion   = nullif(btrim(p ->> 'descripcion'), ''),
@@ -1706,10 +1712,12 @@ begin
     on conflict (telefono_norm) do nothing
     returning id, seccion_clave into v_persona, v_seccion;
 
+    -- La sección de la respuesta es la de quien contestó, no la de la ficha que ya tenía ese
+    -- teléfono: nadie verificó que fueran la misma persona. Sale de su punto, si lo compartió.
     if v_persona is null then
-      select id, seccion_clave into v_persona, v_seccion
-        from public.personas where telefono_norm = v_tel;
+      select id into v_persona from public.personas where telefono_norm = v_tel;
       v_existente := true;
+      v_seccion := case when v_lat is not null then public.seccion_por_punto(v_lng, v_lat) end;
     end if;
   end if;
 

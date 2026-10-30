@@ -49,6 +49,8 @@ export type EntradaEncuesta = {
   descripcion: string;
   incluye_registro: boolean;
   mensaje_final: string;
+  /** El editor ya sabía que había respuestas. Si no lo sabía y las hay, la base rechaza. */
+  congelada: boolean;
   preguntas: {
     tipo: TipoPregunta;
     texto: string;
