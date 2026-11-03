@@ -205,6 +205,16 @@ const nextConfig: NextConfig = {
         source: "/:ruta*",
         headers: cabecerasDeSeguridad,
       },
+      {
+        // El trabajador de servicio no se cachea en ningún lado: el navegador lo compara byte por
+        // byte para saber si hay versión nueva, y una copia vieja en un CDN dejaría a los
+        // teléfonos con la lógica de caché anterior indefinidamente.
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
     ];
   },
 };

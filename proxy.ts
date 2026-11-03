@@ -134,8 +134,11 @@ export const config = {
    *   sección por GPS**, que es el corazón del sistema.
    * - `api/`: los handlers privilegiados hacen su propia comprobación de admin, más estricta
    *   que ésta, y un fetch que espera JSON no debe recibir una redirección HTML.
+   * - `sw.js` y `manifest.webmanifest`: el navegador los pide por su cuenta, a veces sin cookies.
+   *   Redirigido, el trabajador de servicio no se registra —y con él se cae la captura sin señal—
+   *   y el teléfono no ofrece instalar la app. No llevan datos.
    */
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|api/|datos/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|json|geojson|txt|xml|woff|woff2)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|sw\\.js|manifest\\.webmanifest|api/|datos/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|json|geojson|txt|xml|woff|woff2)$).*)",
   ],
 };

@@ -27,6 +27,10 @@ export const metadata: Metadata = {
   title: "Estructura territorial · Oaxaca de Juárez",
   description:
     "Sistema de operación y estructura territorial del municipio de Oaxaca de Juárez.",
+  // El manifiesto (app/manifest.ts) lo enlaza Next solo. iPhone no lee sus iconos ni su modo de
+  // pantalla: necesita los suyos.
+  icons: { apple: "/iconos/180.png" },
+  appleWebApp: { capable: true, title: "Territorial", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

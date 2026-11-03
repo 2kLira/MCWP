@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Check,
   Handshake,
@@ -32,17 +33,16 @@ import {
   type SeccionCatalogo,
 } from "@/lib/territorio";
 import {
-  crearPersona,
-  crearSolicitud,
   buscarPorTelefono,
   telefonoYaRegistrado,
   coincidenciasPorNombre,
   type Persona,
   type PersonaEnLista,
 } from "@/lib/datos/personas";
-import { obtenerActividad, registrarParticipacion } from "@/lib/datos/actividades";
-import { crearContactoAnonimo } from "@/lib/datos/contactos-anonimos";
-import { crearSeguimiento } from "@/lib/datos/seguimientos";
+import { obtenerActividad } from "@/lib/datos/actividades";
+import type { Captura } from "@/lib/datos/capturas";
+import { guardarCaptura } from "@/lib/sin-conexion/cola";
+import { conRespaldo } from "@/lib/sin-conexion/respaldo";
 import { ElegirActividad } from "@/components/registro/elegir-actividad";
 import { esAdmin, MOSTRAR_CONTACTOS_SIN_DATOS } from "@/lib/puertas-ui";
 import { problematicas, type Problematica } from "@/lib/datos/catalogos";
@@ -94,7 +94,21 @@ type Estado = "capturando" | "guardando" | "guardada";
 /** Una opción del selector de sección. `conGeometria` falso = el mapa no la puede mostrar. */
 export type OpcionSeccion = { clave: string; demarcacion: string; conGeometria: boolean };
 
-export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
+/**
+ * La actividad sale de la URL **en el navegador**, no de la página del servidor. Así /registrar es
+ * la misma cáscara para todas las actividades y el trabajador de servicio (public/sw.js) la puede
+ * guardar una sola vez: si la actividad viniera horneada en el HTML, la página guardada de una
+ * actividad abriría el formulario de otra sin señal y la captura quedaría ligada a la equivocada.
+ *
+ * La `key` rehace el formulario completo al cambiar de actividad, que es lo que el efecto de
+ * montaje da por hecho.
+ */
+export function FormularioRegistro() {
+  const actividadId = useSearchParams().get("actividad") ?? undefined;
+  return <Formulario key={actividadId ?? ""} actividadId={actividadId} />;
+}
+
+function Formulario({ actividadId }: { actividadId?: string }) {
   const { actuante } = useActuante();
 
   /**
@@ -139,6 +153,8 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
   const [busquedaPromotor, setBusquedaPromotor] = useState<{
     consulta: string;
     resultados: PersonaEnLista[];
+    /** La búsqueda no llegó a la base, casi siempre por falta de señal. */
+    fallo: boolean;
   } | null>(null);
 
   const [ubicacion, setUbicacion] = useState<Ubicacion | null>(null);
@@ -175,8 +191,12 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
    * RPC avisa del duplicado sin exponer datos de personas ajenas a su actividad.
    */
   const [duplicadoSinFicha, setDuplicadoSinFicha] = useState(false);
+  /** Sin señal no se puede preguntar si el teléfono existe. Se pregunta al enviar. */
+  const [telefonoSinRevisar, setTelefonoSinRevisar] = useState(false);
 
   const [estado, setEstado] = useState<Estado>("capturando");
+  /** La última captura se quedó en el teléfono esperando señal, en lugar de llegar a la base. */
+  const [enTelefono, setEnTelefono] = useState(false);
   // Lo que no se pudo guardar después de que la persona sí quedó: la participación (y con ella el
   // comentario y las problemáticas) o la petición. Antes esos fallos se tiraban y se perdían sin
   // que nadie se enterara.
@@ -195,11 +215,12 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     });
 
     // Si la actividad no tiene sección, el GPS no sirve (ver eventoSinSeccion). Si no se alcanza a
-    // leer la actividad, se sigue como siempre, con GPS.
+    // leer la actividad, se sigue como siempre, con GPS. Sin señal se usa la última lectura, que
+    // también deja ElegirActividad al listar.
     const sinSeccion: Promise<boolean> = actividadId
-      ? obtenerActividad(actuante, actividadId).then(
-          (r) => r.datos != null && !r.datos.seccion_clave,
-        )
+      ? conRespaldo(`actividad:${actividadId}`, () =>
+          obtenerActividad(actuante, actividadId),
+        ).then((r) => r.datos != null && !r.datos.seccion_clave)
       : Promise.resolve(false);
 
     Promise.all([cargarSecciones(), sinSeccion])
@@ -252,7 +273,7 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         }
       });
 
-    problematicas().then((r) => vigente && setCatalogo(r.datos));
+    conRespaldo("problematicas", problematicas).then((r) => vigente && setCatalogo(r.datos));
 
     return () => {
       vigente = false;
@@ -286,7 +307,13 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     let vigente = true;
     const temporizador = setTimeout(() => {
       coincidenciasPorNombre(consultaPromotor, null).then((r) => {
-        if (vigente) setBusquedaPromotor({ consulta: consultaPromotor, resultados: r.datos });
+        if (vigente) {
+          setBusquedaPromotor({
+            consulta: consultaPromotor,
+            resultados: r.datos,
+            fallo: r.aviso !== null,
+          });
+        }
       });
     }, 250);
     return () => {
@@ -302,12 +329,16 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
       if (!norm || norm.length < 10) {
         setDuplicada(null);
         setDuplicadoSinFicha(false);
+        setTelefonoSinRevisar(false);
         return;
       }
 
       // El sí o no se pregunta SIEMPRE, por RPC. Es lo único que funciona para un brigadista:
       // buscarPorTelefono le devolvería null por RLS y perdería el aviso en silencio.
       const existe = await telefonoYaRegistrado(norm);
+      // Si la pregunta no llegó, no se sabe: no se afirma que sea nuevo. Al enviar se resuelve
+      // solo (lib/datos/capturas.ts), con la misma regla que aquí.
+      setTelefonoSinRevisar(existe.aviso !== null);
       if (!existe.datos) {
         setDuplicada(null);
         setDuplicadoSinFicha(false);
@@ -436,26 +467,86 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     requestAnimationFrame(() => nombreRef.current?.focus());
   }
 
-  async function guardarSinDatos(punto: Ubicacion) {
-    const r = await crearContactoAnonimo({
+  /**
+   * Lo que se va a enviar, con todos sus ids puestos aquí: así un reenvío desde la cola no puede
+   * duplicar nada (ver lib/datos/capturas.ts). Null si falta la ubicación, que `listo` ya exige.
+   */
+  function armarCaptura(): Captura | null {
+    const id = crypto.randomUUID();
+
+    if (sinDatos) {
+      if (!ubicacion) return null;
+      return {
+        tipo: "contacto",
+        id,
+        actividadId: actividadId ?? null,
+        seccionClave: ubicacion.clave,
+        coloniaId,
+        lat: ubicacion.lat,
+        lng: ubicacion.lng,
+        genero,
+        rangoEdad,
+        peticion: pidioAlgo ? descripcionSolicitud.trim() || null : null,
+        comentario: comentario.trim() || null,
+        problematicas: elegidas,
+      };
+    }
+
+    const hayDuplicado = !!duplicada || duplicadoSinFicha;
+    // Solo se puede agregar la participación a una ficha que de verdad se alcanzó a leer.
+    const agregarAExistente = !!duplicada && caminoDuplicado === "agregar";
+    if (!agregarAExistente && !ubicacion) return null;
+
+    return {
+      tipo: "persona",
+      id,
       actividadId: actividadId ?? null,
-      seccionClave: punto.clave,
-      coloniaId,
-      lat: punto.lat,
-      lng: punto.lng,
-      genero,
-      rangoEdad,
-      peticion: pidioAlgo ? descripcionSolicitud.trim() || null : null,
+      personaExistenteId: agregarAExistente ? (duplicada?.id ?? null) : null,
+      persona:
+        agregarAExistente || !ubicacion
+          ? null
+          : {
+              // La base vuelve a armar `nombre` con las tres partes; se manda igual porque la
+              // columna es obligatoria y así el renglón nunca depende de que el trigger exista.
+              nombre: [nombres, apellidoPaterno, apellidoMaterno]
+                .map((t) => t.trim())
+                .filter(Boolean)
+                .join(" "),
+              nombres: nombres.trim(),
+              apellido_paterno: apellidoPaterno.trim() || null,
+              apellido_materno: apellidoMaterno.trim() || null,
+              // Si es otra persona distinta, se guarda sin teléfono y queda marcada para revisión.
+              telefono_raw: hayDuplicado ? null : telefono.trim() || null,
+              calle: calle.trim() || null,
+              colonia_id: coloniaId,
+              seccion_clave: ubicacion.clave,
+              demarcacion_id: demarcacionId,
+              lat: ubicacion.lat,
+              lng: ubicacion.lng,
+              origen_ubicacion: ubicacion.origen,
+              genero,
+              fecha_nacimiento: fechaNacimiento || null,
+              quiere_participar: quiereParticipar,
+              quiere_info: quiereInfo,
+              es_promovido: esPromovido,
+              quiere_ser_representante: quiereSerRepresentante,
+              quiere_barda_lona: quiereBardaLona,
+              urgente_contactar: urgente,
+              urgente_motivo: urgente ? motivoUrgente.trim() : null,
+              aviso_version: AVISO_VERSION,
+              consentimiento_en: new Date().toISOString(),
+              registrada_por: actuante.id,
+              actividad_origen: actividadId ?? null,
+              promotor_id: llegoPorPromotor ? (promotor?.id ?? null) : null,
+            },
+      telefonoDuplicado: hayDuplicado,
+      esAdmin: esAdmin(actuante),
       comentario: comentario.trim() || null,
       problematicas: elegidas,
-    });
-    if (!r.datos) {
-      setEstado("capturando");
-      setError(r.aviso ?? "No se pudo guardar.");
-      return;
-    }
-    setFaltantes(r.datos.avisoMenciones ? [r.datos.avisoMenciones] : []);
-    setEstado("guardada");
+      peticion: pidioAlgo ? descripcionSolicitud.trim() || null : null,
+      solicitudId: crypto.randomUUID(),
+      seguimientoId: crypto.randomUUID(),
+    };
   }
 
   async function guardar(evento: React.FormEvent) {
@@ -464,118 +555,28 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     setEstado("guardando");
     setError(null);
 
-    if (sinDatos) {
-      if (ubicacion) await guardarSinDatos(ubicacion);
+    const captura = armarCaptura();
+    if (!captura) {
+      setEstado("capturando");
       return;
     }
 
-    const hayDuplicado = !!duplicada || duplicadoSinFicha;
-    // Solo se puede agregar la participación a una ficha que de verdad se alcanzó a leer.
-    const agregarAExistente = !!duplicada && caminoDuplicado === "agregar";
+    const nombreCompleto = [nombres, apellidoPaterno].map((t) => t.trim()).join(" ").trim();
+    const clave = ubicacion?.clave ?? duplicada?.seccion_clave ?? null;
+    const r = await guardarCaptura(actuante.id, captura, {
+      titulo: sinDatos ? "Contacto sin datos" : (duplicada?.nombre ?? nombreCompleto),
+      detalle: clave ? `Sección ${clave}` : "",
+    });
 
-    let personaId = duplicada?.id ?? null;
-
-    if (!agregarAExistente) {
-      // `listo` ya lo exige para una persona nueva; esto solo se lo dice a TypeScript.
-      if (!ubicacion) {
-        setEstado("capturando");
-        return;
-      }
-      const r = await crearPersona({
-        // La base vuelve a armar `nombre` con las tres partes; se manda igual porque la columna
-        // es obligatoria y así el renglón nunca depende de que el trigger exista.
-        nombre: [nombres, apellidoPaterno, apellidoMaterno]
-          .map((t) => t.trim())
-          .filter(Boolean)
-          .join(" "),
-        nombres: nombres.trim(),
-        apellido_paterno: apellidoPaterno.trim() || null,
-        apellido_materno: apellidoMaterno.trim() || null,
-        // Si es otra persona distinta, se guarda sin teléfono y queda marcada para revisión.
-        telefono_raw: hayDuplicado ? null : telefono.trim() || null,
-        calle: calle.trim() || null,
-        colonia_id: coloniaId,
-        seccion_clave: ubicacion.clave,
-        demarcacion_id: demarcacionId,
-        lat: ubicacion.lat,
-        lng: ubicacion.lng,
-        origen_ubicacion: ubicacion.origen,
-        genero,
-        fecha_nacimiento: fechaNacimiento || null,
-        quiere_participar: quiereParticipar,
-        quiere_info: quiereInfo,
-        es_promovido: esPromovido,
-        quiere_ser_representante: quiereSerRepresentante,
-        quiere_barda_lona: quiereBardaLona,
-        urgente_contactar: urgente,
-        urgente_motivo: urgente ? motivoUrgente.trim() : null,
-        aviso_version: AVISO_VERSION,
-        consentimiento_en: new Date().toISOString(),
-        registrada_por: actuante.id,
-        actividad_origen: actividadId ?? null,
-        promotor_id: llegoPorPromotor ? (promotor?.id ?? null) : null,
-      });
-      if (!r.datos) {
-        setEstado("capturando");
-        setError(r.aviso ?? "No se pudo guardar.");
-        return;
-      }
-      personaId = r.datos.id;
-
-      // La nota de "marcada para revisión" va a seguimientos, que es tabla de gabinete y solo el
-      // admin puede escribir. Para un brigadista esto rebotaría en silencio y la marca se
-      // perdería, así que no se intenta. Queda pendiente decidir si la política se ensancha.
-      if (hayDuplicado && esAdmin(actuante)) {
-        await crearSeguimiento({
-          personaId,
-          tipo: "otro",
-          nota:
-            "Capturada sin teléfono porque el número ya existía en otra ficha. Queda marcada para revisión.",
-          responsableId: actuante.id,
-          estado: "pendiente",
-        });
-      }
+    if (r.estado === "rechazada") {
+      setEstado("capturando");
+      setError(r.motivo);
+      return;
     }
-
-    const noGuardado: string[] = [];
-    let participacionId: string | null = null;
-    if (personaId && actividadId) {
-      const rp = await registrarParticipacion({
-        personaId,
-        actividadId,
-        tipo: agregarAExistente ? "asistencia" : "registro",
-        registradaPor: actuante.id,
-        // La nota va en la participación, que es lo que muestra la ficha de la persona. Se sigue
-        // copiando en cada problemática porque la hoja de Problemáticas de la exportación la lee
-        // de ahí.
-        comentario: comentario.trim() || null,
-        problematicas: elegidas.map((id) => ({
-          id,
-          comentario: comentario.trim() || null,
-        })),
-      });
-      participacionId = rp.datos?.id ?? null;
-      if (rp.aviso) noGuardado.push(rp.aviso);
-    }
-
-    // La petición particular cae en solicitudes con requiere_seguimiento en verdadero, para que
-    // la persona aparezca en la bandeja de seguimiento igual que quien quiere participar.
-    if (personaId && pidioAlgo && descripcionSolicitud.trim()) {
-      const rs = await crearSolicitud({
-        personaId,
-        participacionId,
-        tema: "Petición particular",
-        descripcion: descripcionSolicitud.trim(),
-        requiereSeguimiento: true,
-      });
-      if (!rs.datos) {
-        noGuardado.push(
-          `La petición no se guardó${rs.aviso ? `: ${rs.aviso}` : "."} Anótala y avísale al administrador.`,
-        );
-      }
-    }
-
-    setFaltantes(noGuardado);
+    // Sin señal o con la sesión vencida, la captura ya está a salvo en el teléfono y la cola la
+    // manda sola. Para quien captura es un éxito: puede seguir con la siguiente persona.
+    setEnTelefono(r.estado !== "enviada");
+    setFaltantes(r.estado === "enviada" ? r.avisos : []);
     setEstado("guardada");
   }
 
@@ -606,6 +607,9 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
     setComentario("");
     setConsiente(false);
     setDuplicada(null);
+    setDuplicadoSinFicha(false);
+    setTelefonoSinRevisar(false);
+    setEnTelefono(false);
     setPidioAlgo(false);
     setDescripcionSolicitud("");
     setLlegoPorPromotor(false);
@@ -631,7 +635,11 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
         </span>
         <div>
           <p className="text-lg font-semibold text-tinta">
-            {sinDatos ? "Contacto registrado sin datos" : "Persona registrada"}
+            {enTelefono
+              ? "Guardada en este teléfono"
+              : sinDatos
+                ? "Contacto registrado sin datos"
+                : "Persona registrada"}
           </p>
           <p className="cifras mt-1 text-sm text-tinta-suave">
             {ubicacion
@@ -640,6 +648,12 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
                 ? `Sección ${duplicada.seccion_clave}`
                 : null}
           </p>
+          {enTelefono && (
+            <p className="medida mt-2 text-sm text-tinta-suave">
+              No hay señal. Se envía sola en cuanto la haya, con la app abierta. No cierres sesión
+              antes de que se envíe.
+            </p>
+          )}
         </div>
         {faltantes.length > 0 && (
           <div
@@ -867,6 +881,12 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
                   className="campo cifras"
                 />
                 {errorTelefono && <p className="text-sm text-alerta">{errorTelefono}</p>}
+                {telefonoSinRevisar && !errorTelefono && (
+                  <p className="text-xs text-tinta-tenue">
+                    Sin señal no se puede revisar si ya está registrado. Se revisa al enviar: si
+                    ya existe, se guarda sin teléfono.
+                  </p>
+                )}
               </Campo>
 
               {duplicadoSinFicha && (
@@ -1048,7 +1068,11 @@ export function FormularioRegistro({ actividadId }: { actividadId?: string }) {
                         {!buscandoPromotor &&
                           textoPromotor.trim().length >= 2 &&
                           resultadosPromotor.length === 0 && (
-                            <p className="text-xs text-tinta-tenue">Sin coincidencias.</p>
+                            <p className="text-xs text-tinta-tenue">
+                              {busquedaPromotor?.fallo
+                                ? "Sin señal no se puede buscar al promotor. Apaga esta opción para guardar."
+                                : "Sin coincidencias."}
+                            </p>
                           )}
                       </div>
                     )}

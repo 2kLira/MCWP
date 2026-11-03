@@ -3,6 +3,8 @@ import { BarraInferior } from "@/components/navegacion/barra-inferior";
 import { BarraSuperior } from "@/components/navegacion/barra-superior";
 import { Dock } from "@/components/navegacion/dock";
 import { ProveedorActuante } from "@/components/proveedor-actuante";
+import { EstadoCola } from "@/components/sin-conexion/estado-cola";
+import { RegistroTrabajador } from "@/components/sin-conexion/registro-trabajador";
 import { LaminaTerritorial } from "@/components/sustrato/lamina-territorial";
 
 /**
@@ -19,6 +21,8 @@ import { LaminaTerritorial } from "@/components/sustrato/lamina-territorial";
 export default function LayoutAplicacion({ children }: { children: React.ReactNode }) {
   return (
     <ProveedorActuante>
+      <RegistroTrabajador />
+
       {/* El territorio es el sustrato de toda la aplicación: por eso el vidrio de las
           tarjetas tiene algo real detrás. */}
       <LaminaTerritorial />
@@ -30,6 +34,7 @@ export default function LayoutAplicacion({ children }: { children: React.ReactNo
         {/* Espacio a la izquierda para el dock flotante y abajo para la píldora de celular. */}
         <main className="mx-auto w-full max-w-tope flex-1 px-4 pb-28 pt-5 md:pb-12 md:pl-[6.5rem] md:pr-7 md:pt-6">
           <AvisoConfiguracion />
+          <EstadoCola />
           {children}
         </main>
       </div>

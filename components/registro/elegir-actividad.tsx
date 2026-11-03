@@ -3,6 +3,7 @@
 import { CalendarDays, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useActuante } from "@/components/proveedor-actuante";
+import { conRespaldo, sembrarRespaldo } from "@/lib/sin-conexion/respaldo";
 import { useConsulta } from "@/lib/usar-consulta";
 import { actividadesDeBrigadista, type Actividad } from "@/lib/datos/actividades";
 import { ETIQUETA_TIPO_ACTIVIDAD } from "@/lib/tipos";
@@ -18,8 +19,16 @@ import { ETIQUETA_TIPO_ACTIVIDAD } from "@/lib/tipos";
 export function ElegirActividad() {
   const { actuante } = useActuante();
 
+  // Sin señal se muestra la última lista que se alcanzó a leer. Si alguna ya se cerró, la base
+  // rechaza la captura al enviarla y la cola lo dice.
   const actividades = useConsulta<Actividad[]>(
-    () => actividadesDeBrigadista(actuante, actuante.id),
+    () =>
+      conRespaldo(`actividades:${actuante.id}`, () =>
+        actividadesDeBrigadista(actuante, actuante.id),
+      ).then((r) => {
+        for (const a of r.datos) sembrarRespaldo(`actividad:${a.id}`, a);
+        return r;
+      }),
     [],
     [actuante.id],
   );

@@ -46,9 +46,11 @@ ni quién capturó, ni sección cuando hay coordenada.
 con lo que ibas a hacer, gana el spec. Si el spec no cubre un caso, anótalo en `PENDIENTES.md` en
 lugar de inventar y seguir.
 
-Con una excepción ya registrada: `spec/alcance.md` describe un conmutador de rol y dice
+Con dos excepciones ya registradas: `spec/alcance.md` describe un conmutador de rol y dice
 "Row Level Security. Fuera, por la decisión de no tener login". Eso quedó superado el 8 de octubre
-de 2026. En todo lo demás el spec sigue mandando.
+de 2026. Y dice que la cola de sincronización de capturas no se construye: se construyó para el
+registro rápido el 3 de noviembre de 2026 (`PENDIENTES.md`, entradas 82 a 92). En todo lo demás el
+spec sigue mandando.
 
 ## Pila
 
@@ -57,7 +59,8 @@ MapLibre GL con mapa base de CARTO, Recharts, TanStack Table, react-hook-form co
 Despliegue en Vercel.
 
 No agregues librerías fuera de esta lista sin anotarlo primero en `PENDIENTES.md`. En particular:
-nada de three.js, nada de motores de sincronización, nada de librerías de calendario. La vista de
+nada de three.js, nada de motores de sincronización (la captura sin señal es código propio, ver
+`lib/sin-conexion/`), nada de librerías de calendario. La vista de
 calendario se arma con una rejilla propia.
 
 ## Estructura
@@ -79,6 +82,10 @@ lib/sesion.ts        atributos de la cookie de sesión, compartidos por los tres
 lib/api/             portones de los handlers y validación de imágenes
 lib/puertas-ui.ts    cosmética: qué botones se pintan. NO es seguridad, ver su encabezado
 lib/territorio.ts    punto en polígono en el cliente, normalización de teléfono, direcciones
+lib/datos/capturas.ts  envío del registro rápido. Cada paso se puede repetir sin duplicar
+lib/sin-conexion/    cola de capturas en IndexedDB y respaldo de lecturas para trabajar sin señal
+components/sin-conexion/  registro del trabajador de servicio y aviso de capturas por enviar
+public/sw.js         trabajador de servicio. Guarda cáscaras, código y cartografía; nunca datos
 data/                secciones.geojson, colonias.geojson, demarcaciones.json
 supabase/schema.sql       estructura, consolidada
 supabase/seguridad.sql    permisos, RLS, políticas y sellado de columnas. Único punto de verdad

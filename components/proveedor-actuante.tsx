@@ -5,6 +5,7 @@ import { EsqueletoAplicacion } from "@/components/sistema/esqueleto";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { alcanceDe, type Alcance } from "@/lib/puertas-ui";
+import { actuanteGuardado, borrarRespaldos, guardarActuante } from "@/lib/sin-conexion/respaldo";
 import { clienteSupabase, faltaConfiguracion } from "@/lib/supabase";
 import type { RolUsuario, UsuarioActuante } from "@/lib/tipos";
 
@@ -43,6 +44,15 @@ type FilaUsuario = {
   activo: boolean;
 };
 
+/**
+ * ¿Sigue la cookie de sesión en este navegador? No dice si es válida —eso solo lo sabe Supabase—,
+ * solo que nadie cerró sesión aquí. Es la condición para entrar sin señal con la identidad
+ * guardada: sin ella, alguien que salió no vuelve a ver la app por estar en modo avión.
+ */
+function quedaCookieDeSesion(): boolean {
+  return /(?:^|;\s*)sb-[^=]*-auth-token/.test(document.cookie);
+}
+
 function aActuante(fila: FilaUsuario): UsuarioActuante {
   return {
     id: fila.id,
@@ -77,9 +87,26 @@ export function ProveedorActuante({ children }: { children: React.ReactNode }) {
     async function resolver() {
       // getClaims verifica la firma localmente contra el JWKS: el proyecto firma con ES256, así
       // que esto no es un viaje de red.
-      const { data } = await supabase!.auth.getClaims();
+      // getClaims devuelve sus fallos de red como error, pero relanza lo que no reconoce. Un
+      // lanzamiento aquí dejaba la app en el esqueleto para siempre; se trata como un fallo más.
+      const { data, error } = await supabase!.auth
+        .getClaims()
+        .catch((e: unknown) => ({ data: null, error: e }));
       const sub = typeof data?.claims?.sub === "string" ? data.claims.sub : null;
       if (!vivo) return;
+
+      // Sin señal, getClaims falla aunque haya sesión: el token de una hora venció y no se puede
+      // renovar, o el JWKS no se puede descargar. Un fallo **con error** no es "no hay sesión"
+      // —eso llega sin error—, así que se entra con la identidad de la última vez para poder
+      // capturar. Esto no abre nada: lo que se capture se envía después con la sesión renovada y
+      // lo juzga RLS.
+      const guardado = actuanteGuardado();
+      if (!sub && error && guardado && quedaCookieDeSesion()) {
+        idActual.current = guardado.id;
+        setActuante(guardado);
+        setEstado("lista");
+        return;
+      }
 
       if (!sub) {
         idActual.current = null;
@@ -91,12 +118,20 @@ export function ProveedorActuante({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { data: fila } = await supabase!
+      const { data: fila, error: errorFila } = await supabase!
         .from("usuarios")
         .select("id, nombre, rol, demarcacion_id, seccion_clave, activo")
         .eq("id", sub)
         .maybeSingle<FilaUsuario>();
       if (!vivo) return;
+
+      // El token sí era válido pero la ficha no se pudo leer: misma situación, otra vuelta.
+      if (!fila && errorFila && guardado?.id === sub) {
+        idActual.current = guardado.id;
+        setActuante(guardado);
+        setEstado("lista");
+        return;
+      }
 
       if (!fila) {
         idActual.current = sub;
@@ -108,6 +143,9 @@ export function ProveedorActuante({ children }: { children: React.ReactNode }) {
       idActual.current = fila.id;
       setActuante(aActuante(fila));
       setEstado(fila.activo ? "lista" : "inactivo");
+      // Una cuenta desactivada no debe poder seguir entrando sin señal con su identidad vieja.
+      if (fila.activo) guardarActuante(aActuante(fila));
+      else borrarRespaldos();
     }
 
     void resolver();

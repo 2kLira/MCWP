@@ -1122,3 +1122,83 @@ spec: lo pidió el cliente.
     mensaje que se le muestra al final a quien la eligió. No hay lógica de saltos entre preguntas
     ni resultados calculados; si el cliente pide "según lo que contestó, ve a la pregunta X", es
     otra fase.
+
+## Captura sin señal (3 de noviembre de 2026)
+
+Lo pidió el cliente: la mayoría de los brigadistas captura desde su teléfono, Android o iPhone, en
+zonas sin señal. Hasta hoy `spec/alcance.md` decía "lo que no se construye es la cola de
+sincronización de capturas"; esto lo deroga para el registro rápido.
+
+82. **Sin librería de sincronización, como pide `CLAUDE.md`.** No hace falta: el teléfono solo
+    escribe capturas nuevas y nunca edita lo que ya está en la base, así que no hay conflictos que
+    resolver. Son tres piezas propias: la cola en IndexedDB (`lib/sin-conexion/cola.ts`), el envío
+    que se puede repetir sin duplicar porque el teléfono pone los ids (`lib/datos/capturas.ts`), y
+    un trabajador de servicio que guarda las pantallas de campo, el código y la cartografía
+    (`public/sw.js`). Los permisos no cambian: todo se envía con la sesión de quien capturó y lo
+    juzga RLS, igual que en línea.
+
+83. **Qué funciona sin señal: el registro rápido, y nada más.** Persona y contacto sin datos, con
+    actividad o sin ella. La lista de actividades del brigadista y el catálogo de problemáticas
+    se leen de la última vez que hubo señal. El resto de las pantallas dice "Esta pantalla
+    necesita señal" y ofrece ir a registrar. Condición: haber abierto la app **con señal y con
+    sesión** al menos una vez después de cada despliegue, que es cuando se guardan las pantallas.
+    El mapa para marcar el punto no funciona sin señal (las teselas son de CARTO); el GPS y el
+    selector de sección sí.
+
+84. **La fecha de captura es la de llegada.** `created_at` y `consentimiento_en` los sella la base
+    con `now()` (sección 10 de `seguridad.sql`), a propósito, para que nadie pueda fechar a su
+    gusto. Una captura que llega dos días después cuenta en "nuevas de la semana" y en el reporte
+    diario por el día en que llegó, y su consentimiento queda fechado ese día. Arreglarlo pide
+    una columna `capturado_en` que escriba el teléfono, y ese es un dato que pone el cliente: hay
+    que acotarlo (nunca en el futuro, nunca más de unos días atrás) y decidir si se le cree para
+    los reportes. **Falta decidir**, y conviene que lo vea quien haga la revisión legal del aviso.
+
+85. **Una actividad que se cierra antes de que llegue la captura la rechaza.** El brigadista solo
+    puede escribir mientras su actividad siga abierta (`actividad_abierta_mia`). Si el
+    administrador la cierra mientras alguien sigue sin señal, la captura se queda en el teléfono
+    como "No se pudo enviar", con Reintentar y Descartar. Hoy la salida es que el administrador
+    la reabra, el brigadista toque Reintentar y se vuelva a cerrar. **Falta decidir** si la
+    política debe aceptar capturas que lleguen poco después del cierre; eso es un cambio en
+    `seguridad.sql`, no en la app.
+
+86. **El teléfono repetido se revisa al enviar.** Sin señal no se puede preguntar si existe. Al
+    enviar, si ya estaba en otra ficha, se guarda sin teléfono, que es lo mismo que pasa en línea
+    con un brigadista, y se le avisa a quien capturó. Si captura el administrador, además queda
+    la nota de revisión en seguimientos. El camino de "agregar la participación a la persona
+    encontrada" necesita señal, porque necesita leer la ficha.
+
+87. **El buscador de promotor necesita señal.** Sin ella lo dice, y para guardar hay que apagar la
+    opción. El promotor se puede agregar después desde la ficha.
+
+88. **Datos personales guardados en el teléfono.** Mientras no llegan, las capturas viven en
+    IndexedDB **sin cifrar**. Se borran al llegar, y al cerrar sesión (con una advertencia si
+    queda algo sin enviar). No caducan solas: borrar a los N días es perder trabajo de campo, y
+    eso tiene que decidirlo quien responde por los datos. Va con el pendiente bloqueante de la
+    política de retención. Aparte, en localStorage queda quién entró, su lista de actividades y
+    las problemáticas; ninguna persona del padrón.
+
+89. **En iPhone hay que instalarla.** Safari puede borrar lo guardado de un sitio que no se abre
+    en unos días, y eso incluye las capturas sin enviar; instalada en la pantalla de inicio
+    ("Compartir → Agregar a inicio") no lo hace. Ni en iPhone ni en Android se envía con la app
+    cerrada: Background Sync no existe en Safari, y para no tener dos comportamientos no se usa en
+    ninguno. Se envía al abrir la app, al volver la señal, al regresar a ella, cada minuto
+    mientras quede algo, o con "Enviar ahora". **Falta**: decirlo en la capacitación, y quizá una
+    pantalla que enseñe a instalarla.
+
+90. **Entrar sin señal.** `getClaims()` falla sin red aunque haya sesión: el token de una hora
+    venció y no se puede renovar, o el JWKS no se puede descargar. El proveedor de identidad usa
+    entonces la identidad de la última vez, solo si la cookie de sesión sigue en el navegador.
+    No abre nada: lo que se capture se envía después con la sesión renovada y lo juzga RLS. Si la
+    sesión de verdad venció, las capturas dicen "Vuelve a entrar para enviarla" y se envían al
+    entrar con la misma cuenta.
+
+91. **El trabajador de servicio solo corre en producción.** En desarrollo pelearía con la recarga
+    en caliente. Para probarlo: `npm run build && npm start`. Su constante `VERSION` no se sube en
+    cada despliegue (el código lleva huella y se poda solo): se sube cuando cambia la lógica de
+    caché, para tirar lo guardado con la lógica anterior.
+
+92. **`/registrar` ya no lee la actividad en el servidor.** La lee el formulario en el navegador.
+    Si la actividad viniera en el HTML, la página guardada de una actividad abriría sin señal el
+    formulario de otra, y la captura quedaría ligada a la equivocada. De paso, la página pasó a
+    ser estática. Cualquier pantalla que se agregue a la lista de `public/sw.js` tiene que cumplir
+    lo mismo.

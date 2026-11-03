@@ -5,75 +5,13 @@
  * Qué ve cada quien lo decide RLS (supabase/seguridad.sql, sección 12). La sección, la
  * demarcación, quién capturó y cuándo los sella la base; el punto llega ya difuminado y la base
  * lo vuelve a difuminar.
+ *
+ * El alta vive en lib/datos/capturas.ts, junto con la del registro rápido, porque pasa por la cola
+ * del teléfono.
  */
 
-import { db, resultado, uno, type Resultado } from "@/lib/datos/cliente";
-import { difuminarPunto } from "@/lib/territorio";
+import { db, resultado, type Resultado } from "@/lib/datos/cliente";
 import type { Genero, RangoEdad } from "@/lib/tipos";
-
-export type EntradaContactoAnonimo = {
-  actividadId: string | null;
-  /** La resolvió el celular con el punto exacto, antes de difuminarlo. */
-  seccionClave: string;
-  coloniaId: number | null;
-  /** El punto exacto. Se difumina aquí, antes de que salga del celular. */
-  lat: number | null;
-  lng: number | null;
-  genero: Genero | null;
-  rangoEdad: RangoEdad | null;
-  peticion: string | null;
-  comentario: string | null;
-  problematicas: number[];
-};
-
-export type ResultadoContactoAnonimo = {
-  id: string;
-  /** Si el contacto quedó pero sus problemáticas no, el motivo. */
-  avisoMenciones: string | null;
-};
-
-export async function crearContactoAnonimo(
-  entrada: EntradaContactoAnonimo,
-): Promise<Resultado<ResultadoContactoAnonimo | null>> {
-  const punto =
-    entrada.lat !== null && entrada.lng !== null ? difuminarPunto(entrada.lng, entrada.lat) : null;
-
-  const r = await uno<{ id: string }>(
-    db()
-      .from("contactos_anonimos")
-      .insert({
-        actividad_id: entrada.actividadId,
-        seccion_clave: entrada.seccionClave,
-        colonia_id: entrada.coloniaId,
-        lat: punto?.lat ?? null,
-        lng: punto?.lng ?? null,
-        genero: entrada.genero,
-        rango_edad: entrada.rangoEdad,
-        peticion: entrada.peticion,
-        comentario: entrada.comentario,
-      })
-      .select("id")
-      .single(),
-    "Para registrar a alguien necesitas estar invitado a una actividad programada o en curso, y " +
-      "capturar desde ella.",
-  );
-  if (!r.datos) return { ...r, datos: null };
-
-  let avisoMenciones: string | null = null;
-  if (entrada.problematicas.length > 0) {
-    const { error } = await db()
-      .from("menciones_anonimas")
-      .insert(
-        entrada.problematicas.map((id) => ({ contacto_id: r.datos!.id, problematica_id: id })),
-      );
-    if (error) {
-      console.error(error);
-      avisoMenciones = "Las problemáticas no se guardaron. Anótalas y avísale al administrador.";
-    }
-  }
-
-  return { datos: { id: r.datos.id, avisoMenciones }, sinEsquema: false, aviso: null };
-}
 
 /** Cuántos contactos sin datos hay, con lo que RLS deje ver. */
 export async function totalContactosAnonimos(

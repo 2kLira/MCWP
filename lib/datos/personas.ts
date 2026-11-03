@@ -249,26 +249,6 @@ export type EntradaPersona = {
   promotor_id?: string | null;
 };
 
-export function crearPersona(entrada: EntradaPersona): Promise<Resultado<Persona | null>> {
-  const fila: Record<string, unknown> = {
-    ...entrada,
-    // El teléfono normalizado es la llave de deduplicación y lo calcula el sistema, no el usuario.
-    telefono_norm: normalizarTelefono(entrada.telefono_raw),
-  };
-  // La fecha de promoción no se le pide a nadie: se sella sola en el momento del alta.
-  if (entrada.es_promovido) {
-    fila.promovido_en = new Date().toISOString();
-  }
-  // crearPersona no recibe el actuante en su firma actual, así que promovido_por se queda sin
-  // llenar aquí; lo pone marcarPromovido, que sí conoce quién marca.
-  return uno<Persona>(
-    db().from("personas").insert(fila).select().single(),
-    // El rechazo que un brigadista va a encontrar de verdad. Por eso dice qué hacer.
-    "Para registrar a alguien necesitas estar invitado a una actividad programada o en curso, y " +
-      "capturar desde ella.",
-  );
-}
-
 export async function actualizarPersona(
   usuario: UsuarioActuante | null,
   id: string,
@@ -312,34 +292,6 @@ export async function marcarPromovido(
 /* ---------------------------------------------------------------------------
  * Solicitudes (petición particular del registro rápido)
  * ------------------------------------------------------------------------- */
-
-/**
- * Alta de una solicitud. Por el andamiaje de esta fase (solo puede tocarse este archivo, no
- * lib/datos/catalogos.ts ni uno nuevo lib/datos/solicitudes.ts), la función vive aquí en lugar de
- * en un módulo propio. Si en otra fase se libera ese archivo, esta función se muda ahí completa.
- */
-export function crearSolicitud(entrada: {
-  personaId: string;
-  participacionId?: string | null;
-  tema: string;
-  descripcion?: string | null;
-  requiereSeguimiento?: boolean;
-}): Promise<Resultado<{ id: string } | null>> {
-  return uno<{ id: string }>(
-    db()
-      .from("solicitudes")
-      .insert({
-        persona_id: entrada.personaId,
-        participacion_id: entrada.participacionId ?? null,
-        tema: entrada.tema,
-        descripcion: entrada.descripcion ?? null,
-        requiere_seguimiento: entrada.requiereSeguimiento ?? false,
-      })
-      .select("id")
-      .single(),
-    "Solo puedes dejar una petición de alguien capturado en tu actividad.",
-  );
-}
 
 export type SolicitudDePersona = {
   id: string;

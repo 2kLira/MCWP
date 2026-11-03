@@ -310,59 +310,6 @@ export function participacionesDeActividad(
  * Registra la participación y cuelga de ella las menciones de problemáticas. Cuelgan de la
  * participación, no de la persona, para que cada mención conserve su actividad y su fecha.
  */
-export async function registrarParticipacion(entrada: {
-  personaId: string;
-  actividadId: string;
-  tipo: "registro" | "asistencia";
-  registradaPor?: string | null;
-  /** El cuadro "Comentario" del registro. Va en la participación, con o sin problemáticas. */
-  comentario?: string | null;
-  problematicas?: { id: number; comentario?: string | null }[];
-}): Promise<Resultado<{ id: string } | null>> {
-  const { data, error } = await db()
-    .from("participaciones")
-    .upsert(
-      {
-        persona_id: entrada.personaId,
-        actividad_id: entrada.actividadId,
-        tipo: entrada.tipo,
-        registrada_por: entrada.registradaPor ?? null,
-        comentario: entrada.comentario ?? null,
-      },
-      { onConflict: "persona_id,actividad_id", ignoreDuplicates: false },
-    )
-    .select("id")
-    .single();
-
-  if (error) return resultado(null, error, null, "Esta actividad ya no está abierta para ti.");
-
-  if (entrada.problematicas?.length) {
-    // El resultado de este segundo viaje se recoge. Antes se tiraba, así que si la política
-    // rechazaba las problemáticas la participación quedaba guardada y nadie se enteraba de que
-    // las problemáticas no.
-    const { error: errorMenciones } = await db()
-      .from("menciones_problematica")
-      .upsert(
-        entrada.problematicas.map((p) => ({
-          participacion_id: data.id,
-          problematica_id: p.id,
-          comentario: p.comentario ?? null,
-        })),
-        { onConflict: "participacion_id,problematica_id" },
-      );
-    if (errorMenciones) {
-      return resultado(
-        data,
-        errorMenciones,
-        data,
-        "La persona sí quedó registrada, pero no sus problemáticas.",
-      );
-    }
-  }
-
-  return { datos: data, sinEsquema: false, aviso: null };
-}
-
 /** Distingue la evidencia de inicio y de cierre del resto de la galería, que no lleva momento. */
 export type MomentoFoto = "inicio" | "cierre";
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { ChevronDown, LogOut, User } from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
+import { FormularioSalida } from "@/components/sesion/formulario-salida";
 import { ETIQUETA_ROL } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,8 @@ import { cn } from "@/lib/utils";
  *
  * La salida es un formulario que postea a /salir en lugar de un botón con JavaScript: así
  * funciona sin JS, el servidor revoca el refresh token —cosa que borrar cookies en el navegador
- * no hace— y la redirección recarga la página con la sesión ya cerrada.
+ * no hace— y la redirección recarga la página con la sesión ya cerrada. FormularioSalida le agrega,
+ * con JavaScript, la advertencia de capturas sin enviar y la limpieza del teléfono.
  */
 export function CapsulaSesion({
   className,
@@ -55,7 +57,7 @@ export function CapsulaSesion({
         <p className="truncate text-xs text-tinta-tenue">{ETIQUETA_ROL[actuante.rol]}</p>
       </div>
 
-      <form action="/salir" method="post" className="shrink-0">
+      <FormularioSalida className="shrink-0">
         <button
           type="submit"
           title="Cerrar sesión"
@@ -70,7 +72,7 @@ export function CapsulaSesion({
           <LogOut className="size-4 shrink-0" aria-hidden />
           <span className={comoCapsula ? "sr-only" : undefined}>Cerrar sesión</span>
         </button>
-      </form>
+      </FormularioSalida>
     </div>
   );
 }
@@ -142,7 +144,7 @@ function MenuCuenta({
           <span className="block truncate text-sm font-semibold text-tinta">{nombre}</span>
           {rol}
         </p>
-        <form action="/salir" method="post">
+        <FormularioSalida>
           <button
             type="submit"
             className="transicion-ui flex w-full items-center gap-2.5 rounded-control px-2.5 text-left text-sm text-tinta transition-colors hover:bg-superficie-hundida"
@@ -150,7 +152,7 @@ function MenuCuenta({
             <LogOut className="size-4 shrink-0 text-tinta-suave" aria-hidden />
             Cerrar sesión
           </button>
-        </form>
+        </FormularioSalida>
       </div>
     </details>
   );
