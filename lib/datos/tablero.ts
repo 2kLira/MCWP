@@ -8,7 +8,7 @@ import type { UsuarioActuante } from "@/lib/tipos";
 import { db, esFaltaDeEsquema, lista, type Resultado } from "@/lib/datos/cliente";
 import { seccionesResumen } from "@/lib/datos/catalogos";
 import { totalBandeja } from "@/lib/datos/seguimientos";
-import { fechaLocalIso } from "@/lib/utils";
+import { filtroPideCierre } from "@/lib/datos/actividades";
 
 export type ResumenTablero = {
   personas: number;
@@ -53,10 +53,6 @@ function haceDias(dias: number): string {
   return f.toISOString();
 }
 
-function hoy(): string {
-  return fechaLocalIso();
-}
-
 async function contar(
   usuario: UsuarioActuante | null,
   tabla: string,
@@ -97,10 +93,9 @@ export async function resumenTablero(
     contar(usuario, "actividades", (c) => c.eq("tipo", "reunion").eq("estatus", "realizada")),
     contar(usuario, "actividades", (c) => c.eq("tipo", "activismo").eq("estatus", "realizada")),
     contar(usuario, "actividades", (c) => c.eq("tipo", "recorrido").eq("estatus", "realizada")),
-    // Por cerrar: las que ya empezaron, o las programadas cuya fecha ya pasó.
-    contar(usuario, "actividades", (c) =>
-      c.or(`estatus.eq.en_curso,and(estatus.eq.programada,fecha.lt.${hoy()})`),
-    ),
+    // Por cerrar: vencidas que ya no reciben capturas, o que nunca tuvieron a nadie. Las que
+    // siguen recibiendo formatos se dejan abiertas a propósito y no cuentan como pendiente.
+    contar(usuario, "v_actividades_por_cerrar", (c) => c.or(filtroPideCierre())),
     seccionesResumen(usuario),
     totalBandeja(usuario),
     contar(usuario, "personas", (c) => c.eq("es_promovido", true)),

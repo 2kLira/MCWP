@@ -18,7 +18,7 @@ import { EliminarPersona } from "@/components/personas/eliminar-persona";
 import { Estado } from "@/components/sistema/estado";
 import { useActuante } from "@/components/proveedor-actuante";
 import { demarcacionPorId } from "@/lib/demarcaciones";
-import { esAdmin, puedeEditarPersona } from "@/lib/puertas-ui";
+import { esAdmin, puedeCrear, puedeEditarPersona } from "@/lib/puertas-ui";
 import { cumpleHoy, etiquetaEdad } from "@/lib/personas";
 import { formatearTelefono } from "@/lib/territorio";
 import { nombreCompartido } from "@/lib/transicion";
@@ -33,6 +33,17 @@ import {
   type SolicitudDePersona,
 } from "@/lib/datos/personas";
 import { seguimientosDePersona, type Seguimiento } from "@/lib/datos/seguimientos";
+import {
+  BotonesContacto,
+  FranjaResultado,
+  useContactoRapido,
+  type MedioContacto,
+} from "@/components/seguimiento/contacto-rapido";
+import { HojaSeguimiento } from "@/components/seguimiento/hoja-seguimiento";
+import {
+  ETIQUETA_ESTADO_SEGUIMIENTO,
+  ETIQUETA_TIPO_SEGUIMIENTO,
+} from "@/components/seguimiento/utilidades";
 import { ETIQUETA_GENERO, ETIQUETA_TIPO_ACTIVIDAD, NOTA_SUSTITUTA } from "@/lib/tipos";
 import { rasgoPorClave, cargarSecciones } from "@/lib/territorio";
 import { useEffect, useState } from "react";
@@ -56,8 +67,27 @@ export function FichaPersona({ id }: { id: string }) {
     id,
     recargar,
   ]);
-  const historial = useConsulta<EventoHistorial[]>(() => historialPersona(id), [], [id]);
-  const seguimientos = useConsulta<Seguimiento[]>(() => seguimientosDePersona(id), [], [id]);
+  // Un seguimiento nuevo cambia dos cajas: la de seguimientos y el historial, que los incluye.
+  const [recargarSeguimientos, setRecargarSeguimientos] = useState(0);
+  const historial = useConsulta<EventoHistorial[]>(() => historialPersona(id), [], [
+    id,
+    recargarSeguimientos,
+  ]);
+  const seguimientos = useConsulta<Seguimiento[]>(() => seguimientosDePersona(id), [], [
+    id,
+    recargarSeguimientos,
+  ]);
+  // La hoja abierta: sin medio desde "Registrar seguimiento", con medio desde "Con nota".
+  const [hoja, setHoja] = useState<{ medio?: MedioContacto } | null>(null);
+  const alGuardarSeguimiento = () => {
+    setHoja(null);
+    setRecargarSeguimientos((v) => v + 1);
+  };
+  const contacto = useContactoRapido({
+    personaId: id,
+    actuanteId: actuante.id,
+    alGuardar: alGuardarSeguimiento,
+  });
   const solicitudes = useConsulta<SolicitudDePersona[]>(() => solicitudesDePersona(id), [], [id]);
 
   const [marcando, setMarcando] = useState(false);
@@ -95,6 +125,7 @@ export function FichaPersona({ id }: { id: string }) {
 
   const demarcacion = demarcacionPorId(p.demarcacion_id)?.nombre;
   const editable = puedeEditarPersona(actuante, p);
+  const daSeguimiento = puedeCrear(actuante, "seguimiento");
   const hayIntereses =
     p.quiere_participar ||
     p.quiere_info ||
@@ -138,12 +169,22 @@ export function FichaPersona({ id }: { id: string }) {
         volver={{ href: "/personas", etiqueta: "Personas alcanzadas" }}
       />
 
-      {(cumple || p.telefono_norm || editable) && (
+      {(cumple || p.telefono_norm || editable || daSeguimiento) && (
         <div className="flex flex-wrap items-center gap-2.5">
           {cumple && <Estado vivo>Hoy cumple años</Estado>}
           <div className="ml-auto flex flex-wrap items-center gap-2.5">
             {editable && <EditarPersona persona={p} alGuardar={() => setRecargar((v) => v + 1)} />}
-            {p.telefono_norm && (
+            {daSeguimiento && (
+              <button type="button" onClick={() => setHoja({})} className="boton">
+                Registrar seguimiento
+              </button>
+            )}
+            {/* Quien da seguimiento busca a la persona y deja el resultado a un toque; los demás
+                solo abren WhatsApp, como siempre. */}
+            {p.telefono_norm && daSeguimiento && (
+              <BotonesContacto telefono={p.telefono_norm} contacto={contacto} conTexto />
+            )}
+            {p.telefono_norm && !daSeguimiento && (
               <a
                 href={`https://wa.me/52${p.telefono_norm}`}
                 target="_blank"
@@ -156,6 +197,18 @@ export function FichaPersona({ id }: { id: string }) {
             )}
           </div>
         </div>
+      )}
+
+      <FranjaResultado contacto={contacto} alDetallar={(medio) => setHoja({ medio })} />
+
+      {hoja && (
+        <HojaSeguimiento
+          persona={{ id: p.id, nombre: p.nombre }}
+          actuanteId={actuante.id}
+          tipoInicial={hoja.medio}
+          alCerrar={() => setHoja(null)}
+          alGuardar={alGuardarSeguimiento}
+        />
       )}
 
       {/* En celular el orden es Datos, Intereses, Historial y Seguimientos: el control de
@@ -325,12 +378,15 @@ export function FichaPersona({ id }: { id: string }) {
                     className="flex items-start justify-between gap-3 border-t border-separador py-3 first:border-t-0 first:pt-0 last:pb-0"
                   >
                     <span className="min-w-0">
-                      <span className="block text-sm text-tinta">{s.nota ?? s.tipo}</span>
+                      <span className="block text-sm text-tinta">
+                        {s.nota ?? ETIQUETA_TIPO_SEGUIMIENTO[s.tipo]}
+                      </span>
                       <span className="cifras mt-0.5 block text-xs text-tinta-suave">
                         {fechaLarga(s.fecha)}
+                        {s.nota && ` · ${ETIQUETA_TIPO_SEGUIMIENTO[s.tipo]}`}
                       </span>
                     </span>
-                    <Estado className="shrink-0">{s.estado.replace("_", " ")}</Estado>
+                    <Estado className="shrink-0">{ETIQUETA_ESTADO_SEGUIMIENTO[s.estado]}</Estado>
                   </li>
                 ))}
               </ul>

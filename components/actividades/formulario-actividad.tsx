@@ -24,11 +24,18 @@ const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
  * aparte, sin relación con esa sección: cualquier persona activa que pueda encabezar actividades
  * puede quedar al frente, sea o no de ese territorio.
  */
-export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void }) {
+export function FormularioActividad({
+  alCrear,
+  inicial,
+}: {
+  alCrear: (id: string) => void;
+  /** Para abrirlo ya encaminado, como "Programar recorrido" desde una sección por recorrer. */
+  inicial?: { tipo?: TipoActividad; seccionClave?: string };
+}) {
   const { actuante } = useActuante();
   const alcance = alcanceDe(actuante);
 
-  const [tipo, setTipo] = useState<TipoActividad>("reunion");
+  const [tipo, setTipo] = useState<TipoActividad>(inicial?.tipo ?? "reunion");
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
   const [hora, setHora] = useState("");
@@ -39,7 +46,7 @@ export function FormularioActividad({ alCrear }: { alCrear: (id: string) => void
   // Prellenada con la sección propia de quien captura, cuando la tiene: sigue siendo una
   // elección, no un dato fijo, y se puede cambiar con el buscador.
   const [seccionClave, setSeccionClave] = useState(
-    alcance.tipo === "seccion" ? alcance.seccionClave : "",
+    inicial?.seccionClave ?? (alcance.tipo === "seccion" ? alcance.seccionClave : ""),
   );
 
   const [usuarios, setUsuarios] = useState<UsuarioBreve[]>([]);

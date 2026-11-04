@@ -195,6 +195,9 @@ function Formulario({ actividadId }: { actividadId?: string }) {
   const [telefonoSinRevisar, setTelefonoSinRevisar] = useState(false);
 
   const [estado, setEstado] = useState<Estado>("capturando");
+  // Cuántas se guardaron desde que se abrió la pantalla. Quien pasa formatos de papel cuadra con
+  // esto contra el montón que tiene enfrente; se pierde al salir, y está bien que se pierda.
+  const [enEstaSesion, setEnEstaSesion] = useState(0);
   /** La última captura se quedó en el teléfono esperando señal, en lugar de llegar a la base. */
   const [enTelefono, setEnTelefono] = useState(false);
   // Lo que no se pudo guardar después de que la persona sí quedó: la participación (y con ella el
@@ -577,6 +580,7 @@ function Formulario({ actividadId }: { actividadId?: string }) {
     // manda sola. Para quien captura es un éxito: puede seguir con la siguiente persona.
     setEnTelefono(r.estado !== "enviada");
     setFaltantes(r.estado === "enviada" ? r.avisos : []);
+    setEnEstaSesion((n) => n + 1);
     setEstado("guardada");
   }
 
@@ -648,6 +652,11 @@ function Formulario({ actividadId }: { actividadId?: string }) {
                 ? `Sección ${duplicada.seccion_clave}`
                 : null}
           </p>
+          {enEstaSesion > 1 && (
+            <p className="cifras mt-1 text-sm text-tinta-suave">
+              Llevas {enEstaSesion.toLocaleString("es-MX")} en esta sesión
+            </p>
+          )}
           {enTelefono && (
             <p className="medida mt-2 text-sm text-tinta-suave">
               No hay señal. Se envía sola en cuanto la haya, con la app abierta. No cierres sesión
@@ -665,9 +674,12 @@ function Formulario({ actividadId }: { actividadId?: string }) {
             ))}
           </div>
         )}
+        {/* Con el foco puesto, Enter pasa a la siguiente: al pasar formatos de papel con teclado
+            no hay que ir por el ratón entre una persona y otra. */}
         <button
           type="button"
           onClick={otraCaptura}
+          autoFocus
           className="boton-primario min-h-12 w-full max-w-xs"
         >
           Registrar a alguien más

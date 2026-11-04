@@ -48,6 +48,11 @@ export type FilaBandeja = {
   quiere_barda_lona: boolean;
   urgente_contactar: boolean;
   urgente_motivo: string | null;
+  /** Descripción de la solicitud más reciente que requiere seguimiento. */
+  ultima_solicitud: string | null;
+  ultimo_seguimiento_nota: string | null;
+  /** Cuántos seguimientos se le han registrado, de cualquier estado. */
+  intentos: number;
 };
 
 /**

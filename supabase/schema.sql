@@ -691,10 +691,17 @@ select
           where so.persona_id = p.id and so.requiere_seguimiento) as tiene_solicitud,
   p.quiere_barda_lona,
   p.urgente_contactar,
-  p.urgente_motivo
+  p.urgente_motivo,
+  -- Lo que hace falta para atender sin abrir la ficha: qué pidió, qué pasó la última vez y
+  -- cuántas veces se le ha buscado ("No contestó" tres veces se lee distinto que una).
+  (select so.descripcion from solicitudes so
+   where so.persona_id = p.id and so.requiere_seguimiento
+   order by so.created_at desc limit 1) as ultima_solicitud,
+  ult.nota as ultimo_seguimiento_nota,
+  (select count(*) from seguimientos s where s.persona_id = p.id)::int as intentos
 from personas p
 left join lateral (
-  select s.fecha, s.estado, s.tipo from seguimientos s
+  select s.fecha, s.estado, s.tipo, s.nota from seguimientos s
   where s.persona_id = p.id order by s.fecha desc, s.created_at desc limit 1
 ) ult on true
 where (p.quiere_participar or p.quiere_info or p.quiere_barda_lona or p.urgente_contactar
@@ -732,6 +739,28 @@ select u.id as usuario_id,
 from usuarios u
 left join personas p on p.registrada_por = u.id
 group by u.id;
+
+-- Actividades por cerrar: abiertas y con la fecha ya pasada. Casi todo se captura días después
+-- de la actividad (se pasan los formatos de papel), y cerrarla le quita la captura al brigadista,
+-- así que no basta con la fecha: hace falta saber cuándo llegó la última captura. Personas y
+-- contactos sin datos cuentan igual, los dos son gente que alguien está capturando.
+create view v_actividades_por_cerrar with (security_invoker = true) as
+select a.id, a.nombre, a.tipo, a.fecha, a.estatus, a.seccion_clave, a.demarcacion_id,
+  coalesce(c.capturas, 0)::int as capturas,
+  c.ultima_captura,
+  (a.conclusion is not null and btrim(a.conclusion) <> '') as tiene_conclusion,
+  exists (select 1 from fotos f where f.actividad_id = a.id and f.momento = 'cierre')
+    as tiene_foto_cierre
+from actividades a
+left join lateral (
+  select count(*) as capturas, max(x.created_at) as ultima_captura
+  from (
+    select pa.created_at from participaciones pa where pa.actividad_id = a.id
+    union all
+    select ca.created_at from contactos_anonimos ca where ca.actividad_id = a.id
+  ) x
+) c on true
+where a.estatus in ('programada', 'en_curso') and a.fecha < hoy_oaxaca();
 
 -- ---------------------------------------------------------------------------
 -- Catálogo de problemáticas

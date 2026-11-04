@@ -22,6 +22,7 @@ import {
 } from "@/components/seguimiento/utilidades";
 import { EncabezadoBandeja, RenglonBandeja } from "@/components/seguimiento/renglon-bandeja";
 import { HojaSeguimiento } from "@/components/seguimiento/hoja-seguimiento";
+import type { MedioContacto } from "@/components/seguimiento/contacto-rapido";
 
 const TIPOS: TipoSeguimiento[] = ["llamada", "whatsapp", "invitacion", "reunion", "otro"];
 /**
@@ -44,7 +45,12 @@ export default function Seguimiento() {
   const { actuante } = useActuante();
   const alcance = alcanceDe(actuante);
   const [version, setVersion] = useState(0);
-  const [filaAbierta, setFilaAbierta] = useState<FilaBandeja | null>(null);
+  // La hoja se abre desde Registrar o desde "Con nota" después de un intento; en ese caso llega
+  // con el medio ya elegido.
+  const [filaAbierta, setFilaAbierta] = useState<{
+    fila: FilaBandeja;
+    medio?: MedioContacto;
+  } | null>(null);
 
   const [texto, setTexto] = useState("");
   const [demarcacionId, setDemarcacionId] = useState<number | null>(null);
@@ -233,7 +239,9 @@ export default function Seguimiento() {
                 <RenglonBandeja
                   fila={fila}
                   puedeRegistrar={puedeRegistrar}
-                  alRegistrar={() => setFilaAbierta(fila)}
+                  actuanteId={actuante.id}
+                  alRegistrar={(medio) => setFilaAbierta({ fila, medio })}
+                  alGuardar={alGuardar}
                 />
               </li>
             ))}
@@ -243,7 +251,8 @@ export default function Seguimiento() {
 
       {filaAbierta && (
         <HojaSeguimiento
-          fila={filaAbierta}
+          persona={{ id: filaAbierta.fila.persona_id, nombre: filaAbierta.fila.nombre }}
+          tipoInicial={filaAbierta.medio}
           actuanteId={actuante.id}
           alCerrar={() => setFilaAbierta(null)}
           alGuardar={alGuardar}

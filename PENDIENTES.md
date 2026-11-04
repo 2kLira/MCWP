@@ -1202,3 +1202,76 @@ sincronización de capturas"; esto lo deroga para el registro rápido.
     formulario de otra, y la captura quedaría ligada a la equivocada. De paso, la página pasó a
     ser estática. Cualquier pantalla que se agregue a la lista de `public/sw.js` tiene que cumplir
     lo mismo.
+
+## Seguimiento a un toque (4 de noviembre de 2026)
+
+Salió de revisar el uso real: en cuatro semanas se registraron 312 personas, 44 marcadas como
+urgentes y 13 con petición, y cero seguimientos. La bandeja existía, pero había que abrir la ficha
+para saber qué pidió cada quien, y el contacto (WhatsApp) y el registro iban por separado.
+
+93. **Sigue siendo trabajo del administrador.** Se preguntó si el brigadista debía dar
+    seguimiento a la gente que él registró, y se decidió que no: `seguridad.sql` no cambia. Solo
+    se quitó fricción.
+
+94. **La bandeja trae tres columnas más**, al final de `v_bandeja_seguimiento` (migración
+    `bandeja_seguimiento_contexto`): `ultima_solicitud`, `ultimo_seguimiento_nota` e `intentos`.
+    El renglón enseña lo que la persona pidió, o el motivo de lo urgente, sin abrir la ficha.
+
+95. **WhatsApp y Llamar dejan el resultado a un toque**, en la bandeja y en la ficha. Al volver
+    se pregunta cómo le fue: Atendido, En seguimiento o No contestó. Con nota abre la hoja
+    completa con el medio ya elegido. Quién, cuándo y por qué medio no se preguntan. El botón no
+    pone texto en WhatsApp: el spec dice "el enlace normal de WhatsApp, nada más".
+
+96. **"No contestó" es un seguimiento en `pendiente` con esa nota.** La persona se queda en la
+    bandeja, cuenta el intento y la espera se mide desde ese intento. No se agregó un estado nuevo
+    al enum porque el spec fija tres. **Falta decidir** si después de N intentos sin respuesta
+    debe salir de la bandeja.
+
+97. **Sigue abierto el pendiente 42.** "En seguimiento" saca a la persona de la bandeja, como
+    dice el spec. Ahora que registrar cuesta un toque va a pasar seguido, y no hay pantalla que
+    liste a quien está en seguimiento. Si el cliente pide verlos, hay que tocar la vista o crear
+    otra; no se hizo porque el spec define la bandeja así.
+
+## Actividades vencidas, captura en serie y recorridos (4 de noviembre de 2026)
+
+98. **Las actividades no se cerraban a propósito.** De 312 personas, la gran mayoría se capturó
+    días después de la fecha de su actividad (hasta 13), con ubicación a mano y unos dos minutos
+    entre una y otra: se están pasando formatos de papel. Cerrar le quita la captura al
+    brigadista (`actividad_abierta_mia`), así que dejarlas abiertas era la única forma de seguir.
+    Por eso no se insiste en cerrar: se distingue.
+
+99. **Vista nueva `v_actividades_por_cerrar`** (migración `actividades_por_cerrar`): abiertas con
+    fecha pasada, con cuántas capturas tienen, cuándo llegó la última (participaciones y
+    contactos sin datos) y si ya tienen conclusión y foto de cierre. Lleva `security_invoker`.
+
+100. **Tres grupos en Actividades**, solo para quien puede cerrar: listas para cerrar (con gente
+     y sin capturas en `DIAS_SIN_CAPTURA_PARA_CERRAR` días, que es 3), sin nadie registrado (con
+     botón Cancelar, que se puede deshacer) y las que siguen capturando, que solo se mencionan.
+     Nada se cierra solo: cerrar sigue pidiendo conclusión y foto de cierre. Los tres días salen
+     de octubre, donde la captura tardía casi nunca pasó de cinco. **Falta confirmarlo** con quien
+     pasa los formatos.
+
+101. **"Actividades por cerrar" en el tablero cuenta otra cosa.** Antes: toda en curso más las
+     programadas vencidas (15 el 4 de noviembre). Ahora: las vencidas que piden cierre o
+     cancelación, sin las que siguen capturando. Una en curso con fecha de hoy ya no cuenta.
+
+102. **Ojo con "recorrida".** `v_seccion_resumen` la define como recorrido *realizado*. Mientras
+     las actividades no se cierran, la cuenta de secciones recorridas sale baja. Cerrar las que
+     ya están listas la corrige sola.
+
+103. **Captura en serie.** "Registrar a alguien más" queda enfocado, así que Enter pasa a la
+     siguiente, y la pantalla de guardado dice cuántas van en la sesión, para cuadrar contra el
+     montón de formatos. La ubicación ya se conservaba entre capturas. No se hizo un formato de
+     papel imprimible: llevaría el aviso de privacidad, que sigue provisional.
+
+104. **"Programar recorrido" en Estructura territorial.** Al abrir una sección por recorrer de
+     prioridad A o B aparece el botón, que abre el formulario de actividad con tipo recorrido y
+     esa sección ya puestos. El 4 de noviembre había 61 secciones con prioridad, 3 recorridas y
+     ningún recorrido programado a futuro.
+
+105. **Regla del cliente: nada se cierra solo.** Ni actividades, ni seguimientos, ni reportes de
+     territorio. Se cierran cuando alguien toca el botón y no antes. Se revisó el 4 de noviembre:
+     no hay `pg_cron`, ni crons en Vercel, ni triggers que cambien estatus; lo único automático es
+     que la foto de inicio pase una actividad de programada a en curso, que abre y no cierra. El
+     plazo de `DIAS_SIN_CAPTURA_PARA_CERRAR` solo acomoda el panel de vencidas. Si alguien propone
+     un cierre o una cancelación automática, la respuesta ya está aquí.

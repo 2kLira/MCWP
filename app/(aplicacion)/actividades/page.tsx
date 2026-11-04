@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { PortonAgenda } from "@/components/porton-agenda";
 import { useActuante } from "@/components/proveedor-actuante";
-import { estatusVisibles, puedeCrear, puedeVerListadosGenerales } from "@/lib/puertas-ui";
+import {
+  estatusVisibles,
+  puedeCrear,
+  puedeEditar,
+  puedeVerListadosGenerales,
+} from "@/lib/puertas-ui";
 import { useConsulta } from "@/lib/usar-consulta";
 import { demarcacionPorId } from "@/lib/demarcaciones";
 import {
@@ -19,6 +24,7 @@ import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
 import { Estado } from "@/components/sistema/estado";
 import { Hoja } from "@/components/actividades/hoja";
 import { FormularioActividad } from "@/components/actividades/formulario-actividad";
+import { PorCerrar } from "@/components/actividades/por-cerrar";
 
 const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
 
@@ -37,6 +43,8 @@ export default function Actividades() {
   const [tipo, setTipo] = useState<TipoActividad | "">("");
   const [estatus, setEstatus] = useState<EstatusActividad | "">("");
   const [abierta, setAbierta] = useState(false);
+  // Sube cuando el panel de vencidas cancela una: la tabla de abajo tiene que enterarse.
+  const [version, setVersion] = useState(0);
 
   const actividades = useConsulta<Actividad[]>(
     () =>
@@ -45,7 +53,7 @@ export default function Actividades() {
         estatus: estatus || undefined,
       }),
     [],
-    [actuante.id, tipo, estatus],
+    [actuante.id, tipo, estatus, version],
   );
 
   // El brigadista no navega el sistema por listados generales: se le manda a una actividad
@@ -106,6 +114,11 @@ export default function Actividades() {
           </button>
         )}
       </div>
+
+      {/* Solo para quien puede cerrar: al resto no le sirve saber qué falta para hacerlo. */}
+      {puedeEditar(actuante, "actividad") && (
+        <PorCerrar alCambiar={() => setVersion((v) => v + 1)} />
+      )}
 
       <div className="tarjeta overflow-x-auto">
         {actividades.cargando ? (

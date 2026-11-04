@@ -183,6 +183,62 @@ export async function cambiarEstatus(
   );
 }
 
+/**
+ * Días sin capturas a partir de los cuales una actividad vencida se da por terminada. Casi todo
+ * se captura después (se pasan los formatos de papel en la noche o días más tarde) y cerrar le
+ * quita la captura al brigadista, así que la fecha sola no dice nada. Con los datos de octubre,
+ * la captura tardía casi nunca pasa de cinco días, y una actividad que lleva tres sin nada
+ * normalmente ya terminó. Ver PENDIENTES.md.
+ *
+ * Solo sirve para sugerir. **Nada se cierra solo**: ni con este plazo, ni con un cron, ni con un
+ * trigger. Una actividad sigue abierta hasta que alguien la cierra. Lo pidió el cliente.
+ */
+export const DIAS_SIN_CAPTURA_PARA_CERRAR = 3;
+
+export type ActividadPorCerrar = {
+  id: string;
+  nombre: string;
+  tipo: TipoActividad;
+  fecha: string;
+  estatus: EstatusActividad;
+  seccion_clave: string | null;
+  demarcacion_id: number | null;
+  capturas: number;
+  ultima_captura: string | null;
+  tiene_conclusion: boolean;
+  tiene_foto_cierre: boolean;
+};
+
+/**
+ * Cómo va una actividad vencida: sin nadie (probablemente no se hizo), capturando (todavía
+ * llegan formatos, se deja abierta) o lista para cerrar.
+ */
+export type GrupoCierre = "sin_gente" | "capturando" | "lista";
+
+function limiteSinCaptura(): Date {
+  return new Date(Date.now() - DIAS_SIN_CAPTURA_PARA_CERRAR * 24 * 60 * 60 * 1000);
+}
+
+export function grupoDeCierre(a: ActividadPorCerrar): GrupoCierre {
+  if (a.capturas === 0 || !a.ultima_captura) return "sin_gente";
+  return new Date(a.ultima_captura) > limiteSinCaptura() ? "capturando" : "lista";
+}
+
+/** Abiertas con la fecha ya pasada. RLS recorta lo que cada quien alcanza. */
+export function actividadesPorCerrar(): Promise<Resultado<ActividadPorCerrar[]>> {
+  return lista<ActividadPorCerrar>(
+    db().from("v_actividades_por_cerrar").select("*").order("fecha", { ascending: true }),
+  );
+}
+
+/**
+ * El filtro de "pide cierre" para contar en la base: sin capturas, o la última ya es vieja. Es la
+ * misma regla que `grupoDeCierre`, escrita para PostgREST.
+ */
+export function filtroPideCierre(): string {
+  return `capturas.eq.0,ultima_captura.lt.${limiteSinCaptura().toISOString()}`;
+}
+
 /** Al cerrar, lo único que escribe el responsable es la conclusión. */
 export async function cerrarActividad(
   usuario: UsuarioActuante | null,

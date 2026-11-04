@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Fragment, useMemo, useState } from "react";
 import {
   ChartPie,
@@ -20,7 +21,9 @@ import { Estado } from "@/components/sistema/estado";
 import { TarjetaCifra } from "@/components/sistema/tarjeta-cifra";
 import { PortonAgenda } from "@/components/porton-agenda";
 import { useActuante } from "@/components/proveedor-actuante";
-import { puedeVerListadosGenerales } from "@/lib/puertas-ui";
+import { puedeCrear, puedeVerListadosGenerales } from "@/lib/puertas-ui";
+import { Hoja } from "@/components/actividades/hoja";
+import { FormularioActividad } from "@/components/actividades/formulario-actividad";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
   coloniasDeSeccionConTraslape,
@@ -173,7 +176,32 @@ function NotaSeccion({ seccion, tieneGeometria }: { seccion: SeccionResumen; tie
   return null;
 }
 
-function PanelColonias({ estado }: { estado: ColoniaDeSeccion[] | "cargando" | undefined }) {
+function PanelColonias({
+  estado,
+  alProgramar,
+}: {
+  estado: ColoniaDeSeccion[] | "cargando" | undefined;
+  /** Solo en secciones por recorrer y para quien puede crear actividades. */
+  alProgramar?: () => void;
+}) {
+  return (
+    <>
+      {/* De "qué falta" a "cuándo vamos" sin salir de la tabla: el 4 de noviembre había 61
+          secciones con prioridad, tres recorridas y ningún recorrido programado. */}
+      {alProgramar && (
+        <div className="px-4 pt-3">
+          <button type="button" onClick={alProgramar} className="boton">
+            <Flag className="size-4" aria-hidden />
+            Programar recorrido
+          </button>
+        </div>
+      )}
+      <ListaColonias estado={estado} />
+    </>
+  );
+}
+
+function ListaColonias({ estado }: { estado: ColoniaDeSeccion[] | "cargando" | undefined }) {
   if (estado === undefined || estado === "cargando") {
     return <p className="px-4 py-3 text-xs text-tinta-tenue">Cargando colonias…</p>;
   }
@@ -224,12 +252,14 @@ function ListaPrioridad({
   seccionAbierta,
   colonias,
   onAlternar,
+  onProgramar,
 }: {
   titulo: string;
   filas: SeccionResumen[];
   seccionAbierta: string | null;
   colonias: Record<string, ColoniaDeSeccion[] | "cargando">;
   onAlternar: (seccion: SeccionResumen) => void;
+  onProgramar?: (seccion: SeccionResumen) => void;
 }) {
   const pendientes = filas.filter((s) => !s.recorrida).length;
 
@@ -281,7 +311,12 @@ function ListaPrioridad({
                     {abierta && (
                       <tr className="bg-superficie-hundida/40">
                         <td colSpan={6} className="p-0!">
-                          <PanelColonias estado={colonias[s.clave]} />
+                          <PanelColonias
+                            estado={colonias[s.clave]}
+                            alProgramar={
+                              onProgramar && !s.recorrida ? () => onProgramar(s) : undefined
+                            }
+                          />
                         </td>
                       </tr>
                     )}
@@ -301,6 +336,10 @@ export default function Territorio() {
   const [abierta, setAbierta] = useState<number | null>(null);
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
   const [colonias, setColonias] = useState<Record<string, ColoniaDeSeccion[] | "cargando">>({});
+  const router = useRouter();
+  // La sección para la que se está programando un recorrido. Con valor, la hoja está abierta.
+  const [programando, setProgramando] = useState<string | null>(null);
+  const puedeProgramar = puedeCrear(actuante, "actividad");
 
   const demarcaciones = useConsulta<DemarcacionResumen[]>(
     () => demarcacionesResumen(actuante),
@@ -624,6 +663,7 @@ export default function Territorio() {
               seccionAbierta={seccionAbierta}
               colonias={colonias}
               onAlternar={alternarSeccion}
+              onProgramar={puedeProgramar ? (sec) => setProgramando(sec.clave) : undefined}
             />
             <ListaPrioridad
               titulo="Prioridad B"
@@ -631,10 +671,28 @@ export default function Territorio() {
               seccionAbierta={seccionAbierta}
               colonias={colonias}
               onAlternar={alternarSeccion}
+              onProgramar={puedeProgramar ? (sec) => setProgramando(sec.clave) : undefined}
             />
           </div>
         )}
       </section>
+
+      <Hoja
+        titulo="Programar recorrido"
+        abierta={programando !== null}
+        alCerrar={() => setProgramando(null)}
+      >
+        {programando && (
+          <FormularioActividad
+            key={programando}
+            inicial={{ tipo: "recorrido", seccionClave: programando }}
+            alCrear={(id) => {
+              setProgramando(null);
+              router.push(`/actividades/${id}` as never);
+            }}
+          />
+        )}
+      </Hoja>
     </div>
   );
 }

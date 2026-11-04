@@ -5,7 +5,6 @@ import { X } from "lucide-react";
 import {
   crearSeguimiento,
   type EstadoSeguimiento,
-  type FilaBandeja,
   type TipoSeguimiento,
 } from "@/lib/datos/seguimientos";
 import { ETIQUETA_ESTADO_SEGUIMIENTO, ETIQUETA_TIPO_SEGUIMIENTO } from "@/components/seguimiento/utilidades";
@@ -14,22 +13,26 @@ const TIPOS: TipoSeguimiento[] = ["llamada", "whatsapp", "invitacion", "reunion"
 const ESTADOS: EstadoSeguimiento[] = ["pendiente", "en_seguimiento", "atendido"];
 
 /**
- * Hoja para registrar un seguimiento desde el renglón de la bandeja: tipo, nota y estado. Al
- * guardar avisa al padre, que recarga la bandeja.
+ * Hoja para registrar un seguimiento con detalle: tipo, nota y estado. La abren la bandeja y la
+ * ficha de la persona; al guardar avisa al padre, que recarga lo suyo.
  */
 export function HojaSeguimiento({
-  fila,
+  persona,
   actuanteId,
+  tipoInicial = "llamada",
+  estadoInicial = "en_seguimiento",
   alCerrar,
   alGuardar,
 }: {
-  fila: FilaBandeja;
+  persona: { id: string; nombre: string };
   actuanteId: string;
+  tipoInicial?: TipoSeguimiento;
+  estadoInicial?: EstadoSeguimiento;
   alCerrar: () => void;
   alGuardar: () => void;
 }) {
-  const [tipo, setTipo] = useState<TipoSeguimiento>("llamada");
-  const [estado, setEstado] = useState<EstadoSeguimiento>("en_seguimiento");
+  const [tipo, setTipo] = useState<TipoSeguimiento>(tipoInicial);
+  const [estado, setEstado] = useState<EstadoSeguimiento>(estadoInicial);
   const [nota, setNota] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -38,7 +41,7 @@ export function HojaSeguimiento({
     setGuardando(true);
     setAviso(null);
     crearSeguimiento({
-      personaId: fila.persona_id,
+      personaId: persona.id,
       tipo,
       nota: nota.trim() || null,
       estado,
@@ -68,7 +71,7 @@ export function HojaSeguimiento({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-tinta-tenue">Registrar seguimiento</p>
-            <h2 className="truncate text-lg font-semibold text-tinta">{fila.nombre}</h2>
+            <h2 className="truncate text-lg font-semibold text-tinta">{persona.nombre}</h2>
           </div>
           <button
             type="button"
