@@ -12,7 +12,12 @@
  */
 
 import type { PostgrestError } from "@supabase/supabase-js";
-import type { EstatusActividad, TipoActividad, UsuarioActuante } from "@/lib/tipos";
+import {
+  BRIGADA_INFORME,
+  type EstatusActividad,
+  type TipoActividad,
+  type UsuarioActuante,
+} from "@/lib/tipos";
 import { db, resultado, type Resultado } from "@/lib/datos/cliente";
 import { demarcacionPorId } from "@/lib/demarcaciones";
 import { compararPadron } from "@/lib/personas";
@@ -98,6 +103,7 @@ export type ActividadDelDia = {
   id: string;
   tipo: TipoActividad;
   nombre: string;
+  fecha: string;
   hora: string | null;
   estatus: EstatusActividad;
   responsable: string | null;
@@ -167,6 +173,7 @@ type ActividadFila = {
   id: string;
   tipo: TipoActividad;
   nombre: string;
+  fecha: string;
   hora: string | null;
   estatus: EstatusActividad;
   seccion_clave: string | null;
@@ -175,7 +182,7 @@ type ActividadFila = {
 };
 
 const CAMPOS_ACTIVIDAD =
-  "id, tipo, nombre, hora, estatus, seccion_clave, asistentes_aprox, responsable:usuarios!actividades_responsable_id_fkey(nombre)";
+  "id, tipo, nombre, fecha, hora, estatus, seccion_clave, asistentes_aprox, responsable:usuarios!actividades_responsable_id_fkey(nombre)";
 
 function sumar(c: Categorias, p: PersonaDelDia, nueva: boolean) {
   c.alcanzadas += 1;
@@ -292,9 +299,37 @@ export async function reporteDiario(
     for (const a of (extra.data ?? []) as unknown as ActividadFila[]) actividades.set(a.id, a);
   }
 
+  return {
+    datos: {
+      fecha,
+      promovidasEseDia: promovidas.count ?? 0,
+      seguimientos: seguimientos.count ?? 0,
+      ...consolidar(nuevas.filas, participaciones.filas, actividades, menciones.filas),
+    },
+    sinEsquema: false,
+    aviso: null,
+  };
+}
+
+/** Lo que comparten el reporte del día y el de la Brigada informe. */
+type Consolidado = Pick<
+  ReporteDiario,
+  "total" | "actividades" | "secciones" | "capturistas" | "problematicas" | "urgentes"
+>;
+
+/**
+ * Agrupa las capturas por actividad, sección y capturista. Cada persona cuenta una sola vez por
+ * corte aunque llegue por su participación y por su registro.
+ */
+function consolidar(
+  nuevasFilas: PersonaNueva[],
+  participacionesFilas: ParticipacionDelDia[],
+  actividades: Map<string, ActividadFila>,
+  mencionesFilas: { problematicas: { nombre: string } | null }[],
+): Consolidado {
   const total = { ...CATEGORIAS_VACIAS };
   const vistas = new Set<string>();
-  const idsNuevas = new Set(nuevas.filas.map((p) => p.id));
+  const idsNuevas = new Set(nuevasFilas.map((p) => p.id));
   const porActividad = new Cortes<Categorias>(() => ({ ...CATEGORIAS_VACIAS }));
   const seccionesDeActividad = new Map<string, Map<string, number>>();
   const porSeccion = new Cortes<SeccionDelDia>((clave) => ({
@@ -328,16 +363,16 @@ export async function reporteDiario(
     }
   }
 
-  for (const p of participaciones.filas) {
+  for (const p of participacionesFilas) {
     if (p.personas) anotar(p.personas, p.actividad_id, p.registrador?.nombre ?? "Sin nombre");
   }
   // Las nuevas que no traen participación: registradas fuera de una actividad.
-  for (const p of nuevas.filas) {
+  for (const p of nuevasFilas) {
     anotar(p, p.actividad_origen, p.registrador?.nombre ?? "Sin nombre");
   }
 
   const conteoProblematicas = new Map<string, number>();
-  for (const m of menciones.filas) {
+  for (const m of mencionesFilas) {
     const nombre = m.problematicas?.nombre;
     if (nombre) conteoProblematicas.set(nombre, (conteoProblematicas.get(nombre) ?? 0) + 1);
   }
@@ -347,6 +382,7 @@ export async function reporteDiario(
       id: a.id,
       tipo: a.tipo,
       nombre: a.nombre,
+      fecha: a.fecha,
       hora: a.hora,
       estatus: a.estatus,
       responsable: a.responsable?.nombre ?? null,
@@ -365,25 +401,111 @@ export async function reporteDiario(
     );
 
   return {
-    datos: {
-      fecha,
-      total,
-      promovidasEseDia: promovidas.count ?? 0,
-      seguimientos: seguimientos.count ?? 0,
-      actividades: listaActividades,
-      secciones: porSeccion.valores(),
-      capturistas: porCapturista.valores(),
-      problematicas: [...conteoProblematicas.entries()]
-        .map(([problematica, n]) => ({ problematica, menciones: n }))
-        .sort((a, b) => b.menciones - a.menciones),
-      urgentes: [...urgentes.values()].sort(compararPadron).map((p) => ({
-        id: p.id,
-        nombre: p.nombre,
-        seccion: p.seccion_clave,
-        motivo: p.urgente_motivo,
-      })),
-    },
-    sinEsquema: false,
-    aviso: null,
+    total,
+    actividades: listaActividades,
+    secciones: porSeccion.valores(),
+    capturistas: porCapturista.valores(),
+    problematicas: [...conteoProblematicas.entries()]
+      .map(([problematica, n]) => ({ problematica, menciones: n }))
+      .sort((a, b) => b.menciones - a.menciones),
+    urgentes: [...urgentes.values()].sort(compararPadron).map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      seccion: p.seccion_clave,
+      motivo: p.urgente_motivo,
+    })),
   };
+}
+
+/* ---------------------------------------------------------------------------
+ * Reporte de la Brigada informe
+ * ------------------------------------------------------------------------- */
+
+export type ReporteInforme = Consolidado & {
+  /** El periodo pedido, sobre la fecha de cada actividad. Nulo es "desde el principio" o "hasta hoy". */
+  desde: string | null;
+  hasta: string | null;
+};
+
+export function reporteInformeVacio(desde: string | null, hasta: string | null): ReporteInforme {
+  const { fecha, promovidasEseDia, seguimientos, ...resto } = reporteVacio("");
+  void fecha;
+  void promovidasEseDia;
+  void seguimientos;
+  return { ...resto, desde, hasta };
+}
+
+/**
+ * Solo lo que se hizo en actividades de la Brigada informe (`actividades.brigada`), que va por
+ * aparte del resto. Las actividades pueden ser de cualquier tipo. Cuenta
+ * a quien se le anotó participación en una de ellas y a quien se registró con una de ellas como
+ * origen; una persona es "nueva" si su actividad de origen es del informe. El periodo se mide
+ * sobre la fecha de la actividad, no sobre la de la captura: casi todo se captura días después.
+ *
+ * El recorte por brigada va en la consulta, con `!inner` sobre la actividad, para no traer capturas
+ * de otras actividades y tirarlas después. RLS sigue decidiendo qué renglones llegan.
+ */
+export async function reporteInforme(
+  usuario: UsuarioActuante | null,
+  desde: string | null,
+  hasta: string | null,
+): Promise<Resultado<ReporteInforme>> {
+  void usuario;
+  const vacio = reporteInformeVacio(desde, hasta);
+  const brigada = BRIGADA_INFORME;
+
+  const [nuevas, participaciones, delInforme, menciones] = await Promise.all([
+    todas<PersonaNueva>((d, h) => {
+      let q = db()
+        .from("personas")
+        .select(
+          `${CAMPOS_PERSONA}, actividad_origen, registrador:usuarios!personas_registrada_por_fkey(nombre), ` +
+            "actividades!personas_actividad_origen_fkey!inner(brigada, fecha)",
+        )
+        .eq("actividades.brigada", brigada);
+      if (desde) q = q.gte("actividades.fecha", desde);
+      if (hasta) q = q.lte("actividades.fecha", hasta);
+      return q.order("created_at").order("id").range(d, h);
+    }),
+    todas<ParticipacionDelDia>((d, h) => {
+      let q = db()
+        .from("participaciones")
+        .select(
+          `actividad_id, registrador:usuarios!participaciones_registrada_por_fkey(nombre), personas(${CAMPOS_PERSONA}), ` +
+            "actividades!inner(brigada, fecha)",
+        )
+        .eq("actividades.brigada", brigada);
+      if (desde) q = q.gte("actividades.fecha", desde);
+      if (hasta) q = q.lte("actividades.fecha", hasta);
+      return q.order("created_at").order("id").range(d, h);
+    }),
+    todas<ActividadFila>((d, h) => {
+      let q = db().from("actividades").select(CAMPOS_ACTIVIDAD).eq("brigada", brigada);
+      if (desde) q = q.gte("fecha", desde);
+      if (hasta) q = q.lte("fecha", hasta);
+      return q.order("fecha", { ascending: false }).order("id").range(d, h);
+    }),
+    todas<{ problematicas: { nombre: string } | null }>((d, h) => {
+      let q = db()
+        .from("menciones_problematica")
+        .select("problematicas!inner(nombre), participaciones!inner(actividades!inner(brigada, fecha))")
+        .eq("participaciones.actividades.brigada", brigada);
+      if (desde) q = q.gte("participaciones.actividades.fecha", desde);
+      if (hasta) q = q.lte("participaciones.actividades.fecha", hasta);
+      return q.order("id").range(d, h);
+    }),
+  ]);
+
+  const error = nuevas.error ?? participaciones.error ?? delInforme.error ?? menciones.error;
+  if (error) return resultado(vacio, error, vacio);
+
+  const actividades = new Map(delInforme.filas.map((a) => [a.id, a]));
+  const consolidado = consolidar(nuevas.filas, participaciones.filas, actividades, menciones.filas);
+  // Aquí manda la fecha, porque abarca muchos días: la más reciente primero.
+  consolidado.actividades.sort(
+    (x, y) =>
+      y.fecha.localeCompare(x.fecha) || (x.hora ?? "99").localeCompare(y.hora ?? "99"),
+  );
+
+  return { datos: { ...consolidado, desde, hasta }, sinEsquema: false, aviso: null };
 }

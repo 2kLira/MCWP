@@ -5,7 +5,7 @@
 
 import type { PostgrestError } from "@supabase/supabase-js";
 import { estatusVisibles, puedeEditar } from "@/lib/puertas-ui";
-import type { EstatusActividad, TipoActividad, UsuarioActuante } from "@/lib/tipos";
+import type { Brigada, EstatusActividad, TipoActividad, UsuarioActuante } from "@/lib/tipos";
 import { db, lista, resultado, uno, type Resultado } from "@/lib/datos/cliente";
 import { totalContactosAnonimos } from "@/lib/datos/contactos-anonimos";
 
@@ -29,12 +29,19 @@ export type Actividad = {
   conclusion: string | null;
   cerrada_en: string | null;
   cerrada_por: string | null;
+  /** Nulo en las actividades normales; "informe" en las de la Brigada informe. */
+  brigada: Brigada | null;
   created_by: string | null;
   created_at: string;
 };
 
 export type FiltrosActividades = {
   tipo?: TipoActividad;
+  /**
+   * Nulo, o sin poner, es la lista general: deja fuera lo de la Brigada informe, que va aparte.
+   * "informe" trae solo las de esa brigada.
+   */
+  brigada?: Brigada | null;
   estatus?: EstatusActividad;
   desde?: string;
   hasta?: string;
@@ -57,6 +64,9 @@ export function listarActividades(
   let consulta = db().from("actividades").select("*");
   consulta = consulta.in("estatus", estatusVisibles(usuario));
   if (filtros.tipo) consulta = consulta.eq("tipo", filtros.tipo);
+  consulta = filtros.brigada
+    ? consulta.eq("brigada", filtros.brigada)
+    : consulta.is("brigada", null);
   // Si el filtro pedido cae fuera de lo que este rol alcanza a ver, el cruce con estatusVisibles
   // de arriba deja la consulta vacía en vez de mostrar algo que no le toca.
   if (filtros.estatus) consulta = consulta.eq("estatus", filtros.estatus);

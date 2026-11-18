@@ -5,14 +5,17 @@ import { useActuante } from "@/components/proveedor-actuante";
 import { alcanceDe, esAdmin } from "@/lib/puertas-ui";
 import { demarcacionPorId, DEMARCACIONES } from "@/lib/demarcaciones";
 import { rasgoPorClave } from "@/lib/territorio";
-import { ETIQUETA_TIPO_ACTIVIDAD, type TipoActividad } from "@/lib/tipos";
+import {
+  ETIQUETA_TIPO_ACTIVIDAD,
+  TIPOS_ACTIVIDAD as TIPOS,
+  type Brigada,
+  type TipoActividad,
+} from "@/lib/tipos";
 import { crearActividad } from "@/lib/datos/actividades";
 import { usuariosAsignables, type UsuarioBreve } from "@/components/actividades/datos";
 import { CampoSeccion } from "@/components/actividades/campo-seccion";
 import { Campo } from "@/components/campo";
 import { InvitarBrigadistas } from "@/components/actividades/invitar-brigadistas";
-
-const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
 
 /**
  * Alta de actividad. No se pregunta quién la crea ni cuándo se captura: el sistema lo pone solo.
@@ -27,10 +30,13 @@ const TIPOS: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
 export function FormularioActividad({
   alCrear,
   inicial,
+  brigada,
 }: {
   alCrear: (id: string) => void;
   /** Para abrirlo ya encaminado, como "Programar recorrido" desde una sección por recorrer. */
   inicial?: { tipo?: TipoActividad; seccionClave?: string };
+  /** Abierta desde la Brigada informe: la actividad nace dentro de ella. */
+  brigada?: Brigada;
 }) {
   const { actuante } = useActuante();
   const alcance = alcanceDe(actuante);
@@ -97,6 +103,7 @@ export function FormularioActividad({
       responsable_id: responsableId || null,
       seccion_clave: seccionClave || null,
       demarcacion_id: demarcacionId,
+      brigada: brigada ?? null,
       created_by: actuante.id,
       estatus: "programada",
     });

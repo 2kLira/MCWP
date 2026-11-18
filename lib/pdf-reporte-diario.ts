@@ -52,16 +52,38 @@ function fechaLarga(fecha: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+function fechaCorta(fecha: string): string {
+  return new Date(`${fecha}T00:00:00`).toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export function nombreArchivoPdf(fecha: string): string {
   return `reporte-del-dia-${fecha}.pdf`;
 }
 
-export function pdfReporteDiario({ jsPDF, autoTable }: Modulos, r: ReporteDiario): Blob {
+/** Lo que cambia cuando el mismo formato sirve a otro reporte, como el de la Brigada informe. */
+export type EncabezadoPdf = {
+  titulo: string;
+  subtitulo: string;
+  /** Lo que va bajo la cifra de actividades y bajo la de urgentes. */
+  apoyoActividades: string;
+  apoyoUrgentes: string;
+};
+
+export function pdfReporteDiario(
+  { jsPDF, autoTable }: Modulos,
+  r: ReporteDiario,
+  encabezado?: EncabezadoPdf,
+): Blob {
   const doc = new jsPDF({ unit: "pt", format: "letter" });
   const ancho = doc.internal.pageSize.getWidth();
   const util = ancho - MARGEN * 2;
   const t = r.total;
   const recorridos = r.actividades.filter((a) => a.tipo === "recorrido").length;
+  const cuando = encabezado ? "en este periodo" : "este día";
 
   /** Dónde terminó la última tabla, para encimar la siguiente debajo. */
   const finDeTabla = () =>
@@ -73,11 +95,11 @@ export function pdfReporteDiario({ jsPDF, autoTable }: Modulos, r: ReporteDiario
   doc.setTextColor(...TINTA);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
-  doc.text("Reporte del día", MARGEN, 52);
+  doc.text(encabezado?.titulo ?? "Reporte del día", MARGEN, 52);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.setTextColor(...SUAVE);
-  doc.text(`${fechaLarga(r.fecha)} · Oaxaca de Juárez`, MARGEN, 70);
+  doc.text(encabezado?.subtitulo ?? `${fechaLarga(r.fecha)} · Oaxaca de Juárez`, MARGEN, 70);
 
   // Cuatro cifras
   const cifras: [string, string, string][] = [
@@ -86,9 +108,14 @@ export function pdfReporteDiario({ jsPDF, autoTable }: Modulos, r: ReporteDiario
     [
       "Actividades",
       formato(r.actividades.length),
-      `${formato(recorridos)} ${recorridos === 1 ? "recorrido" : "recorridos"}`,
+      encabezado?.apoyoActividades ??
+        `${formato(recorridos)} ${recorridos === 1 ? "recorrido" : "recorridos"}`,
     ],
-    ["Urgente contactar", formato(t.urgentes), `${formato(r.seguimientos)} seguimientos`],
+    [
+      "Urgente contactar",
+      formato(t.urgentes),
+      encabezado?.apoyoUrgentes ?? `${formato(r.seguimientos)} seguimientos`,
+    ],
   ];
   const separacion = 8;
   const anchoCifra = (util - separacion * 3) / 4;
@@ -178,7 +205,7 @@ export function pdfReporteDiario({ jsPDF, autoTable }: Modulos, r: ReporteDiario
     y += 10;
     doc.setFontSize(9);
     doc.setTextColor(...SUAVE);
-    doc.text("Ninguna actividad programada ni con capturas este día.", MARGEN, y);
+    doc.text(`Ninguna actividad programada ni con capturas ${cuando}.`, MARGEN, y);
     y += 30;
   } else {
     autoTable(doc, {
@@ -186,7 +213,8 @@ export function pdfReporteDiario({ jsPDF, autoTable }: Modulos, r: ReporteDiario
       startY: y,
       head: [["Actividad", "Responsable", "Secciones", "Alcanz.", "Promov.", "Info", "Urg."]],
       body: r.actividades.map((a) => [
-        `${a.nombre}\n${ETIQUETA_TIPO_ACTIVIDAD[a.tipo]}${a.hora ? ` · ${a.hora.slice(0, 5)}` : ""} · ${ETIQUETA_ESTATUS[a.estatus]}`,
+        // La fecha solo se escribe si no es la del reporte: en el del informe siempre va.
+        `${a.nombre}\n${ETIQUETA_TIPO_ACTIVIDAD[a.tipo]}${a.fecha !== r.fecha ? ` · ${fechaCorta(a.fecha)}` : ""}${a.hora ? ` · ${a.hora.slice(0, 5)}` : ""} · ${ETIQUETA_ESTATUS[a.estatus]}`,
         a.responsable ?? "-",
         a.seccionesAlcanzadas.length > 0 ? a.seccionesAlcanzadas.join(", ") : (a.seccion ?? "-"),
         String(a.categorias.alcanzadas),
@@ -221,7 +249,7 @@ export function pdfReporteDiario({ jsPDF, autoTable }: Modulos, r: ReporteDiario
               String,
             ),
           ])
-        : [["Sin personas alcanzadas este día.", "", "", "", "", "", "", ""]],
+        : [[`Sin personas alcanzadas ${cuando}.`, "", "", "", "", "", "", ""]],
     columnStyles: {
       2: { halign: "right", fontStyle: "bold" },
       3: { halign: "right" },

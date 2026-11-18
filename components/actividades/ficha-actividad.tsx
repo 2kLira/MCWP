@@ -30,7 +30,12 @@ import {
 } from "@/components/actividades/evidencia";
 import { demarcacionPorId } from "@/lib/demarcaciones";
 import { esAdmin, puedeCrear, puedeEditar } from "@/lib/puertas-ui";
-import { ETIQUETA_ESTATUS, ETIQUETA_TIPO_ACTIVIDAD, type EstatusActividad } from "@/lib/tipos";
+import {
+  ETIQUETA_BRIGADA,
+  ETIQUETA_ESTATUS,
+  ETIQUETA_TIPO_ACTIVIDAD,
+  type EstatusActividad,
+} from "@/lib/tipos";
 import { useConsulta } from "@/lib/usar-consulta";
 import {
   cambiarEstatus,
@@ -181,6 +186,7 @@ export function FichaActividad({ id }: { id: string }) {
         titulo={a.nombre}
         apoyo={
           <>
+            {a.brigada && `${ETIQUETA_BRIGADA[a.brigada]} · `}
             {ETIQUETA_TIPO_ACTIVIDAD[a.tipo]}
             {a.seccion_clave && (
               <>
@@ -190,7 +196,11 @@ export function FichaActividad({ id }: { id: string }) {
             )}
           </>
         }
-        volver={{ href: "/actividades", etiqueta: "Actividades" }}
+        volver={
+          a.brigada
+            ? { href: "/informe", etiqueta: ETIQUETA_BRIGADA[a.brigada] }
+            : { href: "/actividades", etiqueta: "Actividades" }
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2.5">
@@ -467,7 +477,7 @@ function BloqueCierre({
   const [error, setError] = useState<string | null>(null);
 
   async function confirmar() {
-    if (!conclusion.trim() || !fotoCierre || cerrando) return;
+    if (!conclusion.trim() || cerrando) return;
     setCerrando(true);
     setError(null);
     const r = await cerrarActividad(actuante, id, conclusion.trim());
@@ -499,7 +509,7 @@ function BloqueCierre({
         </label>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm text-tinta-suave">Foto de evidencia final</span>
+          <span className="text-sm text-tinta-suave">Foto de evidencia final (opcional)</span>
           {fotoCierre ? (
             <LineaEvidencia etiqueta="Evidencia final" foto={fotoCierre} />
           ) : (
@@ -516,7 +526,7 @@ function BloqueCierre({
 
         <button
           type="button"
-          disabled={!conclusion.trim() || !fotoCierre || cerrando}
+          disabled={!conclusion.trim() || cerrando}
           onClick={confirmar}
           className={`${primaria ? "boton-primario" : "boton"} sm:self-start`}
         >

@@ -85,6 +85,18 @@ export const ETIQUETA_RANGO_EDAD: Record<RangoEdad, string> = {
 };
 
 export type TipoActividad = "reunion" | "activismo" | "recorrido" | "crucero";
+
+/** En el orden en que se ofrecen en los selectores. */
+export const TIPOS_ACTIVIDAD: TipoActividad[] = ["reunion", "activismo", "recorrido", "crucero"];
+
+/**
+ * Brigada informe (18 de noviembre de 2026): no es un tipo, es un espacio aparte en /informe donde
+ * se abren actividades de cualquier tipo. Van marcadas en `actividades.brigada`, no se mezclan con
+ * la lista general de Actividades y tienen su propio reporte.
+ */
+export type Brigada = "informe";
+export const BRIGADA_INFORME: Brigada = "informe";
+export const ETIQUETA_BRIGADA: Record<Brigada, string> = { informe: "Brigada informe" };
 export type EstatusActividad =
   | "programada"
   | "en_curso"

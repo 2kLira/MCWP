@@ -211,7 +211,11 @@ $$;
 -- Actividades
 -- ---------------------------------------------------------------------------
 
-create type tipo_actividad    as enum ('reunion','activismo','recorrido','crucero');
+-- 'informe' se agregó el 18 de noviembre de 2026 (migración tipo_actividad_informe) y se
+-- reemplazó ese mismo día por la columna `actividades.brigada`. No se usa: la restricción
+-- actividades_tipo_no_informe lo bloquea. Sigue aquí porque un enum no suelta valores sin rehacer
+-- las vistas que leen `tipo`.
+create type tipo_actividad    as enum ('reunion','activismo','recorrido','crucero','informe');
 create type estatus_actividad as enum ('programada','en_curso','realizada','cancelada');
 
 create table actividades (
@@ -234,9 +238,16 @@ create table actividades (
   conclusion      text,
   cerrada_en      timestamptz,
   cerrada_por     uuid references usuarios(id),
+  -- Brigada informe (18 de noviembre de 2026): un espacio aparte donde se abren actividades de
+  -- cualquier tipo, con su propia lista y su propio reporte. Nulo es una actividad normal.
+  brigada         text constraint actividades_brigada_valida
+                    check (brigada is null or brigada in ('informe')),
   created_by      uuid references usuarios(id),
-  created_at      timestamptz not null default now()
+  created_at      timestamptz not null default now(),
+  constraint actividades_tipo_no_informe check (tipo <> 'informe')
 );
+
+create index actividades_brigada_idx on actividades (brigada) where brigada is not null;
 
 alter table personas
   add constraint personas_actividad_origen_fkey

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { CalendarDays, Download } from "lucide-react";
+import { CalendarDays, Download, Megaphone } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -70,10 +70,14 @@ export default function Reportes() {
     <div className="flex flex-col gap-5">
       <EncabezadoPagina titulo="Reportes" apoyo="Calculados en vivo sobre lo capturado." />
 
-      <div>
+      <div className="flex flex-wrap gap-2">
         <Link href={"/reportes/diario" as never} className="boton-primario">
           <CalendarDays className="size-4" aria-hidden />
           Reporte del día
+        </Link>
+        <Link href={"/reportes/informe" as never} className="boton">
+          <Megaphone className="size-4" aria-hidden />
+          Reporte Brigada informe
         </Link>
       </div>
 

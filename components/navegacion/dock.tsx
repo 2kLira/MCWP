@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 /** Grupos por tarea. El corte visual hace que diez destinos se lean como tres decisiones. */
 const GRUPOS = [
   ["/", "/mapa"],
-  ["/personas", "/actividades", "/agenda"],
+  ["/personas", "/actividades", "/informe", "/agenda"],
   ["/territorio", "/seguimiento", "/reportes", "/encuestas"],
   ["/registrar-representante", "/importar", "/exportar"],
   ["/usuarios"],

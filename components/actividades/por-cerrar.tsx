@@ -30,7 +30,8 @@ function hace(iso: string): string {
 /**
  * Las actividades vencidas, separadas por lo que piden. Nada se cierra solo, por regla del
  * cliente: cerrar pide la
- * conclusión y la foto de cierre, y le quita la captura al brigadista, así que la decisión sigue
+ * conclusión (la foto de cierre es opcional desde el 18 de noviembre de 2026), y le quita la
+ * captura al brigadista, así que la decisión sigue
  * siendo de quien coordina. Esto solo le dice cuáles ya puede cerrar y qué les falta.
  */
 export function PorCerrar({ alCambiar }: { alCambiar: () => void }) {
@@ -68,14 +69,7 @@ export function PorCerrar({ alCambiar }: { alCambiar: () => void }) {
                   {a.capturas === 1 ? "captura" : "capturas"}
                   {a.ultima_captura && ` · la última ${hace(a.ultima_captura)}`}
                 </span>
-                {(!a.tiene_conclusion || !a.tiene_foto_cierre) && (
-                  <span className="text-tinta">
-                    Falta{" "}
-                    {[!a.tiene_conclusion && "conclusión", !a.tiene_foto_cierre && "foto de cierre"]
-                      .filter(Boolean)
-                      .join(" y ")}
-                  </span>
-                )}
+                {!a.tiene_conclusion && <span className="text-tinta">Falta conclusión</span>}
               </RenglonVencida>
             ))}
           </Grupo>

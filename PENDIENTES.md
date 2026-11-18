@@ -1275,3 +1275,34 @@ para saber qué pidió cada quien, y el contacto (WhatsApp) y el registro iban p
      que la foto de inicio pase una actividad de programada a en curso, que abre y no cierra. El
      plazo de `DIAS_SIN_CAPTURA_PARA_CERRAR` solo acomoda el panel de vencidas. Si alguien propone
      un cierre o una cancelación automática, la respuesta ya está aquí.
+
+## Brigada informe y cierre sin foto final (18 de noviembre de 2026)
+
+106. **Brigada informe: un espacio aparte, no un tipo.** El cliente la pidió para el informe: ahí
+     se abren varias actividades, de cualquier tipo (reunión, recorrido, etc.), que no se mezclan
+     con la lista general. Van marcadas en la columna nueva `actividades.brigada` (nulo = normal,
+     `'informe'` = de la brigada; migración `actividades_brigada_informe`). Pantalla `/informe`,
+     en el menú junto a Actividades, con su propia lista, filtros y "Nueva actividad", que crea la
+     actividad ya dentro de la brigada. Cada actividad tiene su ficha de siempre (invitar,
+     capturar, cerrar) y al volver regresa a la brigada. La lista de Actividades deja fuera las del
+     informe. En la agenda, el tablero, el mapa y el reporte del día siguen saliendo con las
+     demás, porque el brigadista las encuentra por la agenda. **Falta confirmar** si el cliente las
+     quiere fuera también ahí. No se puede mover una actividad existente a la brigada desde la
+     pantalla; si se pide, es un campo más en la edición.
+
+     Primero se hizo como quinto valor de `tipo_actividad` (migración `tipo_actividad_informe`) y
+     el cliente aclaró ese mismo día que no era un tipo. El valor se queda en el enum porque quitarlo
+     obliga a rehacer las vistas que leen `tipo`; la restricción `actividades_tipo_no_informe` lo
+     bloquea y ningún renglón lo usó.
+
+107. **Reporte de la Brigada informe en `/reportes/informe`.** Mismas categorías y cortes que el
+     reporte del día (actividades, secciones, capturistas, problemáticas, urgentes), con PDF y
+     Excel, pero solo con lo capturado en actividades de la brigada. El periodo es opcional y se
+     mide con la fecha de la actividad, no con la de la captura, porque casi todo se captura
+     días después (entrada 98). Una persona cuenta como "nueva" si su actividad de origen es de la
+     brigada. El recorte va en la consulta con `!inner` sobre `brigada`, no después.
+
+108. **La foto de evidencia final ya no es obligatoria para cerrar**, en ninguna actividad. Cerrar
+     pide solo la conclusión; si hay foto se muestra y se guarda igual. El panel de vencidas ya no
+     dice "falta foto de cierre". Esto corrige lo que decían las entradas 99 y 100. La base nunca
+     la exigía: el requisito vivía solo en la pantalla.
