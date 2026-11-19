@@ -62,6 +62,11 @@ export type DatosRegistroPublico = {
   colonia_id: number | null;
   lat: number | null;
   lng: number | null;
+  /**
+   * La que escribió de su credencial. Solo cuenta si su ubicación no la resolvió: con punto,
+   * la base usa la del punto (responder_encuesta y sellar_persona).
+   */
+  seccion_clave: string;
   genero: string | null;
   fecha_nacimiento: string;
   quiere_participar: boolean;

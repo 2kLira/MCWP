@@ -1116,7 +1116,7 @@ spec: lo pidió el cliente.
 80. **Una encuesta con respuestas ya no cambia sus preguntas.** Las respuestas guardan los ids de
     pregunta y de opción; editar las preguntas haría mentir a las gráficas. Se pueden cambiar
     título, descripción, mensaje final y abrir o cerrar. Para preguntar otra cosa, encuesta nueva.
-    No se borran encuestas: se cierran.
+    No se borran encuestas: se cierran. *(Superado por la entrada 110: ahora sí se pueden borrar.)*
 
 81. **El cierre es un mensaje general más uno por opción elegida.** Cada opción puede llevar un
     mensaje que se le muestra al final a quien la eligió. No hay lógica de saltos entre preguntas
@@ -1306,3 +1306,29 @@ para saber qué pidió cada quien, y el contacto (WhatsApp) y el registro iban p
      pide solo la conclusión; si hay foto se muestra y se guarda igual. El panel de vencidas ya no
      dice "falta foto de cierre". Esto corrige lo que decían las entradas 99 y 100. La base nunca
      la exigía: el requisito vivía solo en la pantalla.
+
+## Encuestas: sección, datos obligatorios y borrar (20 de noviembre de 2026)
+
+Lo pidió el cliente por WhatsApp el 18 de noviembre.
+
+109. **En las encuestas con registro todo es obligatorio salvo la ubicación**, y se pregunta la
+     sección electoral. Nombre y los dos apellidos, teléfono, colonia, calle y número, sección,
+     género y fecha de nacimiento. Las dos casillas de "¿Te gustaría…?" se quedan como están: son
+     preferencias, no datos. La regla vive en `responder_encuesta` (seguridad.sql, sección 14) y
+     la pantalla solo la adelanta. La sección va en un paso propio después del domicilio y **no
+     se pregunta si compartió su ubicación y el punto cae en una sección**: ahí se le muestra la
+     del punto ("nada de pedir la sección cuando hay coordenada"). Si la escribe, se acepta sin
+     ceros a la izquierda y tiene que estar en el catálogo de 169. Dos cosas que pueden estorbar
+     en campo, a vigilar:
+     · Quien tiene un solo apellido no puede contestar. Si pasa, la salida es quitar ese requisito
+       en la función, no inventar un apellido.
+     · Quien vive fuera de Oaxaca de Juárez, o en una colonia que no está en el catálogo de 286,
+       tampoco. Hoy eso es a propósito: la sección tiene que existir en `secciones`.
+     El interruptor "obligatoria" de cada pregunta del editor no se tocó: lo sigue decidiendo el
+     administrador pregunta por pregunta, y por omisión ya viene encendido.
+
+110. **Las encuestas ya se pueden borrar**, lo que deja sin efecto el final de la entrada 80. Solo
+     el administrador, desde la pantalla de la encuesta, con confirmación. `borrar_encuesta` se
+     lleva preguntas y respuestas de verdad; la bitácora guarda cada renglón borrado. **No** borra
+     a las personas que dejaron sus datos por esa encuesta: ya son fichas del padrón y pueden
+     tener más historia. Si eran de prueba, se borran desde su ficha.

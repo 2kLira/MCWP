@@ -165,3 +165,12 @@ export function cambiarActivaEncuesta(
     db().from("encuestas").update({ activa }).eq("id", id).select("id").single(),
   );
 }
+
+/**
+ * Borra la encuesta con sus preguntas y sus respuestas, para siempre. Las personas que dejaron
+ * sus datos se quedan en el padrón. Lo decide `borrar_encuesta` (seguridad.sql, sección 14).
+ */
+export async function borrarEncuesta(id: string): Promise<Resultado<boolean>> {
+  const { error } = await db().rpc("borrar_encuesta", { p_id: id });
+  return resultado(!error, error, false);
+}

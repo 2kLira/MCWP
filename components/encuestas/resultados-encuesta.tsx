@@ -2,9 +2,18 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatDistanceToNowStrict } from "date-fns";
 import { es } from "date-fns/locale";
-import { Download, MessageSquareText, Pencil, UserPlus, Users } from "lucide-react";
+import {
+  Download,
+  MessageSquareText,
+  Pencil,
+  Trash2,
+  TriangleAlert,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { useActuante } from "@/components/proveedor-actuante";
 import { EncabezadoPagina } from "@/components/sistema/encabezado-pagina";
 import { Estado } from "@/components/sistema/estado";
@@ -14,6 +23,7 @@ import { TarjetaQr } from "@/components/encuestas/tarjeta-qr";
 import { descargarCsv } from "@/lib/csv";
 import { PUNTOS_ESCALA, type PreguntaEncuesta } from "@/lib/encuestas";
 import {
+  borrarEncuesta,
   cambiarActivaEncuesta,
   conteosDeEncuesta,
   obtenerEncuesta,
@@ -34,6 +44,9 @@ export function ResultadosEncuesta({ id }: { id: string }) {
   const [version, setVersion] = useState(0);
   const [cambiando, setCambiando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [confirmandoBorrar, setConfirmandoBorrar] = useState(false);
+  const [borrando, setBorrando] = useState(false);
+  const router = useRouter();
 
   const encuesta = useConsulta<EncuestaCompleta | null>(
     () => obtenerEncuesta(actuante, id),
@@ -90,6 +103,18 @@ export function ResultadosEncuesta({ id }: { id: string }) {
     if (res.aviso) setAviso(res.aviso);
     setCambiando(false);
     setVersion((v) => v + 1);
+  };
+
+  const borrar = async () => {
+    setBorrando(true);
+    setAviso(null);
+    const res = await borrarEncuesta(e.id);
+    if (res.aviso) {
+      setAviso(res.aviso);
+      setBorrando(false);
+      return;
+    }
+    router.replace("/encuestas");
   };
 
   const exportar = () => {
@@ -149,7 +174,62 @@ export function ResultadosEncuesta({ id }: { id: string }) {
           <Download className="size-4" aria-hidden />
           Descargar respuestas
         </button>
+        <button
+          type="button"
+          onClick={() => setConfirmandoBorrar(true)}
+          disabled={confirmandoBorrar || borrando}
+          className="boton text-alerta!"
+        >
+          <Trash2 className="size-4" aria-hidden />
+          Borrar
+        </button>
       </div>
+
+      {confirmandoBorrar && (
+        <div
+          role="alertdialog"
+          aria-labelledby="borrar-encuesta-titulo"
+          className="flex flex-col gap-3 rounded-control border border-alerta/40 bg-alerta/10 p-4"
+        >
+          <p id="borrar-encuesta-titulo" className="flex items-start gap-2 text-sm text-alerta">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              {(r?.respuestas ?? 0) === 0
+                ? "Se borra para siempre."
+                : (r?.respuestas ?? 0) === 1
+                  ? "Se borra para siempre, con su única respuesta."
+                  : `Se borra para siempre, con sus ${(r?.respuestas ?? 0).toLocaleString("es-MX")} respuestas.`}{" "}
+              El QR deja de funcionar. No se puede deshacer.
+              {e.incluye_registro && (r?.personas_nuevas ?? 0) > 0 && (
+                <>
+                  {" "}
+                  Las personas que dejaron sus datos se quedan en el padrón; si alguna era de
+                  prueba, bórrala desde su ficha.
+                </>
+              )}
+            </span>
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row-reverse">
+            <button
+              type="button"
+              onClick={borrar}
+              disabled={borrando}
+              className="boton flex-1 text-alerta!"
+            >
+              <Trash2 className="size-4" aria-hidden />
+              {borrando ? "Borrando…" : "Sí, borrar encuesta"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmandoBorrar(false)}
+              disabled={borrando}
+              className="boton flex-1"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {aviso && (
         <p role="alert" className="text-sm text-alerta">

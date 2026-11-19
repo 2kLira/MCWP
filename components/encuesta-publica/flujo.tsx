@@ -14,8 +14,12 @@ import {
 } from "@/lib/encuestas";
 import {
   cargarCatalogoColonias,
+  cargarCatalogoSecciones,
+  cargarSecciones,
+  seccionPorPunto,
   validarTelefonoMexicano,
   type ColoniaCatalogo,
+  type SeccionCatalogo,
 } from "@/lib/territorio";
 import { ETIQUETA_GENERO, GENEROS } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
@@ -23,7 +27,8 @@ import { cn } from "@/lib/utils";
 /**
  * La encuesta que contesta quien escanea el QR. Una pantalla por paso: primero, si la encuesta lo
  * pide, los datos de la persona en el mismo orden que el registro de brigadista; después las
- * preguntas del administrador, una por una. Todo se manda junto al final, en una sola petición:
+ * preguntas del administrador, una por una. En los datos todo es obligatorio salvo la ubicación
+ * (PENDIENTES.md, entrada 109), y la base lo vuelve a exigir en `responder_encuesta`. Todo se manda junto al final, en una sola petición:
  * si alguien se va a la mitad no queda nada guardado a medias.
  */
 
@@ -32,12 +37,19 @@ type Paso =
   | { tipo: "nombre" }
   | { tipo: "telefono" }
   | { tipo: "domicilio" }
+  | { tipo: "seccion" }
   | { tipo: "sobre-ti" }
   | { tipo: "interes" }
   | { tipo: "aviso" }
   | { tipo: "pregunta"; pregunta: PreguntaEncuesta; numero: number };
 
 type Envio = "listo" | "enviando" | "enviado";
+
+/**
+ * La sección que sale del GPS. "sin": no compartió ubicación. "lista" con clave null: la
+ * compartió pero el punto no cae en ninguna sección dibujada, así que hay que preguntarla.
+ */
+type SeccionGps = { estado: "sin" } | { estado: "buscando" } | { estado: "lista"; clave: string | null };
 
 const DATOS_VACIOS: DatosRegistroPublico = {
   nombres: "",
@@ -48,6 +60,7 @@ const DATOS_VACIOS: DatosRegistroPublico = {
   colonia_id: null,
   lat: null,
   lng: null,
+  seccion_clave: "",
   genero: null,
   fecha_nacimiento: "",
   quiere_participar: false,
@@ -67,6 +80,7 @@ export function EncuestaPublicaFlujo({ encuesta }: { encuesta: EncuestaPublica }
         { tipo: "nombre" },
         { tipo: "telefono" },
         { tipo: "domicilio" },
+        { tipo: "seccion" },
         { tipo: "sobre-ti" },
         { tipo: "interes" },
         { tipo: "aviso" },
@@ -85,9 +99,51 @@ export function EncuestaPublicaFlujo({ encuesta }: { encuesta: EncuestaPublica }
   const [envio, setEnvio] = useState<Envio>("listo");
   const [error, setError] = useState<string | null>(null);
   const [trampa, setTrampa] = useState("");
+  /** Sección resuelta para un punto. Se guarda con el punto para saber si sigue vigente. */
+  const [resuelta, setResuelta] = useState<{ lat: number; lng: number; clave: string | null } | null>(
+    null,
+  );
+  const [catalogoSecciones, setCatalogoSecciones] = useState<SeccionCatalogo[]>([]);
   const montada = useRef(0);
   const titulo = useRef<HTMLHeadingElement>(null);
   const autoavance = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!encuesta.incluye_registro) return;
+    let vigente = true;
+    void cargarCatalogoSecciones().then((c) => {
+      if (vigente) setCatalogoSecciones(c);
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [encuesta.incluye_registro]);
+
+  // "Nada de pedir la sección cuando hay coordenada": si compartió su ubicación, la sección sale
+  // del punto con el mismo punto en polígono que el registro de brigadista, y no se le pregunta.
+  // La cartografía solo se baja si de verdad compartió la ubicación.
+  const { lat, lng } = datos;
+  useEffect(() => {
+    if (lat === null || lng === null) return;
+    let vigente = true;
+    cargarSecciones()
+      .then((coleccion) => seccionPorPunto(lng, lat, coleccion))
+      .catch(() => null)
+      .then((clave) => {
+        if (vigente) setResuelta({ lat, lng, clave });
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [lat, lng]);
+
+  const seccionGps: SeccionGps =
+    lat === null || lng === null
+      ? { estado: "sin" }
+      : resuelta && resuelta.lat === lat && resuelta.lng === lng
+        ? { estado: "lista", clave: resuelta.clave }
+        : { estado: "buscando" };
+  const seccionDelPunto = seccionGps.estado === "lista" ? seccionGps.clave : null;
 
   useEffect(() => {
     montada.current = Date.now();
@@ -122,13 +178,23 @@ export function EncuestaPublicaFlujo({ encuesta }: { encuesta: EncuestaPublica }
   const faltante = (p: Paso): string | null => {
     switch (p.tipo) {
       case "nombre":
-        return datos.nombres.trim() && datos.apellido_paterno.trim()
+        return datos.nombres.trim() && datos.apellido_paterno.trim() && datos.apellido_materno.trim()
           ? null
-          : "Escribe tu nombre y tu primer apellido.";
+          : "Escribe tu nombre y tus dos apellidos.";
       case "telefono": {
         const r = validarTelefonoMexicano(datos.telefono);
         return r.valido ? null : r.motivo;
       }
+      case "domicilio":
+        if (datos.colonia_id === null) return "Elige tu colonia de la lista.";
+        return datos.calle.trim() ? null : "Escribe tu calle y número.";
+      case "seccion":
+        if (seccionGps.estado === "buscando") return "Estamos ubicando tu sección, espera un segundo.";
+        if (seccionDelPunto) return null;
+        return problemaSeccion(datos.seccion_clave, catalogoSecciones);
+      case "sobre-ti":
+        if (!datos.genero) return "Elige una opción de género.";
+        return fechaValida(datos.fecha_nacimiento) ? null : "Escribe tu fecha de nacimiento.";
       case "aviso":
         return datos.consiente ? null : "Para continuar, acepta el aviso de privacidad.";
       case "pregunta":
@@ -171,7 +237,12 @@ export function EncuestaPublicaFlujo({ encuesta }: { encuesta: EncuestaPublica }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           respuestas,
-          persona: encuesta.incluye_registro ? datos : null,
+          persona: encuesta.incluye_registro
+            ? {
+                ...datos,
+                seccion_clave: seccionDelPunto ?? normalizarSeccion(datos.seccion_clave),
+              }
+            : null,
           sitio: trampa,
           abierta_ms: Date.now() - montada.current,
         }),
@@ -289,7 +360,6 @@ export function EncuestaPublicaFlujo({ encuesta }: { encuesta: EncuestaPublica }
                 />
                 <CampoGrande
                   etiqueta="Segundo apellido"
-                  apoyo="Opcional"
                   valor={datos.apellido_materno}
                   alCambiar={(v) => actualizar({ apellido_materno: v })}
                   autoComplete="additional-name"
@@ -321,14 +391,35 @@ export function EncuestaPublicaFlujo({ encuesta }: { encuesta: EncuestaPublica }
               titulo={titulo}
               encabezado="¿Dónde vives?"
               etiqueta="Tus datos"
-              apoyo="Nos ayuda a saber qué pasa en tu colonia. Todo es opcional."
+              apoyo="Nos ayuda a saber qué pasa en tu colonia. Compartir tu ubicación es opcional."
             >
               <Domicilio datos={datos} actualizar={actualizar} />
             </Pantalla>
           )}
 
+          {paso.tipo === "seccion" && (
+            <Pantalla
+              titulo={titulo}
+              encabezado={seccionDelPunto ? "Tu sección electoral" : "¿Cuál es tu sección electoral?"}
+              etiqueta="Tus datos"
+              apoyo={
+                seccionDelPunto
+                  ? "La sacamos de tu ubicación, no tienes que escribirla."
+                  : "Son cuatro números. Vienen al frente de tu credencial para votar (INE), donde dice SECCIÓN."
+              }
+            >
+              <Seccion
+                gps={seccionGps}
+                delPunto={seccionDelPunto}
+                valor={datos.seccion_clave}
+                catalogo={catalogoSecciones}
+                alCambiar={(v) => actualizar({ seccion_clave: v })}
+              />
+            </Pantalla>
+          )}
+
           {paso.tipo === "sobre-ti" && (
-            <Pantalla titulo={titulo} encabezado="Cuéntanos un poco de ti" etiqueta="Tus datos" apoyo="Opcional.">
+            <Pantalla titulo={titulo} encabezado="Cuéntanos un poco de ti" etiqueta="Tus datos">
               <div className="flex flex-col gap-5">
                 <fieldset className="flex flex-col gap-2">
                   <legend className="mb-2 text-sm text-tinta-suave">Género</legend>
@@ -352,6 +443,7 @@ export function EncuestaPublicaFlujo({ encuesta }: { encuesta: EncuestaPublica }
                   alCambiar={(v) => actualizar({ fecha_nacimiento: v })}
                   tipo="date"
                   autoComplete="bday"
+                  max={hoyLocal()}
                 />
               </div>
             </Pantalla>
@@ -563,7 +655,7 @@ function Portada({
       >
         {total} {total === 1 ? "pregunta" : "preguntas"}
         {encuesta.incluye_registro ? " · antes te pediremos unos datos" : ""} · menos de{" "}
-        {Math.max(1, Math.ceil((total + (encuesta.incluye_registro ? 6 : 0)) / 4))} min
+        {Math.max(1, Math.ceil((total + (encuesta.incluye_registro ? 7 : 0)) / 4))} min
       </p>
     </div>
   );
@@ -610,6 +702,8 @@ function CampoGrande({
   tipo = "text",
   inputMode,
   autoComplete,
+  maxLength,
+  max,
 }: {
   etiqueta: string;
   apoyo?: string;
@@ -618,6 +712,8 @@ function CampoGrande({
   tipo?: "text" | "tel" | "date";
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   autoComplete?: string;
+  maxLength?: number;
+  max?: string;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
@@ -631,7 +727,8 @@ function CampoGrande({
         onChange={(e) => alCambiar(e.target.value)}
         inputMode={inputMode}
         autoComplete={autoComplete}
-        maxLength={tipo === "tel" ? 20 : 80}
+        maxLength={maxLength ?? (tipo === "tel" ? 20 : 80)}
+        max={max}
         className="campo min-h-14 rounded-[14px] text-base"
       />
     </label>
@@ -801,7 +898,7 @@ function Domicilio({
     return colonias.filter((c) => plano(c.nombre).includes(q)).slice(0, 6);
   }, [busqueda, colonias]);
 
-  // La sección no se le pide a nadie: si comparte su ubicación, la base la saca del punto.
+  // Si comparte su ubicación, la sección sale del punto y el paso siguiente ya no la pregunta.
   const ubicar = () => {
     if (!("geolocation" in navigator)) {
       setAvisoUbicacion("Tu teléfono no permite compartir la ubicación desde aquí.");
@@ -907,6 +1004,100 @@ function Domicilio({
         alCambiar={(v) => actualizar({ calle: v })}
         autoComplete="street-address"
       />
+    </div>
+  );
+}
+
+/** Hasta cuatro dígitos, con los ceros de la izquierda que lleva la clave: "472" → "0472". */
+function normalizarSeccion(texto: string): string {
+  const digitos = texto.replace(/\D/g, "");
+  return digitos ? digitos.slice(-4).padStart(4, "0") : "";
+}
+
+/**
+ * Lo que está mal con la sección escrita, o null. Con el catálogo cargado se revisa que exista;
+ * sin él (falló la descarga) se deja pasar y la base decide.
+ */
+function problemaSeccion(texto: string, catalogo: readonly SeccionCatalogo[]): string | null {
+  const limpia = texto.trim();
+  if (!limpia) return "Escribe tu sección electoral.";
+  if (!/^\d{1,4}$/.test(limpia)) return "La sección son solo números, hasta cuatro.";
+  const clave = normalizarSeccion(limpia);
+  if (catalogo.length > 0 && !catalogo.some((s) => s.clave === clave)) {
+    return `La sección ${clave} no es de Oaxaca de Juárez. Revisa tu credencial para votar.`;
+  }
+  return null;
+}
+
+/** Hoy en la zona del teléfono, como lo escribe un campo de fecha. */
+function hoyLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Misma regla que la base: después de 1900 y no en el futuro. */
+function fechaValida(texto: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return false;
+  return texto > "1900-01-01" && texto <= hoyLocal();
+}
+
+function Seccion({
+  gps,
+  delPunto,
+  valor,
+  catalogo,
+  alCambiar,
+}: {
+  gps: SeccionGps;
+  delPunto: string | null;
+  valor: string;
+  catalogo: readonly SeccionCatalogo[];
+  alCambiar: (v: string) => void;
+}) {
+  if (gps.estado === "buscando") {
+    return (
+      <p className="flex items-center gap-2 text-sm text-tinta-suave" aria-live="polite">
+        <LoaderCircle className="size-4 animate-spin" aria-hidden />
+        Buscando tu sección por tu ubicación…
+      </p>
+    );
+  }
+
+  if (delPunto) {
+    const demarcacion = catalogo.find((s) => s.clave === delPunto)?.demarcacion;
+    return (
+      <div className="opcion-tarjeta" aria-live="polite">
+        <MapPin className="size-5 shrink-0 text-[var(--naranja-tipografico)]" aria-hidden />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="cifras text-lg font-semibold text-tinta">Sección {delPunto}</span>
+          {demarcacion && <span className="text-xs text-tinta-tenue">{demarcacion}</span>}
+        </span>
+      </div>
+    );
+  }
+
+  const clave = /^\d{1,4}$/.test(valor.trim()) ? normalizarSeccion(valor) : "";
+  const encontrada = clave ? catalogo.find((s) => s.clave === clave) : undefined;
+  return (
+    <div className="flex flex-col gap-2">
+      {gps.estado === "lista" && (
+        <p className="text-sm text-tinta-suave">
+          Con tu ubicación no pudimos saber cuál es, así que te la pedimos.
+        </p>
+      )}
+      <CampoGrande
+        etiqueta="Sección"
+        valor={valor}
+        alCambiar={(v) => alCambiar(v.replace(/\D/g, ""))}
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={4}
+      />
+      {encontrada && (
+        <p className="text-sm text-tinta-suave" aria-live="polite">
+          Sección {encontrada.clave} · {encontrada.demarcacion}
+        </p>
+      )}
     </div>
   );
 }

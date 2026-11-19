@@ -1607,6 +1607,8 @@ declare
   v_colonia   integer;
   v_genero    public.genero_persona;
   v_fecha     date;
+  v_dada      text;
+  v_del_punto text;
 begin
   select * into e from public.encuestas where codigo = p_codigo and activa;
   if not found then
@@ -1658,16 +1660,20 @@ begin
     if coalesce(p_persona ->> 'consiente', '') <> 'true' then
       raise exception 'Para guardar tus datos hace falta que aceptes el aviso de privacidad.';
     end if;
+    -- Todo es obligatorio salvo la ubicación (pedido del cliente, 18 de noviembre de 2026;
+    -- PENDIENTES.md, entrada 109). La pantalla ya no deja avanzar sin esto, pero la regla vive
+    -- aquí: lo que llega por el handler no se da por bueno.
     if btrim(coalesce(p_persona ->> 'nombres', '')) = ''
-       or btrim(coalesce(p_persona ->> 'apellido_paterno', '')) = '' then
-      raise exception 'Falta tu nombre y tu primer apellido.';
+       or btrim(coalesce(p_persona ->> 'apellido_paterno', '')) = ''
+       or btrim(coalesce(p_persona ->> 'apellido_materno', '')) = '' then
+      raise exception 'Falta tu nombre o alguno de tus apellidos.';
     end if;
     v_tel := privado.normalizar_telefono(p_persona ->> 'telefono');
     if v_tel is null or v_tel !~ '^[2-9][0-9]{9}$' then
       raise exception 'El teléfono no es válido: son diez dígitos.';
     end if;
 
-    -- Lo opcional que llegue mal se descarta, no tumba el registro (PENDIENTES.md, entrada 24).
+    -- La ubicación es lo único opcional. Si llega mal se descarta, no tumba el registro.
     if jsonb_typeof(p_persona -> 'lat') = 'number' and jsonb_typeof(p_persona -> 'lng') = 'number'
     then
       v_lat := (p_persona ->> 'lat')::double precision;
@@ -1676,12 +1682,44 @@ begin
         v_lat := null; v_lng := null;
       end if;
     end if;
+
     if coalesce(p_persona ->> 'colonia_id', '') ~ '^[0-9]{1,9}$' then
       select c.id into v_colonia from public.colonias c
        where c.id = (p_persona ->> 'colonia_id')::integer;
     end if;
+    if v_colonia is null then
+      raise exception 'Falta tu colonia.';
+    end if;
+    if btrim(coalesce(p_persona ->> 'calle', '')) = '' then
+      raise exception 'Falta tu calle y número.';
+    end if;
+
+    -- Sección electoral. Si compartió su ubicación y el punto cae en una sección, esa manda y no
+    -- se le pidió (sellar_persona hace lo mismo con la ficha). Si no, la escribió de su
+    -- credencial y tiene que existir en el catálogo. Se acepta sin los ceros de la izquierda.
+    if v_lat is not null then
+      v_del_punto := public.seccion_por_punto(v_lng, v_lat);
+    end if;
+    v_dada := nullif(btrim(coalesce(p_persona ->> 'seccion_clave', '')), '');
+    if v_dada is not null then
+      if v_dada !~ '^[0-9]{1,4}$' then
+        raise exception 'La sección electoral son hasta cuatro dígitos.';
+      end if;
+      v_dada := lpad(v_dada, 4, '0');
+      if not exists (select 1 from public.secciones s where s.clave = v_dada) then
+        raise exception 'La sección % no es de Oaxaca de Juárez. Revisa tu credencial para votar.',
+          v_dada;
+      end if;
+    end if;
+    if v_del_punto is null and v_dada is null then
+      raise exception 'Falta tu sección electoral.';
+    end if;
+
     if (p_persona ->> 'genero') = any(enum_range(null::public.genero_persona)::text[]) then
       v_genero := (p_persona ->> 'genero')::public.genero_persona;
+    end if;
+    if v_genero is null then
+      raise exception 'Falta tu género.';
     end if;
     if coalesce(p_persona ->> 'fecha_nacimiento', '') ~ '^\d{4}-\d{2}-\d{2}$' then
       begin
@@ -1690,21 +1728,25 @@ begin
       exception when others then v_fecha := null;
       end;
     end if;
+    if v_fecha is null then
+      raise exception 'Falta tu fecha de nacimiento, o no es válida.';
+    end if;
 
     -- Un teléfono que ya existe no se sobrescribe nunca (PENDIENTES.md, entrada 23): quien
     -- escanea un QR puede escribir el número de otra persona. La respuesta se cuelga de ella,
-    -- marcada, y su ficha queda como estaba. La sección la saca sellar_persona del punto.
+    -- marcada, y su ficha queda como estaba. Con punto, sellar_persona pone la sección del punto
+    -- encima de la escrita.
     insert into public.personas (nombre, nombres, apellido_paterno, apellido_materno,
-                                 telefono_raw, calle, colonia_id, lat, lng, origen_ubicacion,
-                                 genero, fecha_nacimiento, quiere_participar, quiere_info,
-                                 aviso_version, consentimiento_en)
+                                 telefono_raw, calle, colonia_id, seccion_clave, lat, lng,
+                                 origen_ubicacion, genero, fecha_nacimiento, quiere_participar,
+                                 quiere_info, aviso_version, consentimiento_en)
     values (left(btrim(p_persona ->> 'nombres'), 80),
             left(btrim(p_persona ->> 'nombres'), 80),
             left(btrim(p_persona ->> 'apellido_paterno'), 80),
-            left(nullif(btrim(p_persona ->> 'apellido_materno'), ''), 80),
+            left(btrim(p_persona ->> 'apellido_materno'), 80),
             v_tel,
-            left(nullif(btrim(p_persona ->> 'calle'), ''), 160),
-            v_colonia, v_lat, v_lng, case when v_lat is not null then 'gps' end,
+            left(btrim(p_persona ->> 'calle'), 160),
+            v_colonia, v_dada, v_lat, v_lng, case when v_lat is not null then 'gps' end,
             v_genero, v_fecha,
             coalesce(p_persona ->> 'quiere_participar', '') = 'true',
             coalesce(p_persona ->> 'quiere_info', '') = 'true',
@@ -1713,11 +1755,11 @@ begin
     returning id, seccion_clave into v_persona, v_seccion;
 
     -- La sección de la respuesta es la de quien contestó, no la de la ficha que ya tenía ese
-    -- teléfono: nadie verificó que fueran la misma persona. Sale de su punto, si lo compartió.
+    -- teléfono: nadie verificó que fueran la misma persona. Sale de su punto, o de la que escribió.
     if v_persona is null then
       select id into v_persona from public.personas where telefono_norm = v_tel;
       v_existente := true;
-      v_seccion := case when v_lat is not null then public.seccion_por_punto(v_lng, v_lat) end;
+      v_seccion := coalesce(v_del_punto, v_dada);
     end if;
   end if;
 
@@ -1729,6 +1771,27 @@ end $$;
 revoke all on function public.responder_encuesta(text, jsonb, jsonb) from public, anon,
   authenticated;
 grant execute on function public.responder_encuesta(text, jsonb, jsonb) to service_role;
+
+-- ---- Borrar una encuesta ----
+-- Pedido del cliente el 18 de noviembre de 2026 para quitar las de prueba (PENDIENTES.md, entrada
+-- 110). Se lleva sus preguntas y sus respuestas, de verdad y sin papelera; la bitácora guarda cada
+-- renglón borrado. Las personas que dejaron sus datos por ella NO se borran: ya son fichas del
+-- padrón, con su consentimiento, y pueden tener más historia. Solo el administrador.
+create or replace function public.borrar_encuesta(p_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if not privado.es_admin() then
+    raise exception 'Solo el administrador borra encuestas.' using errcode = '42501';
+  end if;
+  delete from public.encuesta_respuestas where encuesta_id = p_id;
+  delete from public.encuestas where id = p_id;  -- las preguntas se van en cascada
+  if not found then
+    raise exception 'Esa encuesta ya no existe.';
+  end if;
+end $$;
+
+revoke all on function public.borrar_encuesta(uuid) from public, anon;
+grant execute on function public.borrar_encuesta(uuid) to authenticated;
 
 -- Bitácora: quien cierre una encuesta o corrija su título queda registrado.
 drop trigger if exists bitacora on public.encuestas;
